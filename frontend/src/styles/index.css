@@ -64,3 +64,220 @@ body {
     transition: none !important;
   }
 }
+
+/* ── Signature elements (ported from the approved mockup) ─────────────── */
+
+/* Flat poster card: the cover IS the card. */
+.poster {
+  aspect-ratio: 2 / 3;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  background: linear-gradient(165deg, var(--c1, var(--raised)), var(--c2, var(--surface)));
+  box-shadow: var(--shadow-card);
+  border: 1px solid rgb(255 255 255 / 0.06);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+:root[data-theme="light"] .poster {
+  border-color: rgb(0 0 0 / 0.05);
+}
+a:hover > .poster,
+a:focus-visible > .poster {
+  transform: translateY(-4px) scale(1.015);
+  box-shadow: var(--shadow-lift);
+  border-color: color-mix(in srgb, var(--accent) 65%, transparent);
+}
+.poster > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Translucent badge on the poster art. */
+.badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: rgb(8 6 20 / 0.65);
+  backdrop-filter: blur(6px);
+  color: #edebfa;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.badge i {
+  width: 6px;
+  height: 6px;
+  border-radius: 99px;
+  display: inline-block;
+  background: var(--go);
+}
+.badge-loan {
+  left: auto;
+  right: 10px;
+  color: #ffc9d4;
+}
+.badge-loan i {
+  background: var(--movie);
+}
+
+/* Streaming-style progress strip along the poster's bottom edge. */
+.pstrip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  z-index: 2;
+  background: rgb(8 6 20 / 0.5);
+}
+.pstrip i {
+  display: block;
+  height: 100%;
+  background: var(--go);
+}
+
+/* Filter pill: quiet by default, solid accent when active. */
+.pill {
+  padding: 7px 16px;
+  border-radius: 99px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--surface);
+  color: var(--muted);
+  transition: all 0.15s;
+  border: none;
+  cursor: pointer;
+}
+.pill:hover {
+  color: var(--text);
+}
+.pill[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 99px;
+  font-size: 14px;
+  font-weight: 700;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: none;
+  cursor: pointer;
+  transition:
+    filter 0.15s,
+    transform 0.15s;
+}
+.btn:hover {
+  filter: brightness(1.1);
+}
+.btn:active {
+  transform: scale(0.98);
+}
+.btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+  filter: none;
+}
+.btn-go {
+  background: var(--go);
+  color: var(--go-ink);
+}
+.btn-ghost {
+  background: var(--surface);
+  color: var(--text);
+}
+.btn-ghost:hover {
+  background: var(--raised);
+  filter: none;
+}
+.btn-sm {
+  padding: 7px 14px;
+  font-size: 13px;
+}
+
+/* Form field */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.field input,
+.field select,
+.field textarea {
+  padding: 10px 13px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid transparent;
+  font-size: 14px;
+  font-family: var(--font-sans);
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--text);
+}
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+/* Skeleton shimmer */
+.skeleton {
+  border-radius: 12px;
+  background: linear-gradient(100deg, var(--surface) 40%, var(--raised) 50%, var(--surface) 60%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* Barcode scan reticle */
+.scanline {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  animation: scan 2.2s ease-in-out infinite;
+  top: 20%;
+}
+@keyframes scan {
+  0%,
+  100% {
+    top: 16%;
+  }
+  50% {
+    top: 82%;
+  }
+}
