@@ -13,6 +13,9 @@ from app.providers.cache import cached_fetch
 SEARCH_URL = "https://openlibrary.org/search.json"
 BOOKS_URL = "https://openlibrary.org/api/books"
 COVER_URL = "https://covers.openlibrary.org/b/id/{cover_id}-L.jpg"
+# Covers are often available by ISBN even when the edition record lacks a
+# cover link; default=false makes missing covers a 404 instead of a pixel.
+ISBN_COVER_URL = "https://covers.openlibrary.org/b/isbn/{isbn}-L.jpg?default=false"
 
 
 class OpenLibraryProvider(MetadataProvider):
@@ -67,7 +70,8 @@ class OpenLibraryProvider(MetadataProvider):
                 "publisher": (entry.get("publishers") or [{}])[0].get("name"),
                 "year": _year_from(entry.get("publish_date")),
             },
-            cover_url=(entry.get("cover") or {}).get("large"),
+            cover_url=(entry.get("cover") or {}).get("large")
+            or ISBN_COVER_URL.format(isbn=code),
             external_id=code,
         )
 

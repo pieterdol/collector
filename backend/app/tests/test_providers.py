@@ -226,3 +226,23 @@ def test_provider_error_degrades_to_empty_results(db):
     )
     provider = get_provider(ItemType.BOOK, db)
     assert provider.search("dune") == []
+
+
+@respx.mock
+def test_isbn_lookup_falls_back_to_isbn_cover_url(db):
+    """Editions without a linked cover still get the covers-by-ISBN URL."""
+    respx.get("https://openlibrary.org/api/books").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "ISBN:9780141016405": {
+                    "title": "Purple Cow",
+                    "authors": [{"name": "Seth Godin"}],
+                    "number_of_pages": 160,
+                }
+            },
+        )
+    )
+    provider = get_provider(ItemType.BOOK, db)
+    result = provider.lookup_barcode("9780141016405")
+    assert result.cover_url == "https://covers.openlibrary.org/b/isbn/9780141016405-L.jpg?default=false"

@@ -77,6 +77,25 @@ def create_item(
     return item
 
 
+@router.get("/platforms")
+def list_platforms(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Distinct platforms across the user's games, for the library filter."""
+    rows = db.scalars(
+        select(text("DISTINCT metadata->>'platform'"))
+        .select_from(Item)
+        .where(
+            Item.user_id == user.id,
+            Item.type == "game",
+            text("metadata->>'platform' IS NOT NULL"),
+        )
+        .order_by(text("1"))
+    ).all()
+    return {"platforms": list(rows)}
+
+
 @router.get("", response_model=ItemListOut)
 def list_items(
     db: Session = Depends(get_db),
@@ -84,6 +103,7 @@ def list_items(
     type: Annotated[list[ItemType] | None, Query()] = None,
     format: Annotated[ItemFormat | None, Query()] = None,
     status: Annotated[list[ItemStatus] | None, Query()] = None,
+    platform: Annotated[str | None, Query(max_length=100)] = None,
     q: Annotated[str | None, Query(max_length=200)] = None,
     sort: Annotated[str, Query(pattern="^(added|title|rating|updated)$")] = "added",
     limit: Annotated[int, Query(ge=1, le=200)] = 100,
@@ -97,6 +117,10 @@ def list_items(
         query = query.where(Item.format == format.value)
     if status:
         query = query.where(Item.status.in_([s.value for s in status]))
+    if platform:
+        query = query.where(
+            text("metadata->>'platform' = :platform").bindparams(platform=platform)
+        )
     if q:
         query = query.where(
             or_(

@@ -5,7 +5,7 @@ import { EmptyState } from "../components/EmptyState";
 import { ItemTable } from "../components/ItemTable";
 import { PosterCard } from "../components/PosterCard";
 import { PosterGridSkeleton } from "../components/Skeletons";
-import { useItems, useStats, useUpdateItem } from "../lib/queries";
+import { useItems, usePlatforms, useStats, useUpdateItem } from "../lib/queries";
 
 const TYPE_CHIPS = [
   { value: "", label: "All" },
@@ -18,6 +18,7 @@ export default function Shelf() {
   const [params, setParams] = useSearchParams();
   const type = params.get("type") ?? "";
   const status = params.get("status") ?? "";
+  const platform = params.get("platform") ?? "";
   const q = params.get("q") ?? "";
   const sort = params.get("sort") ?? "added";
   const view = params.get("view") ?? "grid";
@@ -26,14 +27,17 @@ export default function Shelf() {
     type: type ? [type] : undefined,
     // The library shows what you own; the wishlist is its own page.
     status: status ? [status] : ["backlog", "in_progress", "completed", "abandoned"],
+    platform: platform || undefined,
     q: q || undefined,
     sort,
   });
+  const platforms = usePlatforms();
 
   function setParam(key: string, value: string) {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value);
     else next.delete(key);
+    if (key === "type" && value !== "game") next.delete("platform");
     setParams(next, { replace: true });
   }
 
@@ -57,6 +61,21 @@ export default function Shelf() {
         ))}
         <div className="ml-auto flex items-center gap-2 text-[12.5px] text-faint">
           <span>{data ? `${data.total} item${data.total === 1 ? "" : "s"}` : ""}</span>
+          {type === "game" && (platforms.data?.platforms.length ?? 0) > 0 && (
+            <select
+              aria-label="Platform"
+              value={platform}
+              onChange={(e) => setParam("platform", e.target.value)}
+              className="input cursor-pointer appearance-none py-[7px] text-[12.5px] font-semibold text-body"
+            >
+              <option value="">All platforms</option>
+              {platforms.data!.platforms.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          )}
           <select
             aria-label="Status"
             value={status}

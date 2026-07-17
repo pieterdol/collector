@@ -22,6 +22,18 @@ const PROVIDER_LABEL: Record<ItemType, string> = {
 
 type Mode = "search" | "scan" | "manual";
 
+const COMMON_PLATFORMS = [
+  "PC",
+  "PC (Steam)",
+  "Nintendo Switch",
+  "Nintendo Switch 2",
+  "PlayStation 5",
+  "PlayStation 4",
+  "Xbox Series X|S",
+  "Xbox One",
+  "Steam Deck",
+];
+
 export default function AddItem() {
   const [searchParams] = useSearchParams();
   const initialMode = searchParams.get("mode") === "scan" ? "scan" : "search";
@@ -53,6 +65,7 @@ export default function AddItem() {
             onClick={() => {
               setType(t);
               setDraft(null);
+              if (t !== "book" && mode === "scan") setMode("search");
             }}
             className={`flex flex-col items-center gap-1 rounded-xl border px-2.5 py-3.5 transition-colors ${
               type === t
@@ -80,7 +93,7 @@ export default function AddItem() {
       ) : (
         <>
           <div className="mb-5 flex w-fit gap-1.5 rounded-[10px] border border-line bg-surface p-1" role="tablist">
-            {(["search", "scan", "manual"] as Mode[]).map((m) => (
+            {(type === "book" ? (["search", "scan", "manual"] as Mode[]) : (["search", "manual"] as Mode[])).map((m) => (
               <button
                 key={m}
                 type="button"
@@ -108,7 +121,6 @@ export default function AddItem() {
           )}
           {mode === "scan" && (
             <ScanMode
-              type={type}
               onBook={(result) => {
                 setScannedUpc(null);
                 setDraft(result);
@@ -256,11 +268,9 @@ function ResultRow({
 }
 
 function ScanMode({
-  type,
   onBook,
   onUpc,
 }: {
-  type: ItemType;
   onBook: (r: EnrichResult) => void;
   onUpc: (code: string) => void;
 }) {
@@ -288,10 +298,8 @@ function ScanMode({
     <div>
       <BarcodeScanner onDetected={handleCode} />
       <p className="mt-3.5 flex items-baseline gap-2 text-[13px] text-muted">
-        <b className="font-mono text-xs">{type === "book" ? "ISBN" : "EAN/UPC"}</b>
-        {type === "book"
-          ? "Books fill in automatically from Open Library."
-          : "The code is saved with the item; you'll confirm the match via title search."}
+        <b className="font-mono text-xs">ISBN</b>
+        Books fill in automatically from Open Library.
       </p>
       <form
         className="mt-2 flex gap-2"
@@ -353,7 +361,18 @@ function ConfirmForm({
 
   const countLabel = type === "book" ? "Pages" : type === "movie" ? "Runtime (min)" : "Platform";
   const creatorLabel = type === "book" ? "Author(s)" : type === "movie" ? "Director" : "Developer";
-  const [platform, setPlatform] = useState(typeof meta.platform === "string" ? meta.platform : "");
+
+  // The catalog reports every platform a game was released on; the user
+  // stores the ONE they own (so the library can filter per platform).
+  const detectedPlatforms =
+    typeof meta.platform === "string" ? meta.platform.split(",").map((p) => p.trim()) : [];
+  const platformOptions = [
+    ...new Set([...detectedPlatforms, ...COMMON_PLATFORMS]),
+  ];
+  const [platform, setPlatform] = useState(
+    detectedPlatforms.length === 1 ? detectedPlatforms[0] : "",
+  );
+  const [customPlatform, setCustomPlatform] = useState(false);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -367,6 +386,7 @@ function ConfirmForm({
     } else {
       if (creator) metadata.developer = creator;
       if (platform) metadata.platform = platform;
+      if (detectedPlatforms.length > 1) metadata.released_on = detectedPlatforms;
     }
     if (year) metadata.year = Number(year);
     if (scannedUpc) metadata.upc = scannedUpc;
@@ -416,7 +436,34 @@ function ConfirmForm({
       {type === "game" ? (
         <label className="field">
           Platform
-          <input value={platform} onChange={(e) => setPlatform(e.target.value)} placeholder="PC, Switch…" />
+          {customPlatform ? (
+            <input
+              autoFocus
+              value={platform}
+              onChange={(e) => setPlatform(e.target.value)}
+              placeholder="Type your platform…"
+            />
+          ) : (
+            <select
+              value={platform}
+              onChange={(e) => {
+                if (e.target.value === "__other__") {
+                  setCustomPlatform(true);
+                  setPlatform("");
+                } else {
+                  setPlatform(e.target.value);
+                }
+              }}
+            >
+              <option value="">Choose platform…</option>
+              {platformOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+              <option value="__other__">Other…</option>
+            </select>
+          )}
         </label>
       ) : (
         <label className="field">

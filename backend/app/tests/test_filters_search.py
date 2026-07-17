@@ -71,3 +71,29 @@ def test_pagination_returns_total(client):
     assert {i["id"] for i in body["items"]}.isdisjoint(
         {i["id"] for i in res2.json()["items"]}
     )
+
+
+def test_filter_by_platform(client):
+    headers = auth_headers(client)
+    create_item(client, headers, type="game", title="Zelda", format="physical",
+                metadata={"platform": "Nintendo Switch"})
+    create_item(client, headers, type="game", title="Wolfenstein", format="physical",
+                metadata={"platform": "Xbox One"})
+    create_item(client, headers, type="game", title="Steam Thing", format="digital",
+                metadata={"platform": "PC (Steam)"})
+    res = client.get("/api/items?platform=Nintendo Switch", headers=headers)
+    assert titles(res) == ["Zelda"]
+
+
+def test_platforms_endpoint_lists_distinct_owned_platforms(client):
+    headers = auth_headers(client)
+    create_item(client, headers, type="game", title="A", metadata={"platform": "Xbox One"})
+    create_item(client, headers, type="game", title="B", metadata={"platform": "Xbox One"})
+    create_item(client, headers, type="game", title="C", metadata={"platform": "Nintendo Switch"})
+    create_item(client, headers, type="book", title="No Platform")
+    other = auth_headers(client, email="someone@else.com")
+    create_item(client, other, type="game", title="X", metadata={"platform": "PS Vita"})
+
+    res = client.get("/api/items/platforms", headers=headers)
+    assert res.status_code == 200
+    assert res.json()["platforms"] == ["Nintendo Switch", "Xbox One"]

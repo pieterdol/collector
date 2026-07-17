@@ -18,6 +18,7 @@ export interface ItemFilters {
   type?: string[];
   status?: string[];
   format?: string;
+  platform?: string;
   q?: string;
   sort?: string;
 }
@@ -126,6 +127,14 @@ export function useProviders() {
     queryKey: ["providers"],
     queryFn: () => api<{ providers: ProviderStatus[] }>("/api/enrich/providers"),
     staleTime: 10 * 60 * 1000,
+  });
+}
+
+export function usePlatforms() {
+  return useQuery({
+    queryKey: ["platforms"],
+    queryFn: () => api<{ platforms: string[] }>("/api/items/platforms"),
+    staleTime: 5 * 60 * 1000,
   });
 }
 
