@@ -31,7 +31,7 @@ export default function SteamImport() {
           value={steamId}
           onChange={(e) => setSteamId(e.target.value)}
           placeholder="SteamID64 or vanity name (e.g. 7656119… or gabelogannewell)"
-          className="min-w-0 flex-1 rounded-full border border-transparent bg-surface px-5 py-2.5 text-sm outline-none focus:border-accent"
+          className="min-w-0 flex-1 rounded-full border border-line bg-surface px-5 py-2.5 text-sm outline-none focus:border-accent"
         />
         <button type="submit" className="btn" disabled={importer.isPending || !steamId.trim()}>
           {importer.isPending ? "Importing…" : "Import"}

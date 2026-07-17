@@ -184,7 +184,7 @@ function SearchMode({
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder={`Search ${PROVIDER_LABEL[type]} by title${type === "book" ? " or ISBN" : ""}…`}
-          className="w-full rounded-full border border-transparent bg-surface py-2.5 pr-4 text-sm outline-none focus:border-accent"
+          className="w-full rounded-full border border-line bg-surface py-2.5 pr-4 text-sm outline-none focus:border-accent"
           style={{ paddingLeft: 38 }}
         />
       </div>
@@ -302,7 +302,7 @@ function ScanMode({
           onChange={(e) => setManualCode(e.target.value)}
           placeholder="…or type the barcode digits"
           inputMode="numeric"
-          className="min-w-0 flex-1 rounded-full border border-transparent bg-surface px-4 py-2 text-sm outline-none focus:border-accent"
+          className="min-w-0 flex-1 rounded-full border border-line bg-surface px-4 py-2 text-sm outline-none focus:border-accent"
         />
         <button type="submit" className="btn btn-ghost btn-sm" disabled={lookup.isPending}>
           Look up

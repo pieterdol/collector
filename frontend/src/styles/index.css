@@ -234,7 +234,7 @@ a:focus-visible > .poster {
   padding: 10px 13px;
   border-radius: 8px;
   background: var(--surface);
-  border: 1px solid transparent;
+  border: 1px solid var(--line);
   font-size: 14px;
   font-family: var(--font-sans);
   letter-spacing: normal;

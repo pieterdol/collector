@@ -274,7 +274,7 @@ function RatingPanel({ item }: { item: Item }) {
         onChange={(e) => setReview(e.target.value)}
         placeholder="What did you think?"
         rows={3}
-        className="mt-3 w-full resize-y rounded-lg border border-transparent bg-raised px-3.5 py-2.5 text-[13.5px] leading-relaxed outline-none focus:border-accent"
+        className="mt-3 w-full resize-y rounded-lg border border-line bg-raised px-3.5 py-2.5 text-[13.5px] leading-relaxed outline-none focus:border-accent"
       />
       {dirty && (
         <div className="mt-2 flex justify-end">
@@ -329,7 +329,7 @@ function LoanPanel({ item }: { item: Item }) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Lend to…"
-            className="min-w-0 flex-1 rounded-lg border border-transparent bg-raised px-3.5 py-2 text-[13.5px] outline-none focus:border-accent"
+            className="min-w-0 flex-1 rounded-lg border border-line bg-raised px-3.5 py-2 text-[13.5px] outline-none focus:border-accent"
           />
           <button type="submit" className="btn btn-ghost btn-sm" disabled={!name.trim()}>
             Lend out

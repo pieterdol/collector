@@ -137,7 +137,7 @@ function SearchBox() {
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder="Search your collection…"
-        className="w-full rounded-full border border-transparent bg-surface py-2.5 pl-9.5 pr-4 text-sm outline-none transition-colors focus:border-accent"
+        className="w-full rounded-full border border-line bg-surface py-2.5 pl-9.5 pr-4 text-sm outline-none transition-colors focus:border-accent"
         style={{ paddingLeft: 38 }}
       />
     </div>
