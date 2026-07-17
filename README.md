@@ -117,7 +117,7 @@ browser ──:8080──▶ frontend (nginx)
 - **Wishlist** is first-class: no price/format until you hit **Acquire**,
   which records the acquisition and moves it to your backlog.
 - **Loans**: lend to a name, mark returned — both logged.
-- **Theming**: dark ("midnight shelf", default) and light ("daybreak"),
+- **Theming**: dark ("graphite", the designed theme) and a derived light variant,
   OS-aware with a persisted toggle. All colors are CSS custom properties in
   `frontend/src/styles/tokens.css`; a new theme is one more
   `[data-theme="…"]` block.

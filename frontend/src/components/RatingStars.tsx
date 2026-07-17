@@ -23,7 +23,7 @@ export function RatingStars({ value, onChange, size = 16 }: Props) {
       aria-valuenow={onChange ? value : undefined}
       aria-valuemin={onChange ? 0 : undefined}
       aria-valuemax={onChange ? 5 : undefined}
-      className="inline-flex gap-[2px] text-book"
+      className="inline-flex gap-[2px]"
       style={{ fontSize: size, lineHeight: 1, letterSpacing: 1 }}
     >
       {stars.map((star) => {

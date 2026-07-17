@@ -109,7 +109,14 @@ collector/
 ## Providers
 `MetadataProvider` ABC: `search(query)`, `lookup_barcode(code)`; implementations OpenLibrary (keyless), TMDB (`TMDB_API_KEY`), IGDB (`TWITCH_CLIENT_ID/SECRET`), Steam (`STEAM_API_KEY`). All through `provider_cache` (~7-day TTL). Missing key ⇒ `available=False` ⇒ UI degrades to manual entry. `core/covers.py` downloads cover once at creation (size cap, content-type check) → `media/covers/{item_id}.jpg`.
 
-## Design direction — "Midnight shelf" v2 (APPROVED — Stremio-inspired, flat & modern)
+## Design direction — v3 "Graphite" (CURRENT, from user's Claude Design file)
+Ported 18 Jul 2026 from `~/Downloads/Collector.html` (Media Tracker Dashboard). Supersedes v2 below.
+- **Palette (dark, designed)**: bg `#111114`, surface `#1b1b20`, raised `#2a2a31`, text `#ececf1`, muted `#9a9aa6`; accent `oklch(76% 0.14 290)` with DARK ink on buttons; medium colors book `oklch(80% .12 75)` amber / movie `oklch(80% .12 350)` rose / game `oklch(80% .12 230)` blue (captions, badges, progress bars — never chrome on art). Light variant derived (design was dark-only). Tokens in `frontend/src/styles/tokens.css`.
+- **Type**: Space Grotesk (display), IBM Plex Sans (UI), IBM Plex Mono (data). Radii: cards 14 / covers 10 / buttons 9 / chips 999.
+- **Layout**: 232px labeled sidebar (nav dots; theme+account at bottom; bottom tab bar on mobile) + page header (title, search, Gallery/Table, Scan, + Add item). Library: type chips (active inverts to text-on-bg), status+sort dropdowns, loan banner, flat poster cards with status badge on art. Detail: 240px key-art hero + overlapping cover, About/Screenshots/Review/Activity left, Progress/Details/Loan/Danger right. Stats page: 4 tiles + Continue/Out on loan/Recent activity.
+- **New backend for v3**: `/api/stats` (pure queries over events/timestamps) and `POST /items/{id}/artwork` — hero/screenshots/description fetched once (Steam appdetails keyless → IGDB → TMDB backdrops), stored in media volume + item metadata, lazily triggered on first detail view.
+
+## Design direction — "Midnight shelf" v2 (superseded — Stremio-inspired, flat & modern)
 Reference: user's Stremio screenshot (flat posters, deep indigo night palette). Mockup approved 17 Jul 2026:
 https://claude.ai/code/artifact/0e26b268-8ffd-4d02-bb3b-f853fb8e6302 (source: scratchpad mockup.html — port its tokens/CSS to the frontend).
 - **Palette (dark default)**: bg `midnight #0F0D20`, rail `#0B0A18`, panel `#191631`, raised `#232048`, text `#F1F0F7`, muted `#918DAE`. Accent `iris #7263F2` = ALL interactive states (active nav/pills, hover ring, buttons). `signal green #21C179` = progress strips, completed, acquire-confirm. Medium dots (captions/filters only, never chrome on posters): book `amber #DFA14E`, movie `rose #E8637C`, game `mint #4EC9A4`. Light theme "daybreak": bg `#F4F3FA`, white panels, accent `#5B4BE0`. Themes = token sets only.
