@@ -1,8 +1,10 @@
 /** Camera barcode scanner.
  *
- * Uses the native BarcodeDetector API when the browser has it (Chrome,
- * Android WebView); otherwise falls back to @zxing/browser. Emits the
- * first successfully decoded EAN/UPC/ISBN string, then stops.
+ * Uses the native BarcodeDetector where the browser has one (Chrome,
+ * Android WebView); everywhere else (iOS Safari!) a WASM ponyfill with the
+ * identical API takes over — far more reliable on 1D product barcodes than
+ * the old zxing JS port. The stream is requested at 1080p with continuous
+ * autofocus, because default low-res streams blur EAN/UPC bars together.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -11,11 +13,42 @@ interface Props {
   onDetected: (code: string) => void;
 }
 
-type NativeDetector = {
+interface DetectorLike {
   detect: (source: CanvasImageSource) => Promise<Array<{ rawValue: string }>>;
-};
+}
 
-const NATIVE_FORMATS = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"];
+const FORMATS = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"];
+const SCAN_INTERVAL_MS = 160;
+
+async function makeDetector(): Promise<DetectorLike> {
+  if ("BarcodeDetector" in window) {
+    const Native = (window as unknown as { BarcodeDetector: new (o: object) => DetectorLike })
+      .BarcodeDetector;
+    try {
+      const supported: string[] = await (
+        Native as unknown as { getSupportedFormats?: () => Promise<string[]> }
+      ).getSupportedFormats?.() ?? [];
+      if (FORMATS.some((f) => supported.includes(f))) {
+        return new Native({ formats: FORMATS.filter((f) => supported.includes(f)) });
+      }
+    } catch {
+      /* fall through to the ponyfill */
+    }
+  }
+  const [{ BarcodeDetector: Ponyfill, prepareZXingModule }, { default: wasmUrl }] =
+    await Promise.all([
+      import("barcode-detector/ponyfill"),
+      import("zxing-wasm/reader/zxing_reader.wasm?url"),
+    ]);
+  // Serve the WASM from our own bundle — no CDN, works offline in the PWA.
+  prepareZXingModule({
+    overrides: {
+      locateFile: (path: string, prefix: string) =>
+        path.endsWith(".wasm") ? wasmUrl : prefix + path,
+    },
+  });
+  return new Ponyfill({ formats: FORMATS as never });
+}
 
 export function BarcodeScanner({ onDetected }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -25,21 +58,19 @@ export function BarcodeScanner({ onDetected }: Props) {
   useEffect(() => {
     let stream: MediaStream | null = null;
     let cancelled = false;
-    let stopZxing: (() => void) | null = null;
-    let nativeTimer: number | null = null;
-
-    const emit = (code: string) => {
-      if (detectedRef.current || cancelled) return;
-      detectedRef.current = true;
-      onDetected(code);
-    };
+    let timer: number | null = null;
 
     async function start() {
       const video = videoRef.current;
       if (!video) return;
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" },
+          video: {
+            facingMode: "environment",
+            // High resolution is what makes 1D barcodes readable.
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
           audio: false,
         });
       } catch {
@@ -52,40 +83,45 @@ export function BarcodeScanner({ onDetected }: Props) {
         stream.getTracks().forEach((t) => t.stop());
         return;
       }
+
+      // Ask for continuous autofocus where the platform supports it.
+      const [track] = stream.getVideoTracks();
+      try {
+        await track.applyConstraints({
+          advanced: [{ focusMode: "continuous" } as MediaTrackConstraintSet],
+        });
+      } catch {
+        /* not supported — fine */
+      }
+
       video.srcObject = stream;
       await video.play().catch(() => undefined);
 
-      if ("BarcodeDetector" in window) {
-        const Detector = (window as unknown as { BarcodeDetector: new (o: object) => NativeDetector })
-          .BarcodeDetector;
-        const detector = new Detector({ formats: NATIVE_FORMATS });
-        const tick = async () => {
-          if (cancelled || detectedRef.current) return;
-          try {
+      const detector = await makeDetector();
+      const tick = async () => {
+        if (cancelled || detectedRef.current) return;
+        try {
+          if (video.readyState >= 2) {
             const codes = await detector.detect(video);
-            if (codes.length > 0) return emit(codes[0].rawValue);
-          } catch {
-            /* frame not ready yet */
+            const value = codes[0]?.rawValue?.trim();
+            if (value) {
+              detectedRef.current = true;
+              onDetected(value);
+              return;
+            }
           }
-          nativeTimer = window.setTimeout(tick, 180);
-        };
-        void tick();
-      } else {
-        // Fallback: zxing reads frames from the same <video> element.
-        const { BrowserMultiFormatReader } = await import("@zxing/browser");
-        const reader = new BrowserMultiFormatReader();
-        const controls = await reader.decodeFromVideoElement(video, (result) => {
-          if (result) emit(result.getText());
-        });
-        stopZxing = () => controls.stop();
-      }
+        } catch {
+          /* frame not ready or decoder hiccup — try again */
+        }
+        timer = window.setTimeout(tick, SCAN_INTERVAL_MS);
+      };
+      void tick();
     }
 
     void start();
     return () => {
       cancelled = true;
-      if (nativeTimer !== null) clearTimeout(nativeTimer);
-      stopZxing?.();
+      if (timer !== null) clearTimeout(timer);
       stream?.getTracks().forEach((t) => t.stop());
     };
   }, [onDetected]);
@@ -96,12 +132,12 @@ export function BarcodeScanner({ onDetected }: Props) {
       {!error && (
         <>
           <div
-            className="relative z-10 h-[38%] w-[64%] rounded-xl"
+            className="relative z-10 h-[38%] w-[72%] rounded-xl"
             style={{ boxShadow: "0 0 0 999px rgb(5 4 14 / 0.5)" }}
           />
           <div className="scanline z-10" />
           <div className="absolute bottom-3.5 z-10 w-full text-center font-mono text-[10.5px] uppercase tracking-[0.12em] text-white/80">
-            Point at the barcode
+            Fill the frame · hold steady
           </div>
         </>
       )}
