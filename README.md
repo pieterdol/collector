@@ -108,9 +108,20 @@ browser ──:8080──▶ frontend (nginx)
   (UPC/EAN) have **no public catalog** — the code is stored on the item and
   the UI drops you into title search. There's also a type-the-digits
   fallback.
-  *Testing it*: camera access needs HTTPS or `localhost`. On a phone on
-  your LAN, either port-forward (`adb reverse tcp:8080 tcp:8080` for
-  Android) or put the app behind HTTPS (e.g. Caddy/Tailscale).
+  *Camera access needs HTTPS or `localhost`.* The nicest setup is
+  Tailscale on the server plus the Tailscale app on your phone:
+
+  ```bash
+  sudo tailscale set --operator=$USER    # once
+  tailscale serve --bg http://localhost:8080
+  ```
+
+  Enable HTTPS certificates + Serve for the node when the CLI links you
+  to the admin console (leave Funnel off unless you want the app on the
+  public internet). You get https://<machine>.<tailnet>.ts.net with a
+  valid certificate — full scanning + installable PWA from anywhere,
+  visible only to your tailnet. Alternatives: `adb reverse tcp:8080
+  tcp:8080` (Android, USB), or any HTTPS reverse proxy.
 - **Steam import**: SteamID64 or vanity name → owned games become digital
   items with playtime prefilled; re-runs skip existing games; covers arrive
   in the background. Steam "Game details" privacy must be public.
