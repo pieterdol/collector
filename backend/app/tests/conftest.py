@@ -52,6 +52,16 @@ def _create_schema():
 
 
 @pytest.fixture(autouse=True)
+def _reset_igdb_token():
+    """The IGDB provider caches its Twitch token module-globally; isolate tests."""
+    from app.providers import igdb
+
+    igdb._token["value"] = None
+    igdb._token["expires"] = 0.0
+    yield
+
+
+@pytest.fixture(autouse=True)
 def _clean_tables():
     """Truncate all tables between tests so each test starts clean."""
     yield
