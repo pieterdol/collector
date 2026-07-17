@@ -70,7 +70,10 @@ function Detail({ item }: { item: Item }) {
   }, [item.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const heroPath = typeof meta.hero_path === "string" ? meta.hero_path : null;
-  const showHero = item.type !== "book"; // no source provides key art for books
+  // Only show the band when real key art exists — no placeholder while
+  // fetching, and none for items whose sources have no hero (books,
+  // old/delisted games).
+  const showHero = Boolean(heroPath);
   const shots = Array.isArray(meta.screenshot_paths) ? (meta.screenshot_paths as string[]) : [];
   const description = typeof meta.description === "string" ? meta.description
     : typeof meta.overview === "string" ? meta.overview : null;
@@ -82,22 +85,9 @@ function Detail({ item }: { item: Item }) {
       {/* Hero + overlapping cover (books skip the hero band) */}
       <section>
         {showHero && (
-        <div
-          className="relative flex h-[240px] items-start justify-end overflow-hidden rounded-2xl border border-line-strong p-4 max-[820px]:h-[150px]"
-          style={{
-            background: heroPath
-              ? undefined
-              : `repeating-linear-gradient(135deg, rgba(255,255,255,0.05) 0 9px, transparent 9px 18px),
-                 linear-gradient(180deg, color-mix(in oklch, var(--${item.type}) 22%, transparent), var(--hero-fade))`,
-          }}
-        >
-          {heroPath && <img src={heroPath} alt="" className="absolute inset-0 h-full w-full object-cover" />}
-          {heroPath && (
-            <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, transparent 40%, var(--bg))" }} />
-          )}
-          {!heroPath && artwork.isPending && (
-            <span className="font-mono text-[11px] tracking-[0.05em] text-text/40">fetching key art…</span>
-          )}
+        <div className="relative flex h-[240px] items-start justify-end overflow-hidden rounded-2xl border border-line-strong p-4 max-[820px]:h-[150px]">
+          <img src={heroPath!} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, transparent 40%, var(--bg))" }} />
         </div>
         )}
 
