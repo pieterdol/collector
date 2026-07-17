@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AcquireDialog } from "../components/AcquireDialog";
+import { Lightbox } from "../components/Lightbox";
 import { BackIcon } from "../components/icons";
 import { describeItem } from "../components/PosterCard";
 import { RatingStars } from "../components/RatingStars";
@@ -56,6 +57,7 @@ function BackLink({ wishlist = false }: { wishlist?: boolean }) {
 function Detail({ item }: { item: Item }) {
   const meta = item.metadata;
   const [acquiring, setAcquiring] = useState(false);
+  const [shotIndex, setShotIndex] = useState<number | null>(null);
 
   // Fetch hero/screenshots/description exactly once per item.
   const artwork = useFetchArtwork(item.id);
@@ -163,16 +165,16 @@ function Detail({ item }: { item: Item }) {
             <div className="panel flex flex-col gap-3 p-5">
               <div className="paneltitle">Screenshots</div>
               <div className="grid grid-cols-2 gap-2.5 max-[560px]:grid-cols-1">
-                {shots.map((shot) => (
-                  <a key={shot} href={shot} target="_blank" rel="noreferrer" className="block">
+                {shots.map((shot, index) => (
+                  <button key={shot} type="button" onClick={() => setShotIndex(index)} className="block">
                     <img
                       src={shot}
                       alt=""
                       loading="lazy"
-                      className="aspect-video w-full rounded-[10px] border border-line-strong object-cover"
+                      className="aspect-video w-full cursor-zoom-in rounded-[10px] border border-line-strong object-cover"
                       style={{ background: "var(--shot-bg)" }}
                     />
-                  </a>
+                  </button>
                 ))}
               </div>
             </div>
@@ -191,6 +193,9 @@ function Detail({ item }: { item: Item }) {
       </section>
 
       {acquiring && <AcquireDialog item={item} onClose={() => setAcquiring(false)} />}
+      {shotIndex !== null && (
+        <Lightbox images={shots} index={shotIndex} onClose={() => setShotIndex(null)} onIndex={setShotIndex} />
+      )}
     </>
   );
 }
@@ -198,6 +203,15 @@ function Detail({ item }: { item: Item }) {
 function StatusPill({ item }: { item: Item }) {
   const update = useUpdateItem(item.id);
   const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    window.addEventListener("mousedown", close);
+    return () => window.removeEventListener("mousedown", close);
+  }, [open]);
   if (item.status === "wishlist") {
     return (
       <span className="pillbadge border border-dashed text-muted" style={{ borderColor: "color-mix(in oklch, var(--accent) 50%, transparent)" }}>
@@ -207,7 +221,7 @@ function StatusPill({ item }: { item: Item }) {
   }
   const statuses: ItemStatus[] = ["backlog", "in_progress", "completed", "abandoned"];
   return (
-    <span className="relative">
+    <span className="relative" ref={ref}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -458,7 +472,10 @@ function ActivityPanel({ itemId }: { itemId: string }) {
   );
 }
 
+const MOVIE_MEDIA = ["DVD", "Blu-ray", "Ultra HD Blu-ray", "VHS"];
+
 function DetailsPanel({ item }: { item: Item }) {
+  const update = useUpdateItem(item.id);
   const meta = item.metadata;
   const rows: Array<[string, string]> = [];
   if (Array.isArray(meta.authors) && meta.authors.length) rows.push(["Author", meta.authors.join(", ")]);
@@ -479,9 +496,32 @@ function DetailsPanel({ item }: { item: Item }) {
     new Date(item.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }),
   ]);
 
+  const showMedia = item.type === "movie" && item.format === "physical";
+  const media = typeof meta.media === "string" ? meta.media : "";
+
   return (
     <div className="panel flex flex-col gap-2.5 p-4.5" style={{ padding: 18 }}>
       <div className="paneltitle">Details</div>
+      {showMedia && (
+        <div className="flex items-center justify-between gap-3 border-b border-line/60 pb-2 text-[12.5px]">
+          <span className="text-faint">Media</span>
+          <select
+            aria-label="Media"
+            value={media}
+            onChange={(e) =>
+              update.mutate({ metadata: { ...meta, media: e.target.value || undefined } })
+            }
+            className="input w-auto cursor-pointer appearance-none px-2 py-1 text-right text-[12.5px] font-medium"
+          >
+            <option value="">Choose…</option>
+            {MOVIE_MEDIA.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       {rows.map(([key, value]) => (
         <div key={key} className="flex justify-between gap-3 border-b border-line/60 pb-2 text-[12.5px] last:border-b-0 last:pb-0">
           <span className="text-faint">{key}</span>

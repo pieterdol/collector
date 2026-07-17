@@ -356,6 +356,7 @@ function ConfirmForm({
     meta.page_count ? String(meta.page_count) : meta.runtime ? String(meta.runtime) : "",
   );
   const [format, setFormat] = useState("physical");
+  const [media, setMedia] = useState("");
   const [status, setStatus] = useState<ItemStatus>("backlog");
   const [price, setPrice] = useState("");
   const [date, setDate] = useState("");
@@ -389,6 +390,7 @@ function ConfirmForm({
     } else if (type === "movie") {
       if (creator) metadata.director = creator;
       if (count) metadata.runtime = Number(count);
+      if (media && format === "physical" && status !== "wishlist") metadata.media = media;
     } else {
       if (creator) metadata.developer = creator;
       if (platform) metadata.platform = platform;
@@ -495,6 +497,18 @@ function ConfirmForm({
               <option value="digital">Digital</option>
             </select>
           </label>
+          {type === "movie" && format === "physical" && (
+            <label className="field">
+              Media
+              <select value={media} onChange={(e) => setMedia(e.target.value)}>
+                <option value="">Choose…</option>
+                <option>DVD</option>
+                <option>Blu-ray</option>
+                <option>Ultra HD Blu-ray</option>
+                <option>VHS</option>
+              </select>
+            </label>
+          )}
           <label className="field">
             Price paid (EUR)
             <input inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="optional" />
