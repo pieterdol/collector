@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
-import { coverColors, PosterCard } from "../components/PosterCard";
+import { describeItem, PosterCard } from "../components/PosterCard";
 import type { Item } from "../lib/types";
 
 const base: Item = {
@@ -45,17 +45,27 @@ describe("PosterCard", () => {
     );
   });
 
-  it("shows a progress badge for in-progress items", () => {
+  it("shows the status badge on the cover", () => {
     renderCard(base);
-    expect(screen.getByText("50%")).toBeInTheDocument();
+    expect(screen.getByText("In progress")).toBeInTheDocument();
   });
 
-  it("shows a loan badge while lent out, hides it after return", () => {
+  it("shows the progress strip for in-progress items", () => {
+    renderCard(base);
+    expect(screen.getByTitle("206 / 412")).toBeInTheDocument();
+  });
+
+  it("shows a loan badge while lent out", () => {
     renderCard({ ...base, borrowed_by: "Sanne" });
-    expect(screen.getByText("Sanne")).toBeInTheDocument();
+    expect(screen.getByText("→ Sanne")).toBeInTheDocument();
   });
 
-  it("renders a generated cover with the title when no cover is stored", () => {
+  it("hides the loan badge once returned", () => {
+    renderCard({ ...base, borrowed_by: "Sanne", returned_date: "2026-07-01" });
+    expect(screen.queryByText("→ Sanne")).not.toBeInTheDocument();
+  });
+
+  it("renders a placeholder with the title when no cover is stored", () => {
     renderCard(base);
     expect(screen.getAllByText("Dune").length).toBeGreaterThan(0);
     expect(document.querySelector("img")).toBeNull();
@@ -68,9 +78,18 @@ describe("PosterCard", () => {
   });
 });
 
-describe("coverColors", () => {
-  it("is deterministic per title", () => {
-    expect(coverColors("Dune")).toEqual(coverColors("Dune"));
-    expect(coverColors("Dune")).not.toEqual(coverColors("Hollow Knight"));
+describe("describeItem", () => {
+  it("builds a compact meta line", () => {
+    expect(describeItem(base)).toBe("Frank Herbert · 1965");
+  });
+
+  it("uses developer and platform for games", () => {
+    expect(
+      describeItem({
+        ...base,
+        type: "game",
+        metadata: { developer: "Team Cherry", platform: "Switch", year: 2017 },
+      }),
+    ).toBe("Team Cherry · 2017");
   });
 });

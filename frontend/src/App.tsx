@@ -7,6 +7,7 @@ import AddItem from "./pages/AddItem";
 import ItemDetail from "./pages/ItemDetail";
 import Login from "./pages/Login";
 import Shelf from "./pages/Shelf";
+import StatsPage from "./pages/Stats";
 import SteamImport from "./pages/SteamImport";
 import Wishlist from "./pages/Wishlist";
 import { applyStoredTheme } from "./theme/useTheme";
@@ -46,6 +47,7 @@ export default function App() {
               }
             >
               <Route path="/" element={<Shelf />} />
+              <Route path="/stats" element={<StatsPage />} />
               <Route path="/wishlist" element={<Wishlist />} />
               <Route path="/add" element={<AddItem />} />
               <Route path="/steam" element={<SteamImport />} />

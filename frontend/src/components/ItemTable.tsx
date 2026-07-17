@@ -1,102 +1,66 @@
-/** Dense table view of the collection. */
+/** Dense table view, graphite design: grid rows inside one surface card. */
 
 import { useNavigate } from "react-router-dom";
-import type { Item } from "../lib/types";
+import type { Item, ItemStatus } from "../lib/types";
 import { STATUS_LABEL } from "../lib/types";
-import { coverColors } from "./PosterCard";
 import { RatingStars } from "./RatingStars";
+
+const COLUMNS = "grid-cols-[2.2fr_0.8fr_0.9fr_1fr_0.9fr_0.8fr]";
+
+const STATUS_COLOR: Record<ItemStatus, string> = {
+  wishlist: "var(--muted)",
+  backlog: "var(--muted)",
+  in_progress: "var(--accent)",
+  completed: "var(--done)",
+  abandoned: "var(--dim)",
+};
 
 export function ItemTable({ items }: { items: Item[] }) {
   const navigate = useNavigate();
   return (
-    <div className="overflow-x-auto rounded-xl bg-surface">
-      <table className="w-full min-w-[760px] border-collapse text-[13.5px]">
-        <thead>
-          <tr>
-            {["Title", "Medium", "Format", "Status", "Progress", "Rating", "Added"].map((h) => (
-              <th
-                key={h}
-                className="border-b border-line px-4 py-3 text-left font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-faint"
-              >
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item) => (
-            <Row key={item.id} item={item} onOpen={() => navigate(`/items/${item.id}`)} />
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function Row({ item, onOpen }: { item: Item; onOpen: () => void }) {
-  const [c1, c2] = coverColors(item.title);
-  const progress =
-    item.progress_current && item.progress_total
-      ? `${Number(item.progress_current)}/${Number(item.progress_total)}`
-      : "—";
-  return (
-    <tr
-      onClick={onOpen}
-      className="cursor-pointer transition-colors last:border-none hover:bg-raised"
-    >
-      <td className="border-b border-line-soft px-4 py-2.5">
-        <span className="flex items-center gap-3 font-semibold">
-          <span
-            className="h-10 w-7 flex-none overflow-hidden rounded-[5px]"
-            style={{ background: `linear-gradient(165deg, ${c1}, ${c2})` }}
-          >
-            {item.cover_path && (
-              <img src={item.cover_path} alt="" className="h-full w-full object-cover" />
-            )}
-          </span>
-          {item.title}
-        </span>
-      </td>
-      <td className="border-b border-line-soft px-4 py-2.5">
-        <span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.12em]" style={{ color: `var(--${item.type})` }}>
-          <span className="h-[5px] w-[5px] rounded-full" style={{ background: `var(--${item.type})` }} />
-          {item.type}
-        </span>
-      </td>
-      <td className="border-b border-line-soft px-4 py-2.5 font-mono text-xs text-muted">
-        {item.format ?? "—"}
-      </td>
-      <td className="border-b border-line-soft px-4 py-2.5">
-        <span
-          className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
-            item.status === "completed" ? "text-go" : item.status === "in_progress" ? "text-text" : "text-muted"
-          }`}
+    <section className="panel overflow-x-auto">
+      <div className="min-w-[720px]">
+        <div
+          className={`grid ${COLUMNS} gap-3 border-b border-line px-4.5 py-3 text-[11.5px] font-semibold uppercase tracking-[0.06em] text-faint`}
+          style={{ paddingLeft: 18, paddingRight: 18 }}
         >
-          <i
-            className="h-1.5 w-1.5 rounded-full"
-            style={{
-              background:
-                item.status === "completed" || item.status === "in_progress"
-                  ? "var(--go)"
-                  : "var(--faint)",
-            }}
-          />
-          {STATUS_LABEL[item.status]}
-        </span>
-      </td>
-      <td className="border-b border-line-soft px-4 py-2.5 font-mono text-xs tabular-nums text-muted">
-        {progress}
-      </td>
-      <td className="border-b border-line-soft px-4 py-2.5">
-        {item.rating ? (
-          <RatingStars value={Number(item.rating)} size={11} />
-        ) : (
-          <span className="font-mono text-xs text-faint">—</span>
-        )}
-      </td>
-      <td className="border-b border-line-soft px-4 py-2.5 font-mono text-xs tabular-nums text-muted">
-        {new Date(item.created_at).toLocaleDateString(undefined, { day: "2-digit", month: "short" })}
-      </td>
-    </tr>
+          <span>Title</span>
+          <span>Type</span>
+          <span>Format</span>
+          <span>Status</span>
+          <span>Rating</span>
+          <span>Added</span>
+        </div>
+        {items.map((item) => (
+          <div
+            key={item.id}
+            onClick={() => navigate(`/items/${item.id}`)}
+            className={`grid ${COLUMNS} cursor-pointer items-center gap-3 border-b border-line/60 px-4.5 py-3 text-[13px] transition-colors last:border-b-0 hover:bg-raised/40`}
+            style={{ paddingLeft: 18, paddingRight: 18 }}
+          >
+            <span className="truncate font-semibold">{item.title}</span>
+            <span className="text-xs font-semibold capitalize" style={{ color: `var(--${item.type})` }}>
+              {item.type}
+            </span>
+            <span className="font-mono text-xs capitalize text-muted">{item.format ?? "—"}</span>
+            <span className="text-xs font-semibold" style={{ color: STATUS_COLOR[item.status] }}>
+              {STATUS_LABEL[item.status]}
+            </span>
+            <span>
+              {item.rating ? (
+                <span className="text-accent">
+                  <RatingStars value={Number(item.rating)} size={11} />
+                </span>
+              ) : (
+                <span className="font-mono text-xs text-dim">—</span>
+              )}
+            </span>
+            <span className="font-mono text-xs tabular-nums text-muted">
+              {new Date(item.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short" })}
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }

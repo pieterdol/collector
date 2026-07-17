@@ -5,25 +5,26 @@
  * `inline` keeps the var() reference so theme switches apply instantly. */
 @theme inline {
   --color-bg: var(--bg);
-  --color-bg-glow: var(--bg-glow);
-  --color-rail: var(--rail);
   --color-surface: var(--surface);
   --color-raised: var(--raised);
   --color-line: var(--line);
-  --color-line-soft: var(--line-soft);
+  --color-line-strong: var(--line-strong);
   --color-text: var(--text);
+  --color-body: var(--body);
   --color-muted: var(--muted);
   --color-faint: var(--faint);
+  --color-dim: var(--dim);
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
-  --color-go: var(--go);
-  --color-go-ink: var(--go-ink);
+  --color-danger: var(--danger);
+  --color-done: var(--done);
   --color-book: var(--book);
   --color-movie: var(--movie);
   --color-game: var(--game);
 
-  --font-sans: "Plus Jakarta Sans Variable", system-ui, sans-serif;
-  --font-mono: "Spline Sans Mono Variable", ui-monospace, monospace;
+  --font-sans: "IBM Plex Sans Variable", system-ui, sans-serif;
+  --font-display: "Space Grotesk Variable", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 
   --shadow-card: var(--shadow-card);
   --shadow-lift: var(--shadow-lift);
@@ -36,12 +37,10 @@ body {
 }
 
 body {
-  background:
-    radial-gradient(1100px 480px at 55% -200px, var(--bg-glow), transparent 70%),
-    var(--bg);
+  background: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);
-  font-size: 14.5px;
+  font-size: 14px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
 }
@@ -65,33 +64,28 @@ body {
   }
 }
 
-/* ── Signature elements (ported from the approved mockup) ─────────────── */
+/* ── Component primitives (graphite design) ───────────────────────────── */
 
-/* Flat poster card: the cover IS the card. */
+/* Card panel — the design's base surface */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+/* Poster: cover art with a striped-gradient placeholder */
 .poster {
   aspect-ratio: 2 / 3;
-  border-radius: 12px;
-  overflow: hidden;
+  border-radius: 10px;
   position: relative;
-  background: linear-gradient(165deg, var(--c1, var(--raised)), var(--c2, var(--surface)));
-  box-shadow: var(--shadow-card);
-  border: 1px solid rgb(255 255 255 / 0.06);
-  transition:
-    transform 0.18s ease,
-    box-shadow 0.18s ease,
-    border-color 0.18s ease;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0 7px, transparent 7px 14px),
+    linear-gradient(180deg, color-mix(in oklch, var(--mc, var(--raised)) 16%, transparent), var(--surface));
   display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-}
-:root[data-theme="light"] .poster {
-  border-color: rgb(0 0 0 / 0.05);
-}
-a:hover > .poster,
-a:focus-visible > .poster {
-  transform: translateY(-4px) scale(1.015);
-  box-shadow: var(--shadow-lift);
-  border-color: color-mix(in srgb, var(--accent) 65%, transparent);
+  align-items: center;
+  justify-content: center;
 }
 .poster > img {
   position: absolute;
@@ -101,41 +95,43 @@ a:focus-visible > .poster {
   object-fit: cover;
 }
 
-/* Translucent badge on the poster art. */
-.badge {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  z-index: 2;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  padding: 4px 10px;
-  border-radius: 99px;
-  background: rgb(8 6 20 / 0.65);
-  backdrop-filter: blur(6px);
-  color: #edebfa;
+/* Card hover: quiet lift, per the design (no glow ring) */
+.cardlink {
   display: flex;
-  align-items: center;
-  gap: 5px;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+  text-decoration: none;
+  color: inherit;
 }
-.badge i {
-  width: 6px;
-  height: 6px;
-  border-radius: 99px;
-  display: inline-block;
-  background: var(--go);
-}
-.badge-loan {
-  left: auto;
-  right: 10px;
-  color: #ffc9d4;
-}
-.badge-loan i {
-  background: var(--movie);
+.cardlink:hover,
+.cardlink:focus-visible {
+  transform: translateY(-3px);
 }
 
-/* Streaming-style progress strip along the poster's bottom edge. */
+/* Status badge sitting on the cover */
+.badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  background: var(--scrim);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 2px 7px;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.badge-loan {
+  top: auto;
+  left: 8px;
+  bottom: 8px;
+  border-color: color-mix(in oklch, var(--accent) 50%, transparent);
+  color: var(--accent);
+}
+
+/* Thin progress strip on the poster's bottom edge */
 .pstrip {
   position: absolute;
   left: 0;
@@ -143,51 +139,51 @@ a:focus-visible > .poster {
   bottom: 0;
   height: 4px;
   z-index: 2;
-  background: rgb(8 6 20 / 0.5);
+  background: rgba(0, 0, 0, 0.45);
 }
 .pstrip i {
   display: block;
   height: 100%;
-  background: var(--go);
+  background: var(--mc, var(--accent));
 }
 
-/* Filter pill: quiet by default, solid accent when active. */
-.pill {
-  padding: 7px 16px;
-  border-radius: 99px;
-  font-size: 13px;
-  font-weight: 600;
+/* Filter chip: pill; active inverts to text-on-bg */
+.chip {
   background: var(--surface);
   color: var(--muted);
-  transition: all 0.15s;
-  border: none;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 7px 15px;
+  font-size: 12.5px;
+  font-weight: 600;
   cursor: pointer;
+  transition: all 0.12s;
 }
-.pill:hover {
+.chip:hover {
   color: var(--text);
 }
-.pill[aria-pressed="true"] {
-  background: var(--accent);
-  color: var(--accent-ink);
+.chip[aria-pressed="true"] {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
 }
 
-/* Buttons */
+/* Buttons: 9px-radius rectangles (not pills) */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 10px 20px;
-  border-radius: 99px;
-  font-size: 14px;
-  font-weight: 700;
   background: var(--accent);
-  color: var(--accent-ink);
   border: none;
+  color: var(--accent-ink);
+  border-radius: 9px;
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: var(--font-sans);
   cursor: pointer;
-  transition:
-    filter 0.15s,
-    transform 0.15s;
+  transition: filter 0.15s, background 0.15s, transform 0.1s;
 }
 .btn:hover {
   filter: brightness(1.1);
@@ -200,21 +196,28 @@ a:focus-visible > .poster {
   cursor: default;
   filter: none;
 }
-.btn-go {
-  background: var(--go);
-  color: var(--go-ink);
-}
 .btn-ghost {
   background: var(--surface);
+  border: 1px solid var(--line-strong);
   color: var(--text);
+  font-weight: 600;
 }
 .btn-ghost:hover {
   background: var(--raised);
   filter: none;
 }
 .btn-sm {
-  padding: 7px 14px;
-  font-size: 13px;
+  padding: 7px 12px;
+  font-size: 12.5px;
+}
+
+/* Round status pills used on the detail page */
+.pillbadge {
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: capitalize;
 }
 
 /* Form field */
@@ -224,18 +227,18 @@ a:focus-visible > .poster {
   gap: 6px;
   font-family: var(--font-mono);
   font-size: 10px;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--faint);
 }
 .field input,
 .field select,
 .field textarea {
-  padding: 10px 13px;
-  border-radius: 8px;
+  padding: 9px 12px;
+  border-radius: 9px;
   background: var(--surface);
-  border: 1px solid var(--line);
-  font-size: 14px;
+  border: 1px solid var(--line-strong);
+  font-size: 13.5px;
   font-family: var(--font-sans);
   letter-spacing: normal;
   text-transform: none;
@@ -246,6 +249,28 @@ a:focus-visible > .poster {
 .field textarea:focus {
   border-color: var(--accent);
   outline: none;
+}
+
+/* Plain input (search bars, inline forms) */
+.input {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 14px;
+  font-size: 13.5px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.input:focus {
+  border-color: var(--accent);
+}
+
+/* Section heading inside panels */
+.paneltitle {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
 }
 
 /* Skeleton shimmer */
@@ -261,7 +286,7 @@ a:focus-visible > .poster {
   }
 }
 
-/* Barcode scan reticle */
+/* Barcode scan line */
 .scanline {
   position: absolute;
   left: 8%;

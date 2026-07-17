@@ -1,16 +1,29 @@
-/** Item detail — a full page (not a panel): poster, meta, progress,
- * rating/review, loan tracking and the activity timeline. */
+/** Item detail, graphite design: key-art hero with overlapping cover,
+ * About + screenshots + review + activity (left), progress + details +
+ * loan + danger zone (right). Artwork is fetched once, lazily. */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AcquireDialog } from "../components/AcquireDialog";
 import { BackIcon } from "../components/icons";
-import { coverColors } from "../components/PosterCard";
+import { describeItem } from "../components/PosterCard";
 import { RatingStars } from "../components/RatingStars";
 import { DetailSkeleton } from "../components/Skeletons";
-import { useActivity, useDeleteItem, useItem, useUpdateItem } from "../lib/queries";
+import {
+  useActivity,
+  useDeleteItem,
+  useFetchArtwork,
+  useItem,
+  useUpdateItem,
+} from "../lib/queries";
 import type { Item, ItemStatus } from "../lib/types";
 import { STATUS_LABEL, progressUnit } from "../lib/types";
+
+const SOURCE_LABEL: Record<string, string> = {
+  book: "Open Library",
+  movie: "TMDB",
+  game: "Steam Store / IGDB",
+};
 
 export default function ItemDetail() {
   const { id } = useParams();
@@ -31,160 +44,187 @@ function BackLink() {
   return (
     <Link
       to="/"
-      className="mb-5 inline-flex items-center gap-2 rounded-full bg-surface px-3.5 py-2 text-[13px] font-semibold text-muted no-underline transition-colors hover:bg-raised hover:text-text"
+      className="inline-flex w-fit items-center gap-2 rounded-[9px] border border-line bg-surface px-3 py-1.5 text-[12.5px] font-semibold text-muted no-underline hover:bg-raised hover:text-text"
     >
-      <BackIcon /> Shelf
+      <BackIcon size={12} /> Library
     </Link>
   );
 }
 
 function Detail({ item }: { item: Item }) {
-  const [c1, c2] = coverColors(item.title);
-  const update = useUpdateItem(item.id);
+  const meta = item.metadata;
   const [acquiring, setAcquiring] = useState(false);
 
-  const meta = item.metadata;
-  const metaRow: string[] = [];
-  if (meta.page_count) metaRow.push(`${meta.page_count} pages`);
-  if (meta.runtime) metaRow.push(`${meta.runtime} min`);
-  if (meta.year) metaRow.push(String(meta.year));
-  if (meta.isbn) metaRow.push(`ISBN ${meta.isbn}`);
-  if (item.purchase_price)
-    metaRow.push(
-      `${currencySymbol(item.currency)} ${Number(item.purchase_price).toFixed(2)}` +
-        (item.acquisition_date ? ` · ${formatDate(item.acquisition_date)}` : ""),
-    );
+  // Fetch hero/screenshots/description exactly once per item.
+  const artwork = useFetchArtwork(item.id);
+  const attempted = useRef(false);
+  useEffect(() => {
+    if (attempted.current || meta.artwork_fetched || item.type === "book") return;
+    attempted.current = true;
+    artwork.mutate();
+  }, [item.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const chips = [
-    ...(Array.isArray(meta.authors) ? meta.authors.map(String) : []),
-    ...(typeof meta.director === "string" ? [meta.director] : []),
-    ...(typeof meta.developer === "string" ? [meta.developer] : []),
-    ...(typeof meta.publisher === "string" ? [meta.publisher] : []),
-    ...(typeof meta.platform === "string" ? [meta.platform] : []),
-  ].filter(Boolean);
+  const heroPath = typeof meta.hero_path === "string" ? meta.hero_path : null;
+  const shots = Array.isArray(meta.screenshot_paths) ? (meta.screenshot_paths as string[]) : [];
+  const description = typeof meta.description === "string" ? meta.description
+    : typeof meta.overview === "string" ? meta.overview : null;
 
   return (
-    <section>
+    <>
       <BackLink />
-      <div className="relative overflow-hidden rounded-2xl p-10 max-[760px]:p-5">
-        {/* soft glow from the cover colors, fading into the page */}
-        <div
-          aria-hidden
-          className="absolute inset-0 scale-[1.4] opacity-40 blur-[70px]"
-          style={{ background: `linear-gradient(165deg, ${c1}, ${c2})` }}
-        />
-        <div
-          aria-hidden
-          className="absolute inset-0"
-          style={{ background: "linear-gradient(to bottom, transparent 30%, var(--bg) 100%)" }}
-        />
 
-        <div className="relative z-10 grid grid-cols-[280px_1fr] items-start gap-9 max-[760px]:grid-cols-1">
+      {/* Hero + overlapping cover */}
+      <section>
+        <div
+          className="relative flex h-[240px] items-start justify-end overflow-hidden rounded-2xl border border-line-strong p-4 max-[820px]:h-[150px]"
+          style={{
+            background: heroPath
+              ? undefined
+              : `repeating-linear-gradient(135deg, rgba(255,255,255,0.05) 0 9px, transparent 9px 18px),
+                 linear-gradient(180deg, color-mix(in oklch, var(--${item.type}) 22%, transparent), var(--hero-fade))`,
+          }}
+        >
+          {heroPath && <img src={heroPath} alt="" className="absolute inset-0 h-full w-full object-cover" />}
+          {heroPath && (
+            <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, transparent 40%, var(--bg))" }} />
+          )}
+          {!heroPath && artwork.isPending && (
+            <span className="font-mono text-[11px] tracking-[0.05em] text-text/40">fetching key art…</span>
+          )}
+        </div>
+
+        <div className="relative -mt-[72px] flex items-end gap-6 px-7 max-[820px]:-mt-10 max-[820px]:flex-wrap max-[820px]:px-3">
           <div
-            className="poster max-[760px]:max-w-[240px]"
-            style={{ "--c1": c1, "--c2": c2 } as React.CSSProperties}
+            className="poster w-[148px] flex-none shadow-lift max-[820px]:w-[104px]"
+            style={{ "--mc": `var(--${item.type})` } as React.CSSProperties}
           >
             {item.cover_path ? (
               <img src={item.cover_path} alt={`Cover of ${item.title}`} />
             ) : (
-              <div className="relative p-5 pb-6">
-                <div className="text-[30px] font-extrabold leading-[1.05] tracking-tight text-white/95 [text-wrap:balance]">
-                  {item.title}
-                </div>
-              </div>
+              <span className="px-2 text-center font-mono text-[10.5px] text-text/45">{item.title}</span>
             )}
           </div>
-
-          <div className="min-w-0">
-            <div className="mb-3 flex flex-wrap items-center gap-2.5 font-mono text-[11px] uppercase tracking-[0.14em] text-muted">
-              <span className="h-1.5 w-1.5 rounded-full" style={{ background: `var(--${item.type})` }} />
-              {item.type}
-              {item.format && ` · ${item.format}`}
-              <span className="text-faint">· Added {formatDate(item.created_at)}</span>
-            </div>
-            <h1 className="m-0 mb-2.5 text-[clamp(28px,4vw,44px)] font-extrabold leading-[1.03] tracking-tight [text-wrap:balance]">
+          <div className="flex min-w-0 flex-col gap-2 pb-1.5">
+            <h2 className="m-0 font-display text-3xl font-bold tracking-[-0.01em] max-[820px]:text-xl">
               {item.title}
-            </h1>
-            {metaRow.length > 0 && (
-              <div className="mb-4 flex flex-wrap gap-x-5 gap-y-1 font-mono text-[13px] tabular-nums text-muted">
-                {metaRow.map((entry) => (
-                  <span key={entry}>{entry}</span>
-                ))}
-              </div>
-            )}
-            {chips.length > 0 && (
-              <div className="mb-6 flex flex-wrap gap-2">
-                {chips.map((chip) => (
-                  <span key={chip} className="rounded-full bg-surface px-3.5 py-1.5 text-[13px] font-semibold text-muted">
-                    {chip}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            <StatusRow item={item} onAcquire={() => setAcquiring(true)} />
-
-            <div className="mt-4 grid grid-cols-2 gap-4 max-[900px]:grid-cols-1">
-              {progressUnit(item.type) && item.status !== "wishlist" && (
-                <ProgressPanel item={item} />
+            </h2>
+            <div className="text-[13.5px] text-muted">{describeItem(item)}</div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className="pillbadge"
+                style={{
+                  background: `color-mix(in oklch, var(--${item.type}) 15%, transparent)`,
+                  color: `var(--${item.type})`,
+                }}
+              >
+                {item.type}
+              </span>
+              {item.format && (
+                <span className="pillbadge border border-line-strong bg-surface text-muted">{item.format}</span>
               )}
-              <RatingPanel item={item} />
-              {item.status !== "wishlist" && <LoanPanel item={item} />}
-              <ActivityPanel itemId={item.id} />
+              <StatusPill item={item} />
             </div>
-
-            <DangerZone item={item} />
-            {update.isError && (
-              <p className="mt-3 text-[13px] text-movie">{(update.error as Error).message}</p>
+          </div>
+          <div className="ml-auto flex gap-2.5 pb-1.5 max-[820px]:ml-0">
+            {item.status === "wishlist" && (
+              <button type="button" className="btn" onClick={() => setAcquiring(true)}>
+                Mark as owned
+              </button>
             )}
           </div>
         </div>
-      </div>
+      </section>
+
+      {/* Two-column body */}
+      <section className="grid grid-cols-[2fr_1fr] items-start gap-3.5 max-[980px]:grid-cols-1">
+        <div className="flex min-w-0 flex-col gap-3.5">
+          {description && (
+            <div className="panel flex flex-col gap-2.5 p-5">
+              <div className="paneltitle">About</div>
+              <p className="m-0 text-[13.5px] leading-[1.65] text-body">{description}</p>
+              <div className="font-mono text-[11.5px] text-dim">
+                Metadata via {SOURCE_LABEL[item.type]}
+              </div>
+            </div>
+          )}
+
+          {shots.length > 0 && (
+            <div className="panel flex flex-col gap-3 p-5">
+              <div className="paneltitle">Screenshots</div>
+              <div className="grid grid-cols-2 gap-2.5 max-[560px]:grid-cols-1">
+                {shots.map((shot) => (
+                  <a key={shot} href={shot} target="_blank" rel="noreferrer" className="block">
+                    <img
+                      src={shot}
+                      alt=""
+                      loading="lazy"
+                      className="aspect-video w-full rounded-[10px] border border-line-strong object-cover"
+                      style={{ background: "var(--shot-bg)" }}
+                    />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <ReviewPanel item={item} />
+          <ActivityPanel itemId={item.id} />
+        </div>
+
+        <div className="flex flex-col gap-3.5">
+          {progressUnit(item.type) && item.status !== "wishlist" && <ProgressPanel item={item} />}
+          <DetailsPanel item={item} />
+          <LoanPanel item={item} />
+          <DangerZone item={item} />
+        </div>
+      </section>
+
       {acquiring && <AcquireDialog item={item} onClose={() => setAcquiring(false)} />}
-    </section>
+    </>
   );
 }
 
-function StatusRow({ item, onAcquire }: { item: Item; onAcquire: () => void }) {
+function StatusPill({ item }: { item: Item }) {
   const update = useUpdateItem(item.id);
+  const [open, setOpen] = useState(false);
   if (item.status === "wishlist") {
     return (
-      <div className="flex items-center gap-3">
-        <span className="rounded-full border border-dashed border-accent/60 px-3.5 py-1.5 text-[13px] font-semibold text-muted">
-          On your wishlist
-        </span>
-        <button type="button" className="btn btn-go btn-sm" onClick={onAcquire}>
-          Mark as acquired
-        </button>
-      </div>
+      <span className="pillbadge border border-dashed text-muted" style={{ borderColor: "color-mix(in oklch, var(--accent) 50%, transparent)" }}>
+        wishlist
+      </span>
     );
   }
   const statuses: ItemStatus[] = ["backlog", "in_progress", "completed", "abandoned"];
   return (
-    <div className="flex flex-wrap gap-2" role="group" aria-label="Status">
-      {statuses.map((status) => (
-        <button
-          key={status}
-          type="button"
-          className="pill"
-          aria-pressed={item.status === status}
-          onClick={() => item.status !== status && update.mutate({ status })}
-        >
-          {STATUS_LABEL[status]}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function Panel({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-xl bg-surface p-5">
-      <h4 className="m-0 mb-3.5 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-faint">
-        {title}
-      </h4>
-      {children}
-    </div>
+    <span className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="pillbadge cursor-pointer border border-line-strong bg-surface"
+        style={{ color: item.status === "completed" ? "var(--done)" : item.status === "in_progress" ? "var(--accent)" : "var(--muted)" }}
+      >
+        {STATUS_LABEL[item.status]} ▾
+      </button>
+      {open && (
+        <span className="panel absolute left-0 top-8 z-20 flex w-40 flex-col p-1.5 shadow-lift">
+          {statuses.map((status) => (
+            <button
+              key={status}
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                if (status !== item.status) update.mutate({ status });
+              }}
+              className={`rounded-md px-3 py-1.5 text-left text-[12.5px] font-semibold hover:bg-raised ${
+                status === item.status ? "text-text" : "text-muted"
+              }`}
+            >
+              {STATUS_LABEL[status]}
+            </button>
+          ))}
+        </span>
+      )}
+    </span>
   );
 }
 
@@ -194,45 +234,46 @@ function ProgressPanel({ item }: { item: Item }) {
   const current = item.progress_current ? Number(item.progress_current) : 0;
   const total = item.progress_total ? Number(item.progress_total) : null;
   const pct = total ? Math.min(100, Math.round((current / total) * 100)) : null;
-  const [editingTotal, setEditingTotal] = useState(false);
   const step = unit === "pages" ? 10 : 1;
+  const [editingTotal, setEditingTotal] = useState(false);
 
-  function setCurrent(value: number) {
-    const clamped = Math.max(0, total !== null ? Math.min(value, total) : value);
-    update.mutate({ progress_current: clamped });
-  }
+  const detail =
+    unit === "pages" ? `p. ${current}${total ? ` / ${total}` : ""}` : `${current} h${pct !== null ? ` · ${pct}%` : ""}`;
 
   return (
-    <Panel title={unit === "pages" ? "Reading progress" : "Play time"}>
-      <div className="flex items-center gap-3.5">
-        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-line">
-          {pct !== null && <div className="h-full rounded-full bg-go" style={{ width: `${pct}%` }} />}
-        </div>
-        <span className="font-mono text-[11.5px] tabular-nums text-muted">
-          {current}
-          {total !== null && ` / ${total}`} {unit === "pages" ? "pp" : "h"}
-          {pct !== null && ` · ${pct}%`}
-        </span>
-        <div className="flex rounded-full bg-raised">
+    <div className="panel flex flex-col gap-3 p-4.5" style={{ padding: 18 }}>
+      <div className="paneltitle">Progress</div>
+      <div className="flex items-baseline justify-between">
+        <span className="font-display text-[26px] font-bold">{pct !== null ? `${pct}%` : `${current}`}</span>
+        <span className="font-mono text-xs text-muted">{detail}</span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-[3px]" style={{ background: "var(--line)" }}>
+        <div
+          className="h-full rounded-[3px]"
+          style={{ width: `${pct ?? 0}%`, background: `var(--${item.type})` }}
+        />
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="flex overflow-hidden rounded-[9px] border border-line-strong">
           <button
             type="button"
             aria-label={`${step} ${unit} less`}
-            onClick={() => setCurrent(current - step)}
-            className="rounded-full px-3 py-1 font-mono text-sm text-muted hover:bg-line hover:text-text"
+            onClick={() => update.mutate({ progress_current: Math.max(0, current - step) })}
+            className="px-3 py-1 font-mono text-sm text-muted hover:bg-raised hover:text-text"
           >
             −
           </button>
           <button
             type="button"
             aria-label={`${step} ${unit} more`}
-            onClick={() => setCurrent(current + step)}
-            className="rounded-full px-3 py-1 font-mono text-sm text-muted hover:bg-line hover:text-text"
+            onClick={() =>
+              update.mutate({ progress_current: total !== null ? Math.min(total, current + step) : current + step })
+            }
+            className="border-l border-line-strong px-3 py-1 font-mono text-sm text-muted hover:bg-raised hover:text-text"
           >
             +
           </button>
         </div>
-      </div>
-      <p className="m-0 mt-3 text-xs text-faint">
         {editingTotal ? (
           <input
             autoFocus
@@ -244,146 +285,61 @@ function ProgressPanel({ item }: { item: Item }) {
               if (value !== total) update.mutate({ progress_total: value });
             }}
             onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-            className="w-24 rounded border-none bg-raised px-2 py-1 text-xs text-text outline-none"
+            className="input w-24 py-1 text-xs"
           />
         ) : (
-          <button type="button" className="text-faint underline decoration-dotted" onClick={() => setEditingTotal(true)}>
-            {total !== null ? `total: ${total} ${unit}` : `set total ${unit}`}
+          <button
+            type="button"
+            onClick={() => setEditingTotal(true)}
+            className="text-xs text-faint underline decoration-dotted hover:text-text"
+          >
+            {total !== null ? `total ${total} ${unit === "pages" ? "pp" : "h"}` : `set total ${unit}`}
           </button>
         )}
-      </p>
-    </Panel>
+      </div>
+    </div>
   );
 }
 
-function RatingPanel({ item }: { item: Item }) {
+function ReviewPanel({ item }: { item: Item }) {
   const update = useUpdateItem(item.id);
   const [review, setReview] = useState(item.review ?? "");
   useEffect(() => setReview(item.review ?? ""), [item.review]);
   const dirty = review !== (item.review ?? "");
 
   return (
-    <Panel title="Your rating">
-      <RatingStars
-        value={item.rating ? Number(item.rating) : 0}
-        size={24}
-        onChange={(value) => update.mutate({ rating: value })}
-      />
+    <div className="panel flex flex-col gap-3 p-5">
+      <div className="paneltitle">Your review</div>
+      <div className="text-[15px] tracking-[0.12em] text-accent">
+        <RatingStars
+          value={item.rating ? Number(item.rating) : 0}
+          size={18}
+          onChange={(value) => update.mutate({ rating: value })}
+        />
+      </div>
       <textarea
         value={review}
         onChange={(e) => setReview(e.target.value)}
         placeholder="What did you think?"
         rows={3}
-        className="mt-3 w-full resize-y rounded-lg border border-line bg-raised px-3.5 py-2.5 text-[13.5px] leading-relaxed outline-none focus:border-accent"
+        className="input w-full resize-y leading-relaxed"
       />
       {dirty && (
-        <div className="mt-2 flex justify-end">
-          <button
-            type="button"
-            className="btn btn-sm"
-            disabled={update.isPending}
-            onClick={() => update.mutate({ review })}
-          >
+        <div className="flex justify-end">
+          <button type="button" className="btn btn-sm" disabled={update.isPending} onClick={() => update.mutate({ review })}>
             Save review
           </button>
         </div>
       )}
-    </Panel>
-  );
-}
-
-function LoanPanel({ item }: { item: Item }) {
-  const update = useUpdateItem(item.id);
-  const [name, setName] = useState("");
-  const onLoan = item.borrowed_by && !item.returned_date;
-
-  return (
-    <Panel title="Loan">
-      {onLoan ? (
-        <div className="flex items-center justify-between gap-2.5 text-[13.5px]">
-          <span>
-            Lent to <b>{item.borrowed_by}</b>
-            {item.loaned_date && ` · ${formatDate(item.loaned_date)}`}
-          </span>
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            onClick={() => update.mutate({ returned_date: today() })}
-          >
-            Mark returned
-          </button>
-        </div>
-      ) : (
-        <form
-          className="flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!name.trim()) return;
-            update.mutate(
-              { borrowed_by: name.trim(), loaned_date: today(), returned_date: null },
-              { onSuccess: () => setName("") },
-            );
-          }}
-        >
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Lend to…"
-            className="min-w-0 flex-1 rounded-lg border border-line bg-raised px-3.5 py-2 text-[13.5px] outline-none focus:border-accent"
-          />
-          <button type="submit" className="btn btn-ghost btn-sm" disabled={!name.trim()}>
-            Lend out
-          </button>
-        </form>
-      )}
-      {item.returned_date && (
-        <p className="m-0 mt-2.5 text-xs text-faint">
-          Returned by {item.borrowed_by} on {formatDate(item.returned_date)}
-        </p>
-      )}
-    </Panel>
+    </div>
   );
 }
 
 const EVENT_LABEL: Record<string, string> = {
-  item_added: "Added to shelf",
-  status_change: "Status",
-  progress_update: "Progress",
-  rating_set: "Rated",
-  acquired: "Acquired",
-  loan_out: "Lent out",
-  loan_return: "Returned",
+  item_added: "Added to collection",
+  acquired: "Acquired — moved to backlog",
+  item_deleted: "Removed",
 };
-
-function ActivityPanel({ itemId }: { itemId: string }) {
-  const { data } = useActivity(itemId);
-  const events = data?.events ?? [];
-  return (
-    <Panel title="Activity">
-      <ul className="m-0 list-none p-0">
-        {events.slice(0, 8).map((event) => (
-          <li key={event.id} className="flex items-baseline gap-3 py-1.5 text-[12.5px] text-muted">
-            <span className="w-[74px] flex-none font-mono text-[10.5px] tabular-nums text-faint">
-              {formatDate(event.created_at)}
-            </span>
-            <span
-              className="relative top-[-1px] h-1.5 w-1.5 flex-none rounded-full"
-              style={{
-                background:
-                  event.event_type === "status_change" || event.event_type === "acquired"
-                    ? "var(--go)"
-                    : event.event_type === "item_added"
-                      ? "var(--faint)"
-                      : "var(--accent)",
-              }}
-            />
-            <span className="min-w-0">{describeEvent(event.event_type, event.old_value, event.new_value)}</span>
-          </li>
-        ))}
-      </ul>
-    </Panel>
-  );
-}
 
 function describeEvent(
   type: string,
@@ -401,8 +357,6 @@ function describeEvent(
       return `Lent to ${newValue?.borrowed_by ?? "someone"}`;
     case "loan_return":
       return `Returned by ${oldValue?.borrowed_by ?? "borrower"}`;
-    case "acquired":
-      return "Acquired — moved to backlog";
     default:
       return EVENT_LABEL[type] ?? type;
   }
@@ -412,19 +366,139 @@ function labelOf(status: unknown): string {
   return STATUS_LABEL[status as ItemStatus] ?? String(status ?? "?");
 }
 
+function ActivityPanel({ itemId }: { itemId: string }) {
+  const { data } = useActivity(itemId);
+  const events = data?.events ?? [];
+  return (
+    <div className="panel flex flex-col gap-2.5 p-5">
+      <div className="paneltitle">Activity</div>
+      {events.slice(0, 8).map((event) => (
+        <div key={event.id} className="flex items-baseline gap-3 text-[12.5px]">
+          <span className="whitespace-nowrap font-mono text-dim">
+            {new Date(event.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short" })}
+          </span>
+          <span className="text-body">{describeEvent(event.event_type, event.old_value, event.new_value)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DetailsPanel({ item }: { item: Item }) {
+  const meta = item.metadata;
+  const rows: Array<[string, string]> = [];
+  if (Array.isArray(meta.authors) && meta.authors.length) rows.push(["Author", meta.authors.join(", ")]);
+  if (typeof meta.director === "string") rows.push(["Director", meta.director]);
+  if (typeof meta.developer === "string") rows.push(["Developer", meta.developer]);
+  if (typeof meta.platform === "string") rows.push(["Platform", meta.platform]);
+  if (typeof meta.publisher === "string") rows.push(["Publisher", meta.publisher]);
+  if (meta.year) rows.push(["Year", String(meta.year)]);
+  if (meta.page_count) rows.push(["Pages", String(meta.page_count)]);
+  if (meta.runtime) rows.push(["Runtime", `${meta.runtime} min`]);
+  if (typeof meta.isbn === "string") rows.push(["ISBN", meta.isbn]);
+  if (typeof meta.upc === "string") rows.push(["Barcode", meta.upc]);
+  if (item.format) rows.push(["Format", item.format]);
+  if (item.purchase_price)
+    rows.push(["Paid", `${currencySymbol(item.currency)} ${Number(item.purchase_price).toFixed(2)}`]);
+  rows.push([
+    "Added",
+    new Date(item.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }),
+  ]);
+
+  return (
+    <div className="panel flex flex-col gap-2.5 p-4.5" style={{ padding: 18 }}>
+      <div className="paneltitle">Details</div>
+      {rows.map(([key, value]) => (
+        <div key={key} className="flex justify-between gap-3 border-b border-line/60 pb-2 text-[12.5px] last:border-b-0 last:pb-0">
+          <span className="text-faint">{key}</span>
+          <span className="text-right font-medium capitalize text-text">{value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function LoanPanel({ item }: { item: Item }) {
+  const update = useUpdateItem(item.id);
+  const [name, setName] = useState("");
+  const onLoan = Boolean(item.borrowed_by && !item.returned_date);
+
+  if (onLoan) {
+    return (
+      <div
+        className="flex flex-col gap-2 rounded-[14px] p-4.5"
+        style={{
+          padding: 18,
+          background: "color-mix(in oklch, var(--accent) 7%, transparent)",
+          border: "1px solid color-mix(in oklch, var(--accent) 25%, transparent)",
+        }}
+      >
+        <div className="paneltitle">On loan</div>
+        <div className="text-[13px] text-body">
+          Currently with <strong>{item.borrowed_by}</strong>
+          {item.loaned_date &&
+            ` · since ${new Date(item.loaned_date).toLocaleDateString(undefined, { day: "numeric", month: "short" })}`}
+        </div>
+        <button
+          type="button"
+          className="w-fit text-[12.5px] font-semibold text-accent"
+          disabled={update.isPending}
+          onClick={() => update.mutate({ returned_date: new Date().toISOString().slice(0, 10) })}
+        >
+          Mark returned
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="panel flex flex-col gap-2.5 p-4.5" style={{ padding: 18 }}>
+      <div className="paneltitle">Loan</div>
+      <form
+        className="flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!name.trim()) return;
+          update.mutate(
+            { borrowed_by: name.trim(), loaned_date: new Date().toISOString().slice(0, 10), returned_date: null },
+            { onSuccess: () => setName("") },
+          );
+        }}
+      >
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Lend to…"
+          className="input min-w-0 flex-1 py-1.5"
+        />
+        <button type="submit" className="btn btn-ghost btn-sm" disabled={!name.trim()}>
+          Lend out
+        </button>
+      </form>
+      {item.returned_date && (
+        <p className="m-0 text-xs text-faint">
+          Returned by {item.borrowed_by} on{" "}
+          {new Date(item.returned_date).toLocaleDateString(undefined, { day: "numeric", month: "short" })}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function DangerZone({ item }: { item: Item }) {
   const del = useDeleteItem();
   const navigate = useNavigate();
   const [confirming, setConfirming] = useState(false);
   return (
-    <div className="mt-5 flex justify-end">
+    <div className="flex flex-col gap-1.5 rounded-[14px] border border-dashed border-line-strong px-5 py-4">
+      <div className="text-xs font-semibold text-muted">Danger zone</div>
       {confirming ? (
-        <span className="flex items-center gap-2.5 text-[13px] text-muted">
+        <span className="flex flex-wrap items-center gap-2.5 text-[12.5px] text-muted">
           Delete “{item.title}” and its history?
           <button
             type="button"
             className="btn btn-sm"
-            style={{ background: "var(--movie)" }}
+            style={{ background: "var(--danger)", color: "#fff" }}
             onClick={() => del.mutate(item.id, { onSuccess: () => navigate("/") })}
           >
             Delete
@@ -437,7 +511,7 @@ function DangerZone({ item }: { item: Item }) {
         <button
           type="button"
           onClick={() => setConfirming(true)}
-          className="text-[12.5px] text-faint underline decoration-dotted hover:text-movie"
+          className="w-fit text-[12.5px] font-semibold text-danger"
         >
           Remove from collection
         </button>
@@ -446,14 +520,6 @@ function DangerZone({ item }: { item: Item }) {
   );
 }
 
-function formatDate(value: string): string {
-  return new Date(value).toLocaleDateString(undefined, { day: "2-digit", month: "short" });
-}
-
 function currencySymbol(code: string | null): string {
   return code === "EUR" ? "€" : code === "USD" ? "$" : code === "GBP" ? "£" : (code ?? "");
-}
-
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
 }

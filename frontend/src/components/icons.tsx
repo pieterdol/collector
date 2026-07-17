@@ -85,6 +85,16 @@ export function BackIcon({ size = 14, className }: IconProps) {
   );
 }
 
+export function ChartIcon({ size = 19, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+      <rect x="4" y="12" width="4" height="8" rx="1.2" />
+      <rect x="10" y="6" width="4" height="14" rx="1.2" />
+      <rect x="16" y="9" width="4" height="11" rx="1.2" />
+    </svg>
+  );
+}
+
 export function SteamIcon({ size = 19, className }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} aria-hidden>

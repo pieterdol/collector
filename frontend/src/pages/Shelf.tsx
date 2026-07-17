@@ -1,136 +1,93 @@
-/** Main collection view: poster grid ⇄ dense table, filter pills, sort. */
+/** Library: loan banner, type chips, status/sort dropdowns, poster grid ⇄ table. */
 
-import { useSearchParams } from "react-router-dom";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { EmptyState } from "../components/EmptyState";
-import { GridIcon, RowsIcon } from "../components/icons";
 import { ItemTable } from "../components/ItemTable";
 import { PosterCard } from "../components/PosterCard";
 import { PosterGridSkeleton } from "../components/Skeletons";
-import { useItems } from "../lib/queries";
+import { useItems, useStats, useUpdateItem } from "../lib/queries";
 
-const TYPES = [
+const TYPE_CHIPS = [
+  { value: "", label: "All" },
   { value: "book", label: "Books" },
   { value: "movie", label: "Movies" },
   { value: "game", label: "Games" },
 ];
-const STATUSES = [
-  { value: "in_progress", label: "In progress" },
-  { value: "completed", label: "Completed" },
-  { value: "backlog", label: "Backlog" },
-];
 
 export default function Shelf() {
   const [params, setParams] = useSearchParams();
-  const types = params.getAll("type");
-  const statuses = params.getAll("status");
+  const type = params.get("type") ?? "";
+  const status = params.get("status") ?? "";
   const q = params.get("q") ?? "";
   const sort = params.get("sort") ?? "added";
   const view = params.get("view") ?? "grid";
 
-  // The shelf shows what you own; the wishlist has its own page.
-  const effectiveStatuses = statuses.length
-    ? statuses
-    : ["backlog", "in_progress", "completed", "abandoned"];
-
   const { data, isLoading } = useItems({
-    type: types.length ? types : undefined,
-    status: effectiveStatuses,
+    type: type ? [type] : undefined,
+    // The library shows what you own; the wishlist is its own page.
+    status: status ? [status] : ["backlog", "in_progress", "completed", "abandoned"],
     q: q || undefined,
     sort,
   });
 
-  function toggleMulti(key: "type" | "status", value: string) {
+  function setParam(key: string, value: string) {
     const next = new URLSearchParams(params);
-    const current = next.getAll(key);
-    next.delete(key);
-    for (const v of current.includes(value) ? current.filter((v) => v !== value) : [...current, value]) {
-      next.append(key, v);
-    }
-    setParams(next, { replace: true });
-  }
-
-  function setParam(key: string, value: string | null) {
-    const next = new URLSearchParams(params);
-    if (value === null) next.delete(key);
-    else next.set(key, value);
+    if (value) next.set(key, value);
+    else next.delete(key);
     setParams(next, { replace: true });
   }
 
   const items = data?.items ?? [];
-  const filtersActive = types.length > 0 || statuses.length > 0 || q !== "";
+  const filtersActive = Boolean(type || status || q);
 
   return (
-    <section>
-      <div className="mb-6 flex flex-wrap items-center gap-2">
-        <div className="flex gap-2">
-          {TYPES.map((t) => (
-            <button
-              key={t.value}
-              type="button"
-              className="pill"
-              aria-pressed={types.includes(t.value)}
-              onClick={() => toggleMulti("type", t.value)}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex gap-2">
-          {STATUSES.map((s) => (
-            <button
-              key={s.value}
-              type="button"
-              className="pill"
-              aria-pressed={statuses.includes(s.value)}
-              onClick={() => toggleMulti("status", s.value)}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex-1" />
-        <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-faint">
-          {data ? `${data.total} item${data.total === 1 ? "" : "s"}` : ""}
-        </span>
-        <select
-          aria-label="Sort"
-          value={sort}
-          onChange={(e) => setParam("sort", e.target.value)}
-          className="cursor-pointer appearance-none rounded-full border-none bg-surface py-1.5 pl-4 pr-4 text-[13px] font-semibold text-muted outline-none"
-        >
-          <option value="added">Recently added</option>
-          <option value="title">Title A–Z</option>
-          <option value="rating">Rating</option>
-          <option value="updated">Recently updated</option>
-        </select>
-        <div className="flex gap-0.5 rounded-full bg-surface p-[3px]" role="group" aria-label="View">
+    <>
+      <LoanBanner />
+      <section className="flex flex-wrap items-center gap-2">
+        {TYPE_CHIPS.map((chip) => (
           <button
+            key={chip.value}
             type="button"
-            title="Gallery view"
-            aria-pressed={view === "grid"}
-            onClick={() => setParam("view", null)}
-            className={`grid place-items-center rounded-full px-3 py-1.5 ${view === "grid" ? "bg-raised text-text" : "text-faint"}`}
+            className="chip"
+            aria-pressed={type === chip.value}
+            onClick={() => setParam("type", chip.value)}
           >
-            <GridIcon size={14} />
+            {chip.label}
           </button>
-          <button
-            type="button"
-            title="Table view"
-            aria-pressed={view === "table"}
-            onClick={() => setParam("view", "table")}
-            className={`grid place-items-center rounded-full px-3 py-1.5 ${view === "table" ? "bg-raised text-text" : "text-faint"}`}
+        ))}
+        <div className="ml-auto flex items-center gap-2 text-[12.5px] text-faint">
+          <span>{data ? `${data.total} item${data.total === 1 ? "" : "s"}` : ""}</span>
+          <select
+            aria-label="Status"
+            value={status}
+            onChange={(e) => setParam("status", e.target.value)}
+            className="input cursor-pointer appearance-none py-[7px] text-[12.5px] font-semibold text-body"
           >
-            <RowsIcon />
-          </button>
+            <option value="">Any status</option>
+            <option value="in_progress">In progress</option>
+            <option value="completed">Completed</option>
+            <option value="backlog">Backlog</option>
+            <option value="abandoned">Abandoned</option>
+          </select>
+          <select
+            aria-label="Sort"
+            value={sort}
+            onChange={(e) => setParam("sort", e.target.value)}
+            className="input cursor-pointer appearance-none py-[7px] text-[12.5px] font-semibold text-body"
+          >
+            <option value="added">Recently added</option>
+            <option value="title">Title A–Z</option>
+            <option value="rating">Rating</option>
+            <option value="updated">Recently updated</option>
+          </select>
         </div>
-      </div>
+      </section>
 
       {isLoading ? (
         <PosterGridSkeleton />
       ) : items.length === 0 ? (
         <EmptyState
-          title={filtersActive ? "Nothing here" : "Your shelf is empty"}
+          title={filtersActive ? "Nothing here" : "Your library is empty"}
           message={
             filtersActive
               ? "No items match these filters. Clear them, or add something new."
@@ -142,8 +99,8 @@ export default function Shelf() {
                 Clear filters
               </button>
             ) : (
-              <Link to="/add" className="btn btn-sm no-underline">
-                Add to collection
+              <Link to="/add" className="btn no-underline">
+                + Add item
               </Link>
             )
           }
@@ -151,12 +108,52 @@ export default function Shelf() {
       ) : view === "table" ? (
         <ItemTable items={items} />
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(154px,1fr))] gap-x-4 gap-y-5 max-[760px]:grid-cols-[repeat(auto-fill,minmax(124px,1fr))] max-[760px]:gap-x-3 max-[760px]:gap-y-4">
+        <section className="grid grid-cols-[repeat(auto-fill,minmax(168px,1fr))] gap-[18px] max-[820px]:grid-cols-[repeat(auto-fill,minmax(128px,1fr))] max-[820px]:gap-3">
           {items.map((item) => (
             <PosterCard key={item.id} item={item} />
           ))}
-        </div>
+        </section>
       )}
+    </>
+  );
+}
+
+/** Accent-tinted banner for items currently out on loan. */
+function LoanBanner() {
+  const { data } = useStats();
+  const loans = data?.loans ?? [];
+  if (loans.length === 0) return null;
+  const first = loans[0];
+  return (
+    <section
+      className="flex flex-wrap items-center gap-3 rounded-xl px-4 py-3 text-[13.5px]"
+      style={{
+        background: "color-mix(in oklch, var(--accent) 8%, transparent)",
+        border: "1px solid color-mix(in oklch, var(--accent) 25%, transparent)",
+      }}
+    >
+      <span className="h-2 w-2 flex-none rounded-full" style={{ background: "var(--accent)" }} />
+      <span className="min-w-0">
+        <strong>{first.title}</strong> is with {first.borrowed_by}
+        {first.loaned_date &&
+          ` since ${new Date(first.loaned_date).toLocaleDateString(undefined, { day: "numeric", month: "short" })}`}
+        {loans.length > 1 && ` · +${loans.length - 1} more on loan`}
+      </span>
+      <MarkReturned id={first.id} />
     </section>
+  );
+}
+
+function MarkReturned({ id }: { id: string }) {
+  const update = useUpdateItem(id);
+  return (
+    <button
+      type="button"
+      className="ml-auto text-[12.5px] font-semibold text-accent"
+      disabled={update.isPending}
+      onClick={() => update.mutate({ returned_date: new Date().toISOString().slice(0, 10) })}
+    >
+      Mark returned
+    </button>
   );
 }

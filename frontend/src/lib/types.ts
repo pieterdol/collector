@@ -80,6 +80,34 @@ export interface SteamImportResult {
   total: number;
 }
 
+export interface Stats {
+  tiles: {
+    book: { total: number; in_progress: number; completed_this_year: number };
+    movie: { total: number; physical: number; digital: number };
+    game: { total: number; via_steam: number; hours_played: number };
+    value: { total: string; this_month: string; currency: string };
+  };
+  continue: Array<{
+    id: string;
+    title: string;
+    type: ItemType;
+    sub: string;
+    progress_current: number | null;
+    progress_total: number | null;
+    pct: number | null;
+  }>;
+  loans: Array<{ id: string; title: string; borrowed_by: string; loaned_date: string | null }>;
+  recent: Array<{
+    item_id: string;
+    title: string;
+    type: ItemType;
+    event_type: string;
+    old_value: Record<string, unknown> | null;
+    new_value: Record<string, unknown> | null;
+    created_at: string;
+  }>;
+}
+
 export const TYPE_LABEL: Record<ItemType, string> = {
   book: "Book",
   movie: "Movie",

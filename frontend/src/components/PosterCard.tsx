@@ -1,16 +1,18 @@
-/** Flat poster card: cover art is the card; caption sits quietly below. */
+/** Poster card, graphite design: cover with a status badge on the art,
+ * caption below (title, meta line, stars in accent). */
 
 import { Link } from "react-router-dom";
-import type { Item } from "../lib/types";
+import type { Item, ItemStatus } from "../lib/types";
+import { STATUS_LABEL } from "../lib/types";
 import { RatingStars } from "./RatingStars";
 
-/** Deterministic gradient for items without a stored cover. */
-export function coverColors(title: string): [string, string] {
-  let hash = 0;
-  for (const ch of title) hash = (hash * 31 + ch.charCodeAt(0)) | 0;
-  const hue = ((hash % 360) + 360) % 360;
-  return [`oklch(0.45 0.09 ${hue})`, `oklch(0.22 0.06 ${(hue + 40) % 360})`];
-}
+const STATUS_COLOR: Record<ItemStatus, string> = {
+  wishlist: "var(--muted)",
+  backlog: "var(--muted)",
+  in_progress: "var(--accent)",
+  completed: "var(--done)",
+  abandoned: "var(--dim)",
+};
 
 function progressPercent(item: Item): number | null {
   if (!item.progress_current || !item.progress_total) return null;
@@ -18,71 +20,50 @@ function progressPercent(item: Item): number | null {
   return Number.isFinite(pct) ? Math.min(100, Math.round(pct)) : null;
 }
 
-export function PosterCard({ item }: { item: Item }) {
-  const [c1, c2] = coverColors(item.title);
-  const pct = progressPercent(item);
-  const sub = describeItem(item);
-
-  return (
-    <Link to={`/items/${item.id}`} className="group block no-underline text-inherit">
-      <div className="poster" style={{ "--c1": c1, "--c2": c2 } as React.CSSProperties}>
-        {item.cover_path ? (
-          <img src={item.cover_path} alt="" loading="lazy" />
-        ) : (
-          <div className="relative p-3.5 pb-4">
-            <div className="font-extrabold leading-tight tracking-tight text-[17px] text-white/95 [text-wrap:balance]">
-              {item.title}
-            </div>
-            {sub && (
-              <div className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.12em] text-white/70">
-                {sub}
-              </div>
-            )}
-          </div>
-        )}
-        {item.status === "in_progress" && pct !== null && (
-          <span className="badge">
-            <i />
-            {pct}%
-          </span>
-        )}
-        {item.borrowed_by && !item.returned_date && (
-          <span className="badge badge-loan">
-            <i />
-            {item.borrowed_by}
-          </span>
-        )}
-        {pct !== null && (
-          <div className="pstrip" title={`${item.progress_current} / ${item.progress_total}`}>
-            <i style={{ width: `${pct}%` }} />
-          </div>
-        )}
-      </div>
-      <div className="px-1 pt-2">
-        <div className="truncate text-[13px] font-semibold">{item.title}</div>
-        <div className="mt-0.5 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.08em] text-faint">
-          <span
-            className="h-[5px] w-[5px] flex-none rounded-full"
-            style={{ background: `var(--${item.type})` }}
-          />
-          <span>{item.format ?? item.type}</span>
-          {item.rating && (
-            <span className="ml-auto">
-              <RatingStars value={Number(item.rating)} size={10} />
-            </span>
-          )}
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-function describeItem(item: Item): string {
+export function describeItem(item: Item): string {
   const meta = item.metadata;
   const parts: string[] = [];
   if (Array.isArray(meta.authors) && meta.authors.length) parts.push(String(meta.authors[0]));
   if (typeof meta.director === "string") parts.push(meta.director);
   if (typeof meta.developer === "string") parts.push(meta.developer);
+  if (typeof meta.platform === "string" && !meta.developer) parts.push(meta.platform);
   if (meta.year) parts.push(String(meta.year));
   return parts.slice(0, 2).join(" · ");
+}
+
+export function PosterCard({ item }: { item: Item }) {
+  const pct = progressPercent(item);
+  const onLoan = Boolean(item.borrowed_by && !item.returned_date);
+
+  return (
+    <Link to={`/items/${item.id}`} className="cardlink">
+      <div className="poster" style={{ "--mc": `var(--${item.type})` } as React.CSSProperties}>
+        {item.cover_path ? (
+          <img src={item.cover_path} alt="" loading="lazy" />
+        ) : (
+          <span className="px-3 text-center font-mono text-[10.5px] tracking-[0.04em] text-text/45">
+            {item.title}
+          </span>
+        )}
+        <span className="badge" style={{ color: STATUS_COLOR[item.status] }}>
+          {STATUS_LABEL[item.status]}
+        </span>
+        {onLoan && <span className="badge badge-loan">→ {item.borrowed_by}</span>}
+        {pct !== null && item.status === "in_progress" && (
+          <div className="pstrip" title={`${item.progress_current} / ${item.progress_total}`}>
+            <i style={{ width: `${pct}%` }} />
+          </div>
+        )}
+      </div>
+      <div className="flex flex-col gap-0.5">
+        <div className="truncate text-[13.5px] font-semibold leading-[1.3]">{item.title}</div>
+        <div className="truncate text-xs text-faint">{describeItem(item)}</div>
+        {item.rating && (
+          <div className="text-xs tracking-[0.1em] text-accent">
+            <RatingStars value={Number(item.rating)} size={11} />
+          </div>
+        )}
+      </div>
+    </Link>
+  );
 }

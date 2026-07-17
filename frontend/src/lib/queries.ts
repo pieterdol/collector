@@ -10,6 +10,7 @@ import type {
   ItemList,
   ItemType,
   ProviderStatus,
+  Stats,
   SteamImportResult,
 } from "./types";
 
@@ -52,6 +53,7 @@ function useInvalidateItems() {
   const client = useQueryClient();
   return (id?: string) => {
     void client.invalidateQueries({ queryKey: ["items"] });
+    void client.invalidateQueries({ queryKey: ["stats"] });
     if (id) {
       void client.invalidateQueries({ queryKey: ["item", id] });
       void client.invalidateQueries({ queryKey: ["activity", id] });
@@ -124,6 +126,23 @@ export function useProviders() {
     queryKey: ["providers"],
     queryFn: () => api<{ providers: ProviderStatus[] }>("/api/enrich/providers"),
     staleTime: 10 * 60 * 1000,
+  });
+}
+
+export function useStats() {
+  return useQuery({
+    queryKey: ["stats"],
+    queryFn: () => api<Stats>("/api/stats"),
+    staleTime: 30 * 1000,
+  });
+}
+
+/** Fetch hero/screenshots/description once; server is idempotent. */
+export function useFetchArtwork(id: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<Item>(`/api/items/${id}/artwork`, { method: "POST" }),
+    onSuccess: (item) => client.setQueryData(["item", id], item),
   });
 }
 

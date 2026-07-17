@@ -1,7 +1,8 @@
-/* Design tokens — "midnight shelf" (dark, default) and "daybreak" (light).
+/* Design tokens — "graphite" (from the approved Claude Design file).
  *
- * Themes are token sets ONLY: components never reference raw colors.
- * Adding a theme later = one more [data-theme="…"] block, no component changes.
+ * Dark is the designed theme; light is a derived variant so the theme
+ * toggle keeps working. Themes are token sets ONLY — components never
+ * reference raw colors.
  *
  * Resolution order (must stay in this order):
  *   1. :root                       → dark (app default)
@@ -10,95 +11,127 @@
  */
 
 :root {
-  --bg: #0f0d20;
-  --bg-glow: #1a1636;
-  --rail: #0b0a18;
-  --surface: #191631;
-  --raised: #232048;
-  --line: #2b2750;
-  --line-soft: #211d40;
-  --text: #f1f0f7;
-  --muted: #918dae;
-  --faint: #605c82;
-  --accent: #7263f2;
-  --accent-ink: #ffffff;
-  --go: #21c179;
-  --go-ink: #062517;
-  --book: #dfa14e;
-  --movie: #e8637c;
-  --game: #4ec9a4;
-  --shadow-card: 0 2px 6px rgba(4, 2, 18, 0.45), 0 14px 34px -12px rgba(4, 2, 18, 0.6);
-  --shadow-lift: 0 4px 10px rgba(4, 2, 18, 0.5), 0 24px 48px -14px rgba(4, 2, 18, 0.7);
+  --bg: #111114;
+  --surface: #1b1b20;
+  --raised: #2a2a31;
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.12);
+  --text: #ececf1;
+  --body: #c9c9d4;
+  --muted: #9a9aa6;
+  --faint: #84848f;
+  --dim: #6b6b76;
+  --nav-dot: #3a3a44;
+
+  --accent: oklch(76% 0.14 290);
+  --accent-ink: #111114;
+  --danger: oklch(70% 0.14 20);
+  --done: oklch(78% 0.12 150);
+
+  --book: oklch(80% 0.12 75);
+  --movie: oklch(80% 0.12 350);
+  --game: oklch(80% 0.12 230);
+
+  --hero-fade: #16161a;
+  --shot-bg: #17171b;
+  --scrim: rgba(17, 17, 20, 0.85);
+
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-lift: 0 12px 32px rgba(0, 0, 0, 0.5);
   color-scheme: dark;
 }
 
 @media (prefers-color-scheme: light) {
   :root {
-    --bg: #f4f3fa;
-    --bg-glow: #eae8f5;
-    --rail: #ffffff;
+    --bg: #f5f5f7;
     --surface: #ffffff;
-    --raised: #f7f6fc;
-    --line: #e2e0ef;
-    --line-soft: #eceaf5;
-    --text: #221f3a;
-    --muted: #6f6b8e;
-    --faint: #a7a4c0;
-    --accent: #5b4be0;
+    --raised: #ececf0;
+    --line: rgba(20, 20, 30, 0.09);
+    --line-strong: rgba(20, 20, 30, 0.16);
+    --text: #1b1b20;
+    --body: #3a3a44;
+    --muted: #6b6b76;
+    --faint: #84848f;
+    --dim: #9a9aa6;
+    --nav-dot: #d4d4dc;
+
+    --accent: oklch(56% 0.17 290);
     --accent-ink: #ffffff;
-    --go: #149e66;
-    --go-ink: #ffffff;
-    --book: #b77e2e;
-    --movie: #c74560;
-    --game: #1f9e7c;
-    --shadow-card: 0 1px 3px rgba(43, 38, 90, 0.1), 0 10px 28px -12px rgba(43, 38, 90, 0.18);
-    --shadow-lift: 0 3px 8px rgba(43, 38, 90, 0.12), 0 20px 44px -14px rgba(43, 38, 90, 0.26);
+    --danger: oklch(55% 0.16 20);
+    --done: oklch(55% 0.12 150);
+
+    --book: oklch(58% 0.12 75);
+    --movie: oklch(58% 0.14 350);
+    --game: oklch(56% 0.12 230);
+
+    --hero-fade: #e8e8ee;
+    --shot-bg: #ececf0;
+    --scrim: rgba(255, 255, 255, 0.88);
+
+    --shadow-card: 0 1px 3px rgba(30, 28, 50, 0.1);
+    --shadow-lift: 0 12px 32px rgba(30, 28, 50, 0.18);
     color-scheme: light;
   }
 }
 
 :root[data-theme="dark"] {
-  --bg: #0f0d20;
-  --bg-glow: #1a1636;
-  --rail: #0b0a18;
-  --surface: #191631;
-  --raised: #232048;
-  --line: #2b2750;
-  --line-soft: #211d40;
-  --text: #f1f0f7;
-  --muted: #918dae;
-  --faint: #605c82;
-  --accent: #7263f2;
-  --accent-ink: #ffffff;
-  --go: #21c179;
-  --go-ink: #062517;
-  --book: #dfa14e;
-  --movie: #e8637c;
-  --game: #4ec9a4;
-  --shadow-card: 0 2px 6px rgba(4, 2, 18, 0.45), 0 14px 34px -12px rgba(4, 2, 18, 0.6);
-  --shadow-lift: 0 4px 10px rgba(4, 2, 18, 0.5), 0 24px 48px -14px rgba(4, 2, 18, 0.7);
+  --bg: #111114;
+  --surface: #1b1b20;
+  --raised: #2a2a31;
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.12);
+  --text: #ececf1;
+  --body: #c9c9d4;
+  --muted: #9a9aa6;
+  --faint: #84848f;
+  --dim: #6b6b76;
+  --nav-dot: #3a3a44;
+
+  --accent: oklch(76% 0.14 290);
+  --accent-ink: #111114;
+  --danger: oklch(70% 0.14 20);
+  --done: oklch(78% 0.12 150);
+
+  --book: oklch(80% 0.12 75);
+  --movie: oklch(80% 0.12 350);
+  --game: oklch(80% 0.12 230);
+
+  --hero-fade: #16161a;
+  --shot-bg: #17171b;
+  --scrim: rgba(17, 17, 20, 0.85);
+
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-lift: 0 12px 32px rgba(0, 0, 0, 0.5);
   color-scheme: dark;
 }
 
 :root[data-theme="light"] {
-  --bg: #f4f3fa;
-  --bg-glow: #eae8f5;
-  --rail: #ffffff;
+  --bg: #f5f5f7;
   --surface: #ffffff;
-  --raised: #f7f6fc;
-  --line: #e2e0ef;
-  --line-soft: #eceaf5;
-  --text: #221f3a;
-  --muted: #6f6b8e;
-  --faint: #a7a4c0;
-  --accent: #5b4be0;
+  --raised: #ececf0;
+  --line: rgba(20, 20, 30, 0.09);
+  --line-strong: rgba(20, 20, 30, 0.16);
+  --text: #1b1b20;
+  --body: #3a3a44;
+  --muted: #6b6b76;
+  --faint: #84848f;
+  --dim: #9a9aa6;
+  --nav-dot: #d4d4dc;
+
+  --accent: oklch(56% 0.17 290);
   --accent-ink: #ffffff;
-  --go: #149e66;
-  --go-ink: #ffffff;
-  --book: #b77e2e;
-  --movie: #c74560;
-  --game: #1f9e7c;
-  --shadow-card: 0 1px 3px rgba(43, 38, 90, 0.1), 0 10px 28px -12px rgba(43, 38, 90, 0.18);
-  --shadow-lift: 0 3px 8px rgba(43, 38, 90, 0.12), 0 20px 44px -14px rgba(43, 38, 90, 0.26);
+  --danger: oklch(55% 0.16 20);
+  --done: oklch(55% 0.12 150);
+
+  --book: oklch(58% 0.12 75);
+  --movie: oklch(58% 0.14 350);
+  --game: oklch(56% 0.12 230);
+
+  --hero-fade: #e8e8ee;
+  --shot-bg: #ececf0;
+  --scrim: rgba(255, 255, 255, 0.88);
+
+  --shadow-card: 0 1px 3px rgba(30, 28, 50, 0.1);
+  --shadow-lift: 0 12px 32px rgba(30, 28, 50, 0.18);
   color-scheme: light;
 }

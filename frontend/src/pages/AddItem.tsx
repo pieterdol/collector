@@ -2,10 +2,9 @@
  * enter manually. Search and scan prefill the same confirm form. */
 
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { BarcodeScanner } from "../components/BarcodeScanner";
 import { SearchIcon } from "../components/icons";
-import { coverColors } from "../components/PosterCard";
 import {
   useBarcodeLookup,
   useCreateItem,
@@ -24,8 +23,10 @@ const PROVIDER_LABEL: Record<ItemType, string> = {
 type Mode = "search" | "scan" | "manual";
 
 export default function AddItem() {
+  const [searchParams] = useSearchParams();
+  const initialMode = searchParams.get("mode") === "scan" ? "scan" : "search";
   const [type, setType] = useState<ItemType>("book");
-  const [mode, setMode] = useState<Mode>("search");
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [draft, setDraft] = useState<EnrichResult | null>(null);
   const [scannedUpc, setScannedUpc] = useState<string | null>(null);
   const providers = useProviders();
@@ -78,7 +79,7 @@ export default function AddItem() {
         />
       ) : (
         <>
-          <div className="mb-5 flex w-fit gap-1.5 rounded-full bg-surface p-1" role="tablist">
+          <div className="mb-5 flex w-fit gap-1.5 rounded-[10px] border border-line bg-surface p-1" role="tablist">
             {(["search", "scan", "manual"] as Mode[]).map((m) => (
               <button
                 key={m}
@@ -86,8 +87,8 @@ export default function AddItem() {
                 role="tab"
                 aria-selected={mode === m}
                 onClick={() => setMode(m)}
-                className={`rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors ${
-                  mode === m ? "bg-accent text-white" : "text-muted hover:text-text"
+                className={`rounded-[8px] px-4 py-1.5 text-[13px] font-semibold transition-colors ${
+                  mode === m ? "bg-raised text-text" : "text-muted hover:text-text"
                 }`}
               >
                 {m === "search" ? "Search" : m === "scan" ? "Scan barcode" : "Manual entry"}
@@ -184,7 +185,7 @@ function SearchMode({
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder={`Search ${PROVIDER_LABEL[type]} by title${type === "book" ? " or ISBN" : ""}…`}
-          className="w-full rounded-full border border-line bg-surface py-2.5 pr-4 text-sm outline-none focus:border-accent"
+          className="input w-full"
           style={{ paddingLeft: 38 }}
         />
       </div>
@@ -214,7 +215,6 @@ function ResultRow({
   onPick: () => void;
   busy: boolean;
 }) {
-  const [c1, c2] = coverColors(result.title);
   const meta = result.metadata;
   const sub = [
     Array.isArray(meta.authors) ? meta.authors.slice(0, 2).join(", ") : null,
@@ -234,8 +234,11 @@ function ResultRow({
       className="flex items-center gap-3.5 rounded-xl bg-surface px-3.5 py-3 text-left transition-colors hover:bg-raised disabled:opacity-60"
     >
       <span
-        className="h-14 w-[38px] flex-none overflow-hidden rounded-md"
-        style={{ background: `linear-gradient(165deg, ${c1}, ${c2})` }}
+        className="h-14 w-[38px] flex-none overflow-hidden rounded-md border border-line-strong"
+        style={{
+          background:
+            "repeating-linear-gradient(135deg, rgba(255,255,255,0.05) 0 5px, transparent 5px 10px), var(--raised)",
+        }}
       >
         {result.cover_url && (
           <img src={result.cover_url} alt="" loading="lazy" className="h-full w-full object-cover" />
@@ -302,7 +305,7 @@ function ScanMode({
           onChange={(e) => setManualCode(e.target.value)}
           placeholder="…or type the barcode digits"
           inputMode="numeric"
-          className="min-w-0 flex-1 rounded-full border border-line bg-surface px-4 py-2 text-sm outline-none focus:border-accent"
+          className="input min-w-0 flex-1"
         />
         <button type="submit" className="btn btn-ghost btn-sm" disabled={lookup.isPending}>
           Look up
