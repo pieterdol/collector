@@ -65,6 +65,7 @@ function Detail({ item }: { item: Item }) {
   }, [item.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const heroPath = typeof meta.hero_path === "string" ? meta.hero_path : null;
+  const showHero = item.type !== "book"; // no source provides key art for books
   const shots = Array.isArray(meta.screenshot_paths) ? (meta.screenshot_paths as string[]) : [];
   const description = typeof meta.description === "string" ? meta.description
     : typeof meta.overview === "string" ? meta.overview : null;
@@ -73,8 +74,9 @@ function Detail({ item }: { item: Item }) {
     <>
       <BackLink />
 
-      {/* Hero + overlapping cover */}
+      {/* Hero + overlapping cover (books skip the hero band) */}
       <section>
+        {showHero && (
         <div
           className="relative flex h-[240px] items-start justify-end overflow-hidden rounded-2xl border border-line-strong p-4 max-[820px]:h-[150px]"
           style={{
@@ -92,8 +94,15 @@ function Detail({ item }: { item: Item }) {
             <span className="font-mono text-[11px] tracking-[0.05em] text-text/40">fetching key art…</span>
           )}
         </div>
+        )}
 
-        <div className="relative -mt-[72px] flex items-end gap-6 px-7 max-[820px]:-mt-10 max-[820px]:flex-wrap max-[820px]:px-3">
+        <div
+          className={
+            showHero
+              ? "relative -mt-[72px] flex items-end gap-6 px-7 max-[820px]:-mt-10 max-[820px]:flex-wrap max-[820px]:px-3"
+              : "relative flex items-end gap-6 px-1 pt-2 max-[820px]:flex-wrap"
+          }
+        >
           <div
             className="poster w-[148px] flex-none shadow-lift max-[820px]:w-[104px]"
             style={{ "--mc": `var(--${item.type})` } as React.CSSProperties}
@@ -390,7 +399,7 @@ function DetailsPanel({ item }: { item: Item }) {
   if (Array.isArray(meta.authors) && meta.authors.length) rows.push(["Author", meta.authors.join(", ")]);
   if (typeof meta.director === "string") rows.push(["Director", meta.director]);
   if (typeof meta.developer === "string") rows.push(["Developer", meta.developer]);
-  if (typeof meta.platform === "string") rows.push(["Platform", meta.platform]);
+  if (item.platform) rows.push(["Platform", item.platform]);
   if (typeof meta.publisher === "string") rows.push(["Publisher", meta.publisher]);
   if (meta.year) rows.push(["Year", String(meta.year)]);
   if (meta.page_count) rows.push(["Pages", String(meta.page_count)]);

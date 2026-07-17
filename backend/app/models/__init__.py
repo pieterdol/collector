@@ -2,7 +2,8 @@
 
 from app.models.activity_event import ActivityEvent
 from app.models.item import Item
+from app.models.platform import Platform
 from app.models.provider_cache import ProviderCache
 from app.models.user import User
 
-__all__ = ["ActivityEvent", "Item", "ProviderCache", "User"]
+__all__ = ["ActivityEvent", "Item", "Platform", "ProviderCache", "User"]

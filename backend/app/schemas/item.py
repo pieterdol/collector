@@ -67,6 +67,8 @@ class AcquireIn(BaseModel):
     purchase_price: Decimal | None = None
     currency: str | None = Field(default=None, min_length=3, max_length=3)
     acquisition_date: date | None = None
+    # Games: the platform you bought it on.
+    platform: str | None = Field(default=None, max_length=100)
 
 
 class ItemOut(BaseModel):
@@ -80,6 +82,8 @@ class ItemOut(BaseModel):
     title: str
     cover_path: str | None
     metadata: dict = Field(validation_alias="meta")
+    # Resolved platform name (games); falls back to legacy metadata.platform.
+    platform: str | None = None
 
     progress_current: Decimal | None
     progress_total: Decimal | None

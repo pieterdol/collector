@@ -19,6 +19,8 @@ export interface Item {
   title: string;
   cover_path: string | null;
   metadata: Record<string, unknown>;
+  /** Resolved platform name (games), from the linked platform record. */
+  platform: string | null;
   progress_current: string | null;
   progress_total: string | null;
   rating: string | null;

@@ -12,6 +12,7 @@ const base: Item = {
   status: "in_progress",
   title: "Dune",
   cover_path: null,
+  platform: null,
   metadata: { authors: ["Frank Herbert"], year: 1965 },
   progress_current: "206",
   progress_total: "412",
@@ -88,7 +89,8 @@ describe("describeItem", () => {
       describeItem({
         ...base,
         type: "game",
-        metadata: { developer: "Team Cherry", platform: "Switch", year: 2017 },
+        platform: "Switch",
+        metadata: { developer: "Team Cherry", year: 2017 },
       }),
     ).toBe("Team Cherry · 2017");
   });

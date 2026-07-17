@@ -26,7 +26,7 @@ export function describeItem(item: Item): string {
   if (Array.isArray(meta.authors) && meta.authors.length) parts.push(String(meta.authors[0]));
   if (typeof meta.director === "string") parts.push(meta.director);
   if (typeof meta.developer === "string") parts.push(meta.developer);
-  if (typeof meta.platform === "string" && !meta.developer) parts.push(meta.platform);
+  if (item.platform && !meta.developer) parts.push(item.platform);
   if (meta.year) parts.push(String(meta.year));
   return parts.slice(0, 2).join(" · ");
 }

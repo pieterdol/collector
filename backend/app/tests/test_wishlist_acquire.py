@@ -52,3 +52,16 @@ def test_acquire_rejects_non_wishlist_items(client):
         f"/api/items/{item['id']}/acquire", json={"format": "physical"}, headers=headers
     )
     assert res.status_code == 400
+
+
+def test_acquiring_a_game_sets_its_platform(client):
+    headers = auth_headers(client)
+    item = create_item(client, headers, status="wishlist", format=None,
+                       title="Silksong", type="game")
+    res = client.post(
+        f"/api/items/{item['id']}/acquire",
+        json={"format": "digital", "platform": "Nintendo Switch"},
+        headers=headers,
+    )
+    assert res.status_code == 200
+    assert res.json()["platform"] == "Nintendo Switch"

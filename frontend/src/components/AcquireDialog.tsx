@@ -1,7 +1,7 @@
 /** "Mark as acquired": wishlist → backlog with price/format/date. */
 
 import { useEffect, useRef, useState } from "react";
-import { useAcquireItem } from "../lib/queries";
+import { useAcquireItem, usePlatformCatalog } from "../lib/queries";
 import type { Item } from "../lib/types";
 
 interface Props {
@@ -17,6 +17,8 @@ export function AcquireDialog({ item, onClose, onDone }: Props) {
   const [price, setPrice] = useState("");
   const [currency, setCurrency] = useState("EUR");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [platform, setPlatform] = useState("");
+  const catalog = usePlatformCatalog(item.type === "game");
 
   useEffect(() => {
     dialogRef.current?.showModal();
@@ -30,6 +32,7 @@ export function AcquireDialog({ item, onClose, onDone }: Props) {
         purchase_price: price ? Number(price) : null,
         currency: price ? currency : null,
         acquisition_date: date || null,
+        platform: platform || null,
       },
       {
         onSuccess: () => {
@@ -79,6 +82,19 @@ export function AcquireDialog({ item, onClose, onDone }: Props) {
           Acquired on
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
+        {item.type === "game" && (
+          <label className="field col-span-2">
+            Platform
+            <select value={platform} onChange={(e) => setPlatform(e.target.value)}>
+              <option value="">Choose platform…</option>
+              {(catalog.data?.platforms ?? []).map((p) => (
+                <option key={p.id} value={p.name}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {acquire.isError && (
           <p className="col-span-2 m-0 text-[13px] text-movie">{(acquire.error as Error).message}</p>
         )}

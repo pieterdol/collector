@@ -181,7 +181,7 @@ def _subtitle(item: Item) -> str:
     meta = item.meta
     if item.type == ItemType.BOOK.value and meta.get("authors"):
         return str(meta["authors"][0])
-    return str(meta.get("platform") or meta.get("director") or meta.get("developer") or "")
+    return str(item.platform or meta.get("director") or meta.get("developer") or "")
 
 
 def _num(value) -> float | None:

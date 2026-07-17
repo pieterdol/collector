@@ -130,11 +130,25 @@ export function useProviders() {
   });
 }
 
+/** Platforms the user actually owns games on (library filter). */
 export function usePlatforms() {
   return useQuery({
     queryKey: ["platforms"],
     queryFn: () => api<{ platforms: string[] }>("/api/items/platforms"),
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+/** The full platform catalog, synced once from IGDB (add-item form). */
+export function usePlatformCatalog(enabled: boolean) {
+  return useQuery({
+    queryKey: ["platform-catalog"],
+    queryFn: () =>
+      api<{ platforms: Array<{ id: string; name: string; abbreviation: string | null }> }>(
+        "/api/platforms",
+      ),
+    enabled,
+    staleTime: 60 * 60 * 1000,
   });
 }
 

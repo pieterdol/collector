@@ -170,7 +170,7 @@ def test_migration_produces_schema(tmp_path):
                 text("SELECT tablename FROM pg_tables WHERE schemaname='public'")
             ).scalars().all()
         scratch_engine.dispose()
-        for t in ["users", "items", "activity_events", "provider_cache", "alembic_version"]:
+        for t in ["users", "items", "activity_events", "provider_cache", "platforms", "alembic_version"]:
             assert t in tables, f"missing table {t}"
     finally:
         with admin.connect() as conn:

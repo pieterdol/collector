@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.artwork import fetch_artwork
 from app.core.covers import download_cover
 from app.core.events import record_event
+from app.core.platforms import find_or_create_platform
 from app.core.security import get_current_user
 from app.db import get_db
 from app.domain.enums import EventType, ItemFormat, ItemStatus, ItemType
@@ -37,6 +38,18 @@ def _get_owned_item(db: Session, user: User, item_id: uuid.UUID) -> Item:
     return item
 
 
+def _link_platform(db: Session, item: Item) -> None:
+    """Keep the platform FK in sync with metadata.platform (games only)."""
+    if item.type != "game":
+        return
+    name = item.meta.get("platform")
+    if not isinstance(name, str) or not name.strip():
+        return
+    if item.platform_ref is not None and item.platform_ref.name.lower() == name.strip().lower():
+        return
+    item.platform_id = find_or_create_platform(db, name).id
+
+
 @router.post("", response_model=ItemOut, status_code=201)
 def create_item(
     body: ItemCreate,
@@ -60,6 +73,7 @@ def create_item(
     )
     if item.status == ItemStatus.COMPLETED.value:
         item.completed_at = datetime.now(UTC)
+    _link_platform(db, item)
     db.add(item)
     db.flush()  # assign item.id before recording the event
     if body.cover_url:
@@ -83,15 +97,14 @@ def list_platforms(
     user: User = Depends(get_current_user),
 ) -> dict:
     """Distinct platforms across the user's games, for the library filter."""
+    from app.models import Platform
+
     rows = db.scalars(
-        select(text("DISTINCT metadata->>'platform'"))
-        .select_from(Item)
-        .where(
-            Item.user_id == user.id,
-            Item.type == "game",
-            text("metadata->>'platform' IS NOT NULL"),
-        )
-        .order_by(text("1"))
+        select(Platform.name)
+        .join(Item, Item.platform_id == Platform.id)
+        .where(Item.user_id == user.id, Item.type == "game")
+        .distinct()
+        .order_by(Platform.name)
     ).all()
     return {"platforms": list(rows)}
 
@@ -118,8 +131,10 @@ def list_items(
     if status:
         query = query.where(Item.status.in_([s.value for s in status]))
     if platform:
+        from app.models import Platform
+
         query = query.where(
-            text("metadata->>'platform' = :platform").bindparams(platform=platform)
+            Item.platform_id.in_(select(Platform.id).where(Platform.name == platform))
         )
     if q:
         query = query.where(
@@ -171,6 +186,7 @@ def update_item(
 
     if "metadata" in fields:
         item.meta = fields.pop("metadata")
+        _link_platform(db, item)
     for name, value in fields.items():
         setattr(item, name, value.value if hasattr(value, "value") else value)
 
@@ -290,6 +306,9 @@ def acquire_item(
     item.purchase_price = body.purchase_price
     item.currency = body.currency
     item.acquisition_date = body.acquisition_date
+    if body.platform and item.type == "game":
+        item.meta = {**item.meta, "platform": body.platform}
+        _link_platform(db, item)
 
     record_event(
         db,

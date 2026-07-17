@@ -10,6 +10,7 @@ import {
   useCreateItem,
   useEnrichDetails,
   useEnrichSearch,
+  usePlatformCatalog,
   useProviders,
 } from "../lib/queries";
 import type { EnrichResult, ItemStatus, ItemType } from "../lib/types";
@@ -22,8 +23,9 @@ const PROVIDER_LABEL: Record<ItemType, string> = {
 
 type Mode = "search" | "scan" | "manual";
 
+// Shown first in the platform dropdown; the full IGDB catalog follows.
 const COMMON_PLATFORMS = [
-  "PC",
+  "PC (Microsoft Windows)",
   "PC (Steam)",
   "Nintendo Switch",
   "Nintendo Switch 2",
@@ -31,7 +33,6 @@ const COMMON_PLATFORMS = [
   "PlayStation 4",
   "Xbox Series X|S",
   "Xbox One",
-  "Steam Deck",
 ];
 
 export default function AddItem() {
@@ -366,8 +367,13 @@ function ConfirmForm({
   // stores the ONE they own (so the library can filter per platform).
   const detectedPlatforms =
     typeof meta.platform === "string" ? meta.platform.split(",").map((p) => p.trim()) : [];
+  const catalog = usePlatformCatalog(type === "game");
   const platformOptions = [
-    ...new Set([...detectedPlatforms, ...COMMON_PLATFORMS]),
+    ...new Set([
+      ...detectedPlatforms,
+      ...COMMON_PLATFORMS,
+      ...(catalog.data?.platforms.map((p) => p.name) ?? []),
+    ]),
   ];
   const [platform, setPlatform] = useState(
     detectedPlatforms.length === 1 ? detectedPlatforms[0] : "",

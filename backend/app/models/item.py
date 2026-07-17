@@ -15,7 +15,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR, UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
 from app.domain.enums import ItemFormat, ItemStatus, ItemType, values
@@ -38,6 +38,10 @@ class Item(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE")
+    )
+    # Games link to a platform record; other types leave this NULL.
+    platform_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("platforms.id", ondelete="SET NULL")
     )
 
     type: Mapped[str] = mapped_column(Text)
@@ -77,6 +81,16 @@ class Item(Base):
         TSVECTOR, Computed("to_tsvector('simple', title)", persisted=True)
     )
 
+    platform_ref = relationship("Platform", lazy="selectin")
+
+    @property
+    def platform(self) -> str | None:
+        """Platform name for API output; legacy items fall back to metadata."""
+        if self.platform_ref is not None:
+            return self.platform_ref.name
+        value = self.meta.get("platform")
+        return value if isinstance(value, str) else None
+
     __table_args__ = (
         CheckConstraint(_check_in("type", values(ItemType)), name="ck_items_type"),
         CheckConstraint(_check_in("format", values(ItemFormat)), name="ck_items_format"),
@@ -87,6 +101,7 @@ class Item(Base):
         ),
         Index("ix_items_user_type_status", "user_id", "type", "status"),
         Index("ix_items_user_format", "user_id", "format"),
+        Index("ix_items_platform_id", "platform_id"),
         Index(
             "ix_items_user_completed_at",
             "user_id",

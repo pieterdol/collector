@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.covers import download_cover
 from app.core.events import record_event
+from app.core.platforms import find_or_create_platform
 from app.core.security import get_current_user
 from app.db import SessionLocal, get_db
 from app.domain.enums import EventType, ItemFormat, ItemStatus, ItemType
@@ -49,6 +50,7 @@ def import_library(
         )
     }
 
+    steam_platform = find_or_create_platform(db, "PC (Steam)")
     imported_ids: list[uuid.UUID] = []
     skipped = 0
     for game in games:
@@ -61,6 +63,7 @@ def import_library(
             type=ItemType.GAME.value,
             format=ItemFormat.DIGITAL.value,
             status=ItemStatus.BACKLOG.value,
+            platform_id=steam_platform.id,
             title=game.get("name", f"App {game['appid']}"),
             meta={
                 "steam_appid": game["appid"],
