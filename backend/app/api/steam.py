@@ -94,8 +94,15 @@ def import_library(
 
 
 def _fetch_covers(item_ids: list[uuid.UUID]) -> None:
-    """Download library posters for freshly imported games (own session)."""
+    """Download library posters for freshly imported games (own session).
+
+    Older/delisted titles have no vertical art on Steam's library CDN;
+    those fall back to IGDB covers via its Steam-appid mapping.
+    """
+    from app.providers.igdb import covers_for_steam_appids
+
     with SessionLocal() as db:
+        missing: list[Item] = []
         for item_id in item_ids:
             item = db.get(Item, item_id)
             if item is None or item.cover_path:
@@ -103,4 +110,20 @@ def _fetch_covers(item_ids: list[uuid.UUID]) -> None:
             url = item.meta.get("cover_source_url")
             if url:
                 item.cover_path = download_cover(url, item.id)
+                db.commit()
+            if item.cover_path is None and item.meta.get("steam_appid"):
+                missing.append(item)
+
+        if not missing:
+            return
+        fallback = covers_for_steam_appids(
+            db, [int(i.meta["steam_appid"]) for i in missing]
+        )
+        for item in missing:
+            url = fallback.get(int(item.meta["steam_appid"]))
+            if not url:
+                continue
+            item.cover_path = download_cover(url, item.id)
+            if item.cover_path:
+                item.meta = {**item.meta, "cover_source_url": url}
                 db.commit()

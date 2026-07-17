@@ -246,3 +246,32 @@ def test_isbn_lookup_falls_back_to_isbn_cover_url(db):
     provider = get_provider(ItemType.BOOK, db)
     result = provider.lookup_barcode("9780141016405")
     assert result.cover_url == "https://covers.openlibrary.org/b/isbn/9780141016405-L.jpg?default=false"
+
+
+@respx.mock
+def test_igdb_maps_steam_appids_to_covers(db, keys):
+    keys(TWITCH_CLIENT_ID="cid", TWITCH_CLIENT_SECRET="sec")
+    respx.post("https://id.twitch.tv/oauth2/token").mock(
+        return_value=httpx.Response(200, json={"access_token": "t", "expires_in": 9999})
+    )
+    respx.post("https://api.igdb.com/v4/external_games").mock(
+        return_value=httpx.Response(
+            200,
+            json=[
+                {"id": 1, "uid": "21090", "game": {"id": 123, "cover": {"id": 9, "image_id": "co1fear"}}},
+                {"id": 2, "uid": "400", "game": {"id": 456}},  # game without cover art
+            ],
+        )
+    )
+    from app.providers.igdb import covers_for_steam_appids
+
+    out = covers_for_steam_appids(db, [21090, 400, 99999])
+    assert out == {
+        21090: "https://images.igdb.com/igdb/image/upload/t_cover_big/co1fear.jpg"
+    }
+
+
+def test_igdb_steam_mapping_without_credentials_is_empty(db):
+    from app.providers.igdb import covers_for_steam_appids
+
+    assert covers_for_steam_appids(db, [21090]) == {}

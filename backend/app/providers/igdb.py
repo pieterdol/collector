@@ -17,9 +17,19 @@ from app.providers.cache import cached_fetch
 
 TOKEN_URL = "https://id.twitch.tv/oauth2/token"
 GAMES_URL = "https://api.igdb.com/v4/games"
+EXTERNAL_GAMES_URL = "https://api.igdb.com/v4/external_games"
 COVER_URL = "https://images.igdb.com/igdb/image/upload/t_cover_big/{image_id}.jpg"
+STEAM_SOURCE = 1  # external_games.external_game_source for Steam
 
 _token: dict = {"value": None, "expires": 0.0}
+
+
+def covers_for_steam_appids(db, steam_appids: list[int]) -> dict[int, str]:
+    """Module-level convenience: {} when IGDB isn't configured."""
+    provider = IgdbProvider(db)
+    if not provider.available or not steam_appids:
+        return {}
+    return provider.external_covers(steam_appids)
 
 
 class IgdbProvider(MetadataProvider):
@@ -79,6 +89,42 @@ class IgdbProvider(MetadataProvider):
         _token["value"] = payload["access_token"]
         _token["expires"] = time.time() + payload.get("expires_in", 3600)
         return _token["value"]
+
+    def external_covers(self, steam_appids: list[int]) -> dict[int, str]:
+        """Steam appid → IGDB cover URL, via IGDB's external-id mapping.
+
+        Exact ID matching (no fuzzy title search); appids IGDB doesn't
+        know, or games without cover art, are simply absent from the map.
+        """
+        out: dict[int, str] = {}
+        for start in range(0, len(steam_appids), 100):
+            chunk = steam_appids[start : start + 100]
+            uid_list = ",".join(f'"{appid}"' for appid in chunk)
+            body = (
+                "fields uid, game.cover.image_id; "
+                f"where external_game_source = {STEAM_SOURCE} & uid = ({uid_list}); limit 500;"
+            )
+            try:
+                res = httpx.post(
+                    EXTERNAL_GAMES_URL,
+                    content=body,
+                    headers={
+                        "Client-ID": get_settings().twitch_client_id,
+                        "Authorization": f"Bearer {self._token()}",
+                    },
+                    timeout=15,
+                )
+                res.raise_for_status()
+            except httpx.HTTPError:
+                continue  # partial results are fine
+            for entry in res.json():
+                uid = entry.get("uid", "")
+                image = ((entry.get("game") or {}).get("cover") or {}).get("image_id")
+                if uid.isdigit() and image:
+                    out[int(uid)] = COVER_URL.format(image_id=image)
+            if start + 100 < len(steam_appids):
+                time.sleep(0.3)  # stay under IGDB's 4 req/s limit
+        return out
 
     def _map_game(self, game: dict) -> MetadataResult:
         developer = next(

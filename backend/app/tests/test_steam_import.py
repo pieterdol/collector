@@ -138,3 +138,36 @@ def test_covers_are_fetched_in_background(client, steam_key):
     # TestClient runs FastAPI background tasks before returning, so covers exist now.
     items = client.get("/api/items?type=game", headers=headers).json()["items"]
     assert all(i["cover_path"] for i in items)
+
+
+@respx.mock
+def test_import_falls_back_to_igdb_cover_when_steam_cdn_misses(client, steam_key, monkeypatch):
+    monkeypatch.setenv("TWITCH_CLIENT_ID", "cid")
+    monkeypatch.setenv("TWITCH_CLIENT_SECRET", "sec")
+    get_settings.cache_clear()
+
+    mock_owned_games(stub_cdn=True)  # Steam library CDN 404s
+    respx.post("https://id.twitch.tv/oauth2/token").mock(
+        return_value=httpx.Response(200, json={"access_token": "t", "expires_in": 9999})
+    )
+    respx.post("https://api.igdb.com/v4/external_games").mock(
+        return_value=httpx.Response(
+            200,
+            json=[{"id": 1, "uid": "367520", "game": {"id": 5, "cover": {"id": 2, "image_id": "cohk"}}}],
+        )
+    )
+    png = bytes.fromhex(
+        "89504e470d0a1a0a0000000d4948445200000001000000010806000000"
+        "1f15c4890000000d49444154789c626001000000ffff03000006000557"
+        "bfabd40000000049444e44ae426082".replace("49444e44", "49454e44")
+    )
+    respx.get(url__regex=r"https://images\.igdb\.com/.*").mock(
+        return_value=httpx.Response(200, content=png, headers={"content-type": "image/png"})
+    )
+
+    headers = auth_headers(client)
+    client.post("/api/steam/import", json={"steam_id": "76561198000000001"}, headers=headers)
+    items = client.get("/api/items?type=game", headers=headers).json()["items"]
+    by_title = {i["title"]: i for i in items}
+    assert by_title["Hollow Knight"]["cover_path"]  # rescued via IGDB
+    assert by_title["Stardew Valley"]["cover_path"] is None  # not in the mapping
