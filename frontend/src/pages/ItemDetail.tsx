@@ -477,6 +477,18 @@ function ActivityPanel({ itemId }: { itemId: string }) {
 }
 
 const MOVIE_MEDIA = ["DVD", "Blu-ray", "Ultra HD Blu-ray", "VHS"];
+const STOREFRONTS = [
+  "Steam",
+  "Epic Games Store",
+  "GOG",
+  "Xbox App / Game Pass",
+  "EA App",
+  "Ubisoft Connect",
+  "Battle.net",
+  "itch.io",
+  "PlayStation Store",
+  "Nintendo eShop",
+];
 
 function DetailsPanel({ item }: { item: Item }) {
   const update = useUpdateItem(item.id);
@@ -501,30 +513,30 @@ function DetailsPanel({ item }: { item: Item }) {
   ]);
 
   const showMedia = item.type === "movie" && item.format === "physical";
+  const showStorefront = item.type === "game" && item.format === "digital";
   const media = typeof meta.media === "string" ? meta.media : "";
+  const storefront = typeof meta.storefront === "string" ? meta.storefront : "";
 
   return (
     <div className="panel flex flex-col gap-2.5 p-4.5" style={{ padding: 18 }}>
       <div className="paneltitle">Details</div>
       {showMedia && (
-        <div className="flex items-center justify-between gap-3 border-b border-line/60 pb-2 text-[12.5px]">
-          <span className="text-faint">Media</span>
-          <select
-            aria-label="Media"
-            value={media}
-            onChange={(e) =>
-              update.mutate({ metadata: { ...meta, media: e.target.value || undefined } })
-            }
-            className="input w-auto cursor-pointer appearance-none px-2 py-1 text-right text-[12.5px] font-medium"
-          >
-            <option value="">Choose…</option>
-            {MOVIE_MEDIA.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </div>
+        <MetaSelectRow
+          label="Media"
+          value={media}
+          options={MOVIE_MEDIA}
+          onChange={(value) => update.mutate({ metadata: { ...meta, media: value || undefined } })}
+        />
+      )}
+      {showStorefront && (
+        <MetaSelectRow
+          label="Storefront"
+          value={storefront}
+          options={STOREFRONTS}
+          onChange={(value) =>
+            update.mutate({ metadata: { ...meta, storefront: value || undefined } })
+          }
+        />
       )}
       {rows.map(([key, value]) => (
         <div key={key} className="flex justify-between gap-3 border-b border-line/60 pb-2 text-[12.5px] last:border-b-0 last:pb-0">
@@ -634,6 +646,38 @@ function DangerZone({ item }: { item: Item }) {
           Remove from collection
         </button>
       )}
+    </div>
+  );
+}
+
+/** Inline editable metadata row used by Details (Media, Storefront). */
+function MetaSelectRow({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-line/60 pb-2 text-[12.5px]">
+      <span className="text-faint">{label}</span>
+      <select
+        aria-label={label}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="input w-auto cursor-pointer appearance-none px-2 py-1 text-right text-[12.5px] font-medium"
+      >
+        <option value="">Choose…</option>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }

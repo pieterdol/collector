@@ -67,6 +67,7 @@ def import_library(
             title=game.get("name", f"App {game['appid']}"),
             meta={
                 "steam_appid": game["appid"],
+                "storefront": "Steam",
                 "platform": "PC (Microsoft Windows)",
                 "playtime_minutes": playtime_min,
                 "cover_source_url": LIBRARY_COVER.format(appid=game["appid"]),

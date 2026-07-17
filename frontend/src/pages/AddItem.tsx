@@ -23,6 +23,19 @@ const PROVIDER_LABEL: Record<ItemType, string> = {
 
 type Mode = "search" | "scan" | "manual";
 
+const STOREFRONTS = [
+  "Steam",
+  "Epic Games Store",
+  "GOG",
+  "Xbox App / Game Pass",
+  "EA App",
+  "Ubisoft Connect",
+  "Battle.net",
+  "itch.io",
+  "PlayStation Store",
+  "Nintendo eShop",
+];
+
 // Shown first in the platform dropdown; the full IGDB catalog follows.
 const COMMON_PLATFORMS = [
   "PC (Microsoft Windows)",
@@ -357,6 +370,7 @@ function ConfirmForm({
   );
   const [format, setFormat] = useState("physical");
   const [media, setMedia] = useState("");
+  const [storefront, setStorefront] = useState("");
   const [status, setStatus] = useState<ItemStatus>("backlog");
   const [price, setPrice] = useState("");
   const [date, setDate] = useState("");
@@ -395,6 +409,9 @@ function ConfirmForm({
       if (creator) metadata.developer = creator;
       if (platform) metadata.platform = platform;
       if (detectedPlatforms.length > 1) metadata.released_on = detectedPlatforms;
+      if (storefront && format === "digital" && status !== "wishlist") {
+        metadata.storefront = storefront;
+      }
     }
     if (year) metadata.year = Number(year);
     if (scannedUpc) metadata.upc = scannedUpc;
@@ -506,6 +523,17 @@ function ConfirmForm({
                 <option>Blu-ray</option>
                 <option>Ultra HD Blu-ray</option>
                 <option>VHS</option>
+              </select>
+            </label>
+          )}
+          {type === "game" && format === "digital" && (
+            <label className="field">
+              Storefront
+              <select value={storefront} onChange={(e) => setStorefront(e.target.value)}>
+                <option value="">Choose…</option>
+                {STOREFRONTS.map((option) => (
+                  <option key={option}>{option}</option>
+                ))}
               </select>
             </label>
           )}

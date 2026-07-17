@@ -55,6 +55,7 @@ def test_import_creates_digital_games_with_playtime(client, steam_key):
     assert hollow["metadata"]["playtime_minutes"] == 1860
     assert hollow["metadata"]["platform"] == "PC (Microsoft Windows)"
     assert hollow["platform"] == "PC (Microsoft Windows)"  # linked platform row
+    assert hollow["metadata"]["storefront"] == "Steam"
     assert float(hollow["progress_current"]) == 31.0  # hours
 
     stardew = by_title["Stardew Valley"]
