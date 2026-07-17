@@ -1,11 +1,12 @@
 /** Library: loan banner, type chips, status/sort dropdowns, poster grid ⇄ table. */
 
+import { useEffect, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { EmptyState } from "../components/EmptyState";
 import { ItemTable } from "../components/ItemTable";
 import { PosterCard } from "../components/PosterCard";
 import { PosterGridSkeleton } from "../components/Skeletons";
-import { useItems, usePlatforms, useStats, useUpdateItem } from "../lib/queries";
+import { useItemsInfinite, usePlatforms, useStats, useUpdateItem } from "../lib/queries";
 
 const TYPE_CHIPS = [
   { value: "", label: "All" },
@@ -23,7 +24,7 @@ export default function Shelf() {
   const sort = params.get("sort") ?? "added";
   const view = params.get("view") ?? "grid";
 
-  const { data, isLoading } = useItems({
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useItemsInfinite({
     type: type ? [type] : undefined,
     // The library shows what you own; the wishlist is its own page.
     status: status ? [status] : ["backlog", "in_progress", "completed", "abandoned"],
@@ -41,7 +42,8 @@ export default function Shelf() {
     setParams(next, { replace: true });
   }
 
-  const items = data?.items ?? [];
+  const items = data?.pages.flatMap((page) => page.items) ?? [];
+  const total = data?.pages[0]?.total;
   const filtersActive = Boolean(type || status || q);
 
   return (
@@ -60,7 +62,7 @@ export default function Shelf() {
           </button>
         ))}
         <div className="ml-auto flex items-center gap-2 text-[12.5px] text-faint">
-          <span>{data ? `${data.total} item${data.total === 1 ? "" : "s"}` : ""}</span>
+          <span>{total !== undefined ? `${total} item${total === 1 ? "" : "s"}` : ""}</span>
           {type === "game" && (platforms.data?.platforms.length ?? 0) > 0 && (
             <select
               aria-label="Platform"
@@ -133,7 +135,44 @@ export default function Shelf() {
           ))}
         </section>
       )}
+
+      <LoadMore
+        hasMore={Boolean(hasNextPage)}
+        loading={isFetchingNextPage}
+        onLoad={fetchNextPage}
+      />
     </>
+  );
+}
+
+/** Sentinel that loads the next page when scrolled into view. */
+function LoadMore({
+  hasMore,
+  loading,
+  onLoad,
+}: {
+  hasMore: boolean;
+  loading: boolean;
+  onLoad: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!hasMore || !ref.current) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !loading) onLoad();
+      },
+      { rootMargin: "600px" }, // start fetching well before the end
+    );
+    observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [hasMore, loading, onLoad]);
+
+  if (!hasMore) return null;
+  return (
+    <div ref={ref} className="flex justify-center py-6">
+      <div className="skeleton h-8 w-28 rounded-full" />
+    </div>
   );
 }
 

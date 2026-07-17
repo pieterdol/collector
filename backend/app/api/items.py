@@ -102,7 +102,13 @@ def list_platforms(
     rows = db.scalars(
         select(Platform.name)
         .join(Item, Item.platform_id == Platform.id)
-        .where(Item.user_id == user.id, Item.type == "game")
+        .where(
+            Item.user_id == user.id,
+            Item.type == "game",
+            # The library lists owned games; wishlist-only platforms would
+            # produce empty filter results there.
+            Item.status != ItemStatus.WISHLIST.value,
+        )
         .distinct()
         .order_by(Platform.name)
     ).all()

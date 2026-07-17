@@ -1,6 +1,11 @@
 /** TanStack Query hooks — every server interaction goes through here. */
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { api } from "./api";
 import type {
   ActivityEvent,
@@ -30,6 +35,24 @@ export function useItems(filters: ItemFilters) {
       api<ItemList>("/api/items", {
         params: { ...filters, limit: 200 },
       }),
+  });
+}
+
+const PAGE_SIZE = 60;
+
+/** Paged item loading for the library's infinite scroll. */
+export function useItemsInfinite(filters: ItemFilters) {
+  return useInfiniteQuery({
+    queryKey: ["items", "infinite", filters],
+    queryFn: ({ pageParam }) =>
+      api<ItemList>("/api/items", {
+        params: { ...filters, limit: PAGE_SIZE, offset: pageParam },
+      }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((n, page) => n + page.items.length, 0);
+      return loaded < lastPage.total ? loaded : undefined;
+    },
   });
 }
 

@@ -98,3 +98,13 @@ def test_platform_catalog_without_credentials_returns_custom_rows(client):
     create_item(client, headers, type="game", title="W", metadata={"platform": "PC (Steam)"})
     res = client.get("/api/platforms", headers=headers)
     assert [p["name"] for p in res.json()["platforms"]] == ["PC (Steam)"]
+
+
+def test_wishlist_only_platforms_hidden_from_library_filter(client):
+    headers = auth_headers(client)
+    create_item(client, headers, type="game", title="Owned", status="backlog",
+                metadata={"platform": "Xbox One"})
+    create_item(client, headers, type="game", title="Wanted", status="wishlist",
+                format=None, metadata={"platform": "PlayStation 5"})
+    res = client.get("/api/items/platforms", headers=headers)
+    assert res.json()["platforms"] == ["Xbox One"]

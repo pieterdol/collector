@@ -173,6 +173,7 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  white-space: nowrap;
   gap: 8px;
   background: var(--accent);
   border: none;

@@ -161,10 +161,10 @@ function PageHeader() {
   }
 
   return (
-    <header className="flex flex-wrap items-center gap-4">
+    <header className="flex flex-wrap items-center gap-x-4 gap-y-2.5">
       <h1 className="m-0 font-display text-2xl font-semibold tracking-[-0.01em]">{title}</h1>
       {showSearch && <SearchBox />}
-      <div className="ml-auto flex items-center gap-2.5">
+      <div className="ml-auto flex flex-wrap items-center justify-end gap-2.5">
         {onLibrary && (
           <div className="flex gap-0.5 rounded-[9px] border border-line bg-surface p-0.5">
             <button
@@ -232,7 +232,7 @@ function SearchBox() {
   }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="relative min-w-[220px] flex-1" style={{ maxWidth: 420 }}>
+    <div className="relative min-w-[220px] flex-1 max-w-[420px] max-[820px]:order-last max-[820px]:max-w-none max-[820px]:basis-full">
       <SearchIcon size={13} className="absolute left-3.5 top-1/2 -translate-y-1/2 opacity-50" />
       <input
         type="search"

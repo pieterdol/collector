@@ -50,7 +50,7 @@ def import_library(
         )
     }
 
-    steam_platform = find_or_create_platform(db, "PC (Steam)")
+    steam_platform = find_or_create_platform(db, "PC (Microsoft Windows)")
     imported_ids: list[uuid.UUID] = []
     skipped = 0
     for game in games:
@@ -67,7 +67,7 @@ def import_library(
             title=game.get("name", f"App {game['appid']}"),
             meta={
                 "steam_appid": game["appid"],
-                "platform": "PC (Steam)",
+                "platform": "PC (Microsoft Windows)",
                 "playtime_minutes": playtime_min,
                 "cover_source_url": LIBRARY_COVER.format(appid=game["appid"]),
             },

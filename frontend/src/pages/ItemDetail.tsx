@@ -40,13 +40,14 @@ export default function ItemDetail() {
   return <Detail item={item} />;
 }
 
-function BackLink() {
+/** Wishlist items return to the wishlist; everything else to the library. */
+function BackLink({ wishlist = false }: { wishlist?: boolean }) {
   return (
     <Link
-      to="/"
+      to={wishlist ? "/wishlist" : "/"}
       className="inline-flex w-fit items-center gap-2 rounded-[9px] border border-line bg-surface px-3 py-1.5 text-[12.5px] font-semibold text-muted no-underline hover:bg-raised hover:text-text"
     >
-      <BackIcon size={12} /> Library
+      <BackIcon size={12} /> {wishlist ? "Wishlist" : "Library"}
     </Link>
   );
 }
@@ -72,7 +73,7 @@ function Detail({ item }: { item: Item }) {
 
   return (
     <>
-      <BackLink />
+      <BackLink wishlist={item.status === "wishlist"} />
 
       {/* Hero + overlapping cover (books skip the hero band) */}
       <section>
