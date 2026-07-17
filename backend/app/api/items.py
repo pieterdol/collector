@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import Session
 
+from app.core.covers import download_cover
 from app.core.events import record_event
 from app.core.security import get_current_user
 from app.db import get_db
@@ -60,6 +61,10 @@ def create_item(
         item.completed_at = datetime.now(UTC)
     db.add(item)
     db.flush()  # assign item.id before recording the event
+    if body.cover_url:
+        # Fetched once, stored locally; the item saves fine without it.
+        item.cover_path = download_cover(body.cover_url, item.id)
+        item.meta = {**item.meta, "cover_source_url": body.cover_url}
     record_event(
         db,
         item_id=item.id,
@@ -129,7 +134,10 @@ def update_item(
 ) -> Item:
     item = _get_owned_item(db, user, item_id)
     fields = body.model_dump(exclude_unset=True)
-    fields.pop("cover_url", None)  # applied by the cover pipeline, not directly
+    cover_url = fields.pop("cover_url", None)
+    if cover_url:
+        item.cover_path = download_cover(cover_url, item.id)
+        item.meta = {**item.meta, "cover_source_url": cover_url}
 
     _apply_status_change(db, item, user, fields)
     _apply_progress_change(db, item, user, fields)
