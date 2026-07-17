@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import Session
 
+from app.core.artwork import fetch_artwork
 from app.core.covers import download_cover
 from app.core.events import record_event
 from app.core.security import get_current_user
@@ -280,6 +281,19 @@ def acquire_item(
         },
     )
     db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.post("/{item_id}/artwork", response_model=ItemOut)
+def fetch_item_artwork(
+    item_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> Item:
+    """Fetch hero art, screenshots and description once (idempotent)."""
+    item = _get_owned_item(db, user, item_id)
+    fetch_artwork(db, item)
     db.refresh(item)
     return item
 
