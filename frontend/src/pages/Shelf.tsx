@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { EmptyState } from "../components/EmptyState";
+import { GridIcon, RowsIcon } from "../components/icons";
 import { ItemTable } from "../components/ItemTable";
 import { PosterCard } from "../components/PosterCard";
 import { PosterGridSkeleton } from "../components/Skeletons";
@@ -62,7 +63,7 @@ export default function Shelf() {
           </button>
         ))}
         <div className="ml-auto flex items-center gap-2 text-[12.5px] text-faint">
-          <span>{total !== undefined ? `${total} item${total === 1 ? "" : "s"}` : ""}</span>
+          <span className="whitespace-nowrap">{total !== undefined ? `${total} item${total === 1 ? "" : "s"}` : ""}</span>
           {type === "game" && (platforms.data?.platforms.length ?? 0) > 0 && (
             <select
               aria-label="Platform"
@@ -101,6 +102,26 @@ export default function Shelf() {
             <option value="rating">Rating</option>
             <option value="updated">Recently updated</option>
           </select>
+          <div className="hidden gap-0.5 rounded-[9px] border border-line bg-surface p-0.5 max-[820px]:flex">
+            <button
+              type="button"
+              aria-pressed={view === "grid"}
+              aria-label="Gallery view"
+              onClick={() => setParam("view", "")}
+              className={`grid place-items-center rounded-[7px] px-2 py-1.5 ${view === "grid" ? "bg-raised text-text" : "text-faint"}`}
+            >
+              <GridIcon size={13} />
+            </button>
+            <button
+              type="button"
+              aria-pressed={view === "table"}
+              aria-label="Table view"
+              onClick={() => setParam("view", "table")}
+              className={`grid place-items-center rounded-[7px] px-2 py-1.5 ${view === "table" ? "bg-raised text-text" : "text-faint"}`}
+            >
+              <RowsIcon size={13} />
+            </button>
+          </div>
         </div>
       </section>
 

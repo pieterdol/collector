@@ -11,6 +11,7 @@ import {
   HeartIcon,
   LogoIcon,
   MoonIcon,
+  PlusIcon,
   RowsIcon,
   SearchIcon,
   SteamIcon,
@@ -66,10 +67,10 @@ function Sidebar() {
         <span className="font-display text-[17px] font-semibold tracking-[0.02em]">Collector</span>
       </div>
 
-      <nav className="flex flex-col gap-0.5 max-[820px]:flex-1 max-[820px]:flex-row max-[820px]:justify-around max-[820px]:gap-0">
-        {NAV.map(({ to, label, icon: Icon }) => (
+      <nav className="flex flex-col gap-0.5 max-[820px]:flex-1 max-[820px]:flex-row max-[820px]:items-center max-[820px]:justify-around max-[820px]:gap-0">
+        {NAV.map(({ to, label, icon: Icon }, index) => (
+          <NavFragment key={to} withAdd={index === 2}>
           <NavLink
-            key={to}
             to={to}
             end={to === "/"}
             className={({ isActive }) =>
@@ -90,6 +91,7 @@ function Sidebar() {
               </>
             )}
           </NavLink>
+          </NavFragment>
         ))}
       </nav>
 
@@ -105,6 +107,24 @@ function Sidebar() {
         <UserRow name={user?.display_name ?? "?"} onLogout={logout} />
       </div>
     </aside>
+  );
+}
+
+/** Wraps a nav item; on mobile, injects the center "+ Add" button before it. */
+function NavFragment({ withAdd, children }: { withAdd: boolean; children: React.ReactNode }) {
+  if (!withAdd) return <>{children}</>;
+  return (
+    <>
+      <NavLink to="/add" aria-label="Add item" className="hidden no-underline max-[820px]:block">
+        <span
+          className="grid h-10 w-10 place-items-center rounded-full text-accent-ink shadow-lift"
+          style={{ background: "var(--accent)" }}
+        >
+          <PlusIcon size={17} />
+        </span>
+      </NavLink>
+      {children}
+    </>
   );
 }
 
@@ -163,8 +183,32 @@ function PageHeader() {
   return (
     <header className="flex flex-wrap items-center gap-x-4 gap-y-2.5">
       <h1 className="m-0 font-display text-2xl font-semibold tracking-[-0.01em]">{title}</h1>
+
+      {/* Mobile: compact utilities share the title row */}
+      <div className="ml-auto hidden items-center gap-1 max-[820px]:flex">
+        <button
+          type="button"
+          onClick={() => navigate("/add?mode=scan")}
+          title="Scan barcode"
+          aria-label="Scan barcode"
+          className="grid h-9 w-9 place-items-center rounded-[9px] text-muted hover:bg-surface"
+        >
+          <span className="font-mono text-[11px]">[|||]</span>
+        </button>
+        <button
+          type="button"
+          onClick={toggle}
+          title="Switch theme"
+          aria-label="Switch theme"
+          className="grid h-9 w-9 place-items-center rounded-[9px] text-muted hover:bg-surface"
+        >
+          {theme === "dark" ? <SunIcon size={15} /> : <MoonIcon size={15} />}
+        </button>
+        <MobileUser name={user?.display_name ?? "?"} onLogout={logout} />
+      </div>
+
       {showSearch && <SearchBox />}
-      <div className="ml-auto flex flex-wrap items-center justify-end gap-2.5">
+      <div className="ml-auto flex flex-wrap items-center justify-end gap-2.5 max-[820px]:hidden">
         {onLibrary && (
           <div className="flex gap-0.5 rounded-[9px] border border-line bg-surface p-0.5">
             <button
@@ -191,22 +235,12 @@ function PageHeader() {
             </button>
           </div>
         )}
-        <button type="button" className="btn btn-ghost max-[560px]:hidden" onClick={() => navigate("/add?mode=scan")}>
+        <button type="button" className="btn btn-ghost" onClick={() => navigate("/add?mode=scan")}>
           <span className="font-mono text-xs">[|||]</span> Scan
         </button>
         <button type="button" className="btn" onClick={() => navigate("/add")}>
           + Add item
         </button>
-        <button
-          type="button"
-          onClick={toggle}
-          title="Switch theme"
-          aria-label="Switch theme"
-          className="hidden h-9 w-9 place-items-center rounded-[9px] text-muted hover:bg-surface max-[820px]:grid"
-        >
-          {theme === "dark" ? <SunIcon size={15} /> : <MoonIcon size={15} />}
-        </button>
-        <MobileUser name={user?.display_name ?? "?"} onLogout={logout} />
       </div>
     </header>
   );
