@@ -347,6 +347,22 @@ def fetch_item_artwork(
     return item
 
 
+@router.delete("/{item_id}/activity/{event_id}", status_code=204)
+def delete_activity_event(
+    item_id: uuid.UUID,
+    event_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> None:
+    """Remove one history entry (user-requested cleanup of the log)."""
+    item = _get_owned_item(db, user, item_id)
+    event = db.get(ActivityEvent, event_id)
+    if event is None or event.item_id != item.id:
+        raise HTTPException(status_code=404, detail="Activity entry not found")
+    db.delete(event)
+    db.commit()
+
+
 @router.get("/{item_id}/activity", response_model=ActivityListOut)
 def item_activity(
     item_id: uuid.UUID,

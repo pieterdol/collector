@@ -11,6 +11,7 @@ import { RatingStars } from "../components/RatingStars";
 import { DetailSkeleton } from "../components/Skeletons";
 import {
   useActivity,
+  useDeleteActivity,
   useDeleteItem,
   useFetchArtwork,
   useItem,
@@ -247,8 +248,40 @@ function ProgressPanel({ item }: { item: Item }) {
   const step = unit === "pages" ? 10 : 1;
   const [editingTotal, setEditingTotal] = useState(false);
 
-  const detail =
-    unit === "pages" ? `p. ${current}${total ? ` / ${total}` : ""}` : `${current} h${pct !== null ? ` · ${pct}%` : ""}`;
+  // Games track open-ended play time: no target, no percentage, no bar.
+  if (unit === "hours") {
+    return (
+      <div className="panel flex flex-col gap-3 p-4.5" style={{ padding: 18 }}>
+        <div className="paneltitle">Play time</div>
+        <div className="flex items-baseline justify-between">
+          <span className="font-display text-[26px] font-bold">{current} h</span>
+          <div className="flex overflow-hidden rounded-[9px] border border-line-strong">
+            <button
+              type="button"
+              aria-label="One hour less"
+              onClick={() => update.mutate({ progress_current: Math.max(0, current - 1) })}
+              className="px-3 py-1 font-mono text-sm text-muted hover:bg-raised hover:text-text"
+            >
+              −
+            </button>
+            <button
+              type="button"
+              aria-label="One hour more"
+              onClick={() => update.mutate({ progress_current: current + 1 })}
+              className="border-l border-line-strong px-3 py-1 font-mono text-sm text-muted hover:bg-raised hover:text-text"
+            >
+              +
+            </button>
+          </div>
+        </div>
+        <p className="m-0 text-xs text-faint">
+          Logged play time — add hours as you play. Steam imports prefill this.
+        </p>
+      </div>
+    );
+  }
+
+  const detail = `p. ${current}${total ? ` / ${total}` : ""}`;
 
   return (
     <div className="panel flex flex-col gap-3 p-4.5" style={{ padding: 18 }}>
@@ -378,16 +411,47 @@ function labelOf(status: unknown): string {
 
 function ActivityPanel({ itemId }: { itemId: string }) {
   const { data } = useActivity(itemId);
+  const del = useDeleteActivity(itemId);
+  const [confirming, setConfirming] = useState<string | null>(null);
   const events = data?.events ?? [];
   return (
     <div className="panel flex flex-col gap-2.5 p-5">
       <div className="paneltitle">Activity</div>
-      {events.slice(0, 8).map((event) => (
-        <div key={event.id} className="flex items-baseline gap-3 text-[12.5px]">
+      {events.slice(0, 12).map((event) => (
+        <div key={event.id} className="group flex items-baseline gap-3 text-[12.5px]">
           <span className="whitespace-nowrap font-mono text-dim">
             {new Date(event.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short" })}
           </span>
-          <span className="text-body">{describeEvent(event.event_type, event.old_value, event.new_value)}</span>
+          <span className="min-w-0 flex-1 text-body">
+            {describeEvent(event.event_type, event.old_value, event.new_value)}
+          </span>
+          {confirming === event.id ? (
+            <span className="flex flex-none items-center gap-2 text-xs">
+              <button
+                type="button"
+                className="font-semibold text-danger"
+                disabled={del.isPending}
+                onClick={() =>
+                  del.mutate(event.id, { onSettled: () => setConfirming(null) })
+                }
+              >
+                Delete
+              </button>
+              <button type="button" className="text-muted" onClick={() => setConfirming(null)}>
+                Keep
+              </button>
+            </span>
+          ) : (
+            <button
+              type="button"
+              aria-label="Delete this entry"
+              title="Delete this entry"
+              onClick={() => setConfirming(event.id)}
+              className="flex-none text-faint opacity-0 transition-opacity hover:text-danger focus-visible:opacity-100 group-hover:opacity-100 max-[820px]:opacity-60"
+            >
+              ×
+            </button>
+          )}
         </div>
       ))}
     </div>

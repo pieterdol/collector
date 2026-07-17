@@ -45,7 +45,8 @@ docker compose exec backend alembic revision --autogenerate -m "..."
   replacing the CHECK.
 - **Every item mutation writes an `activity_events` row in the same
   transaction** (`backend/app/core/events.py`). The log is append-only —
-  never update or repurpose rows. Future dashboards depend on it.
+  never update or repurpose rows (the only exception: the user-facing
+  per-event DELETE endpoint). Future dashboards depend on it.
 - **Fetch-once**: external lookups go through `provider_cache`
   (`app/providers/cache.py`); images are downloaded once into the media
   volume (`core/covers.py`, `core/artwork.py`) — never hotlink.

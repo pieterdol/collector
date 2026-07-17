@@ -90,14 +90,16 @@ function ContinuePanel({ entries }: { entries: Stats["continue"] }) {
               <div className="font-mono text-xs tabular-nums" style={{ color: `var(--${entry.type})` }}>
                 {entry.type === "book"
                   ? `p. ${entry.progress_current ?? 0}${entry.progress_total ? ` / ${entry.progress_total}` : ""}`
-                  : `${entry.progress_current ?? 0} h${entry.pct !== null ? ` · ${entry.pct}%` : ""}`}
+                  : `${entry.progress_current ?? 0} h`}
               </div>
-              <div className="col-span-2 h-[5px] overflow-hidden rounded-[3px]" style={{ background: "var(--line)" }}>
-                <div
-                  className="h-full rounded-[3px]"
-                  style={{ width: `${entry.pct ?? 0}%`, background: `var(--${entry.type})` }}
-                />
-              </div>
+              {entry.type === "book" && entry.pct !== null && (
+                <div className="col-span-2 h-[5px] overflow-hidden rounded-[3px]" style={{ background: "var(--line)" }}>
+                  <div
+                    className="h-full rounded-[3px]"
+                    style={{ width: `${entry.pct}%`, background: `var(--${entry.type})` }}
+                  />
+                </div>
+              )}
             </div>
           </Link>
         ))}

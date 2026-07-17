@@ -137,3 +137,35 @@ def test_item_activity_endpoint_lists_events(client):
     assert res.status_code == 200
     types = [e["event_type"] for e in res.json()["events"]]
     assert types == ["status_change", "item_added"]  # newest first
+
+
+def test_delete_single_activity_event(client):
+    headers = auth_headers(client)
+    item = create_item(client, headers)
+    client.patch(f"/api/items/{item['id']}", json={"status": "in_progress"}, headers=headers)
+    events = client.get(f"/api/items/{item['id']}/activity", headers=headers).json()["events"]
+    assert len(events) == 2
+    target = events[0]  # the status_change
+
+    res = client.delete(f"/api/items/{item['id']}/activity/{target['id']}", headers=headers)
+    assert res.status_code == 204
+    remaining = client.get(f"/api/items/{item['id']}/activity", headers=headers).json()["events"]
+    assert [e["id"] for e in remaining] == [events[1]["id"]]
+
+
+def test_delete_activity_event_checks_ownership(client):
+    mine = auth_headers(client, email="mine2@example.com")
+    theirs = auth_headers(client, email="theirs2@example.com")
+    item = create_item(client, theirs)
+    event = client.get(f"/api/items/{item['id']}/activity", headers=theirs).json()["events"][0]
+    res = client.delete(f"/api/items/{item['id']}/activity/{event['id']}", headers=mine)
+    assert res.status_code == 404
+
+
+def test_delete_activity_event_must_belong_to_item(client):
+    headers = auth_headers(client)
+    item_a = create_item(client, headers, title="A")
+    item_b = create_item(client, headers, title="B")
+    event_a = client.get(f"/api/items/{item_a['id']}/activity", headers=headers).json()["events"][0]
+    res = client.delete(f"/api/items/{item_b['id']}/activity/{event_a['id']}", headers=headers)
+    assert res.status_code == 404

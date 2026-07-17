@@ -120,6 +120,18 @@ export function useAcquireItem(id: string) {
   });
 }
 
+export function useDeleteActivity(itemId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (eventId: string) =>
+      api<void>(`/api/items/${itemId}/activity/${eventId}`, { method: "DELETE" }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["activity", itemId] });
+      void client.invalidateQueries({ queryKey: ["stats"] });
+    },
+  });
+}
+
 export function useEnrichSearch(type: ItemType, q: string) {
   return useQuery({
     queryKey: ["enrich", type, q],
