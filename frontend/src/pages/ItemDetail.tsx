@@ -7,7 +7,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { AcquireDialog } from "../components/AcquireDialog";
 import { Lightbox } from "../components/Lightbox";
 import { BackIcon } from "../components/icons";
-import { describeItem } from "../components/PosterCard";
+import { coverSrc, describeItem } from "../components/PosterCard";
 import { RatingStars } from "../components/RatingStars";
 import { DetailSkeleton } from "../components/Skeletons";
 import {
@@ -17,6 +17,7 @@ import {
   useFetchArtwork,
   useItem,
   useUpdateItem,
+  useUploadCover,
 } from "../lib/queries";
 import type { Item, ItemStatus } from "../lib/types";
 import { STATUS_LABEL, progressUnit } from "../lib/types";
@@ -107,15 +108,18 @@ function Detail({ item }: { item: Item }) {
               : "relative flex items-end gap-6 px-1 pt-2 max-[820px]:flex-wrap"
           }
         >
-          <div
-            className="poster w-[148px] flex-none shadow-lift max-[820px]:w-[104px]"
-            style={{ "--mc": `var(--${item.type})` } as React.CSSProperties}
-          >
-            {item.cover_path ? (
-              <img src={item.cover_path} alt={`Cover of ${item.title}`} />
-            ) : (
-              <span className="px-2 text-center font-mono text-[10.5px] text-text/45">{item.title}</span>
-            )}
+          <div className="flex w-[148px] flex-none flex-col gap-1.5 max-[820px]:w-[104px]">
+            <div
+              className="poster shadow-lift"
+              style={{ "--mc": `var(--${item.type})` } as React.CSSProperties}
+            >
+              {item.cover_path ? (
+                <img src={coverSrc(item)!} alt={`Cover of ${item.title}`} />
+              ) : (
+                <span className="px-2 text-center font-mono text-[10.5px] text-text/45">{item.title}</span>
+              )}
+            </div>
+            <CoverEditor item={item} />
           </div>
           <div className="flex min-w-0 flex-col gap-2 pb-1.5">
             <h2 className="m-0 font-display text-3xl font-bold tracking-[-0.01em] max-[820px]:text-xl">
@@ -629,6 +633,81 @@ function DangerZone({ item }: { item: Item }) {
         >
           Remove from collection
         </button>
+      )}
+    </div>
+  );
+}
+
+/** Replace the cover: photo/file upload, or fetch from a pasted URL. */
+function CoverEditor({ item }: { item: Item }) {
+  const uploadCover = useUploadCover(item.id);
+  const update = useUpdateItem(item.id);
+  const [open, setOpen] = useState(false);
+  const [url, setUrl] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+  const busy = uploadCover.isPending || update.isPending;
+  const error = (uploadCover.error ?? update.error) as Error | null;
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-fit text-[11px] font-medium text-faint hover:text-text"
+      >
+        {item.cover_path ? "Change cover" : "Add cover"}
+      </button>
+      {open && (
+        <div className="panel flex flex-col gap-2 p-2.5">
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (file) uploadCover.mutate(file, { onSuccess: () => setOpen(false) });
+            }}
+          />
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            disabled={busy}
+            onClick={() => fileRef.current?.click()}
+          >
+            {uploadCover.isPending ? "Uploading…" : "Upload photo"}
+          </button>
+          <form
+            className="flex flex-col gap-1.5"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!url.trim()) return;
+              update.mutate(
+                { cover_url: url.trim() },
+                {
+                  onSuccess: () => {
+                    setUrl("");
+                    setOpen(false);
+                  },
+                },
+              );
+            }}
+          >
+            <input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="…or paste an image URL"
+              className="input w-full px-2 py-1.5 text-[11.5px]"
+            />
+            {url.trim() && (
+              <button type="submit" className="btn btn-sm" disabled={busy}>
+                {update.isPending ? "Fetching…" : "Use this URL"}
+              </button>
+            )}
+          </form>
+          {error && <p className="m-0 text-[11px] text-danger">{error.message}</p>}
+        </div>
       )}
     </div>
   );

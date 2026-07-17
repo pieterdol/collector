@@ -48,3 +48,59 @@ def test_non_image_content_is_rejected(client):
     headers = auth_headers(client)
     item = create_item(client, headers, cover_url="https://covers.example.com/evil")
     assert item["cover_path"] is None
+
+
+def test_upload_cover_replaces_and_busts_the_old_file(client):
+    headers = auth_headers(client)
+    item = create_item(client, headers)
+
+    res = client.post(
+        f"/api/items/{item['id']}/cover",
+        files={"file": ("box.png", PNG_BYTES, "image/png")},
+        headers=headers,
+    )
+    assert res.status_code == 200, res.text
+    first_path = res.json()["cover_path"]
+    assert first_path.startswith(f"/media/covers/{item['id']}-")
+    assert first_path.endswith(".png")
+
+    from pathlib import Path
+
+    from app.config import get_settings
+
+    covers = Path(get_settings().media_dir) / "covers"
+    first_file = covers / first_path.rsplit("/", 1)[1]
+    assert first_file.read_bytes() == PNG_BYTES
+
+    # replacing gets a NEW filename (cache-safe) and removes the old file
+    res2 = client.post(
+        f"/api/items/{item['id']}/cover",
+        files={"file": ("photo.png", PNG_BYTES, "image/png")},
+        headers=headers,
+    )
+    second_path = res2.json()["cover_path"]
+    assert second_path != first_path
+    assert not first_file.exists()
+
+
+def test_upload_cover_rejects_non_images(client):
+    headers = auth_headers(client)
+    item = create_item(client, headers)
+    res = client.post(
+        f"/api/items/{item['id']}/cover",
+        files={"file": ("evil.txt", b"not an image", "text/plain")},
+        headers=headers,
+    )
+    assert res.status_code == 415
+
+
+def test_upload_cover_checks_ownership(client):
+    mine = auth_headers(client, email="up1@example.com")
+    theirs = auth_headers(client, email="up2@example.com")
+    item = create_item(client, theirs)
+    res = client.post(
+        f"/api/items/{item['id']}/cover",
+        files={"file": ("box.png", PNG_BYTES, "image/png")},
+        headers=mine,
+    )
+    assert res.status_code == 404

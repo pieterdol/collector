@@ -6,7 +6,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { api } from "./api";
+import { api, upload } from "./api";
 import type {
   ActivityEvent,
   BarcodeResult,
@@ -117,6 +117,17 @@ export function useAcquireItem(id: string) {
     mutationFn: (body: Record<string, unknown>) =>
       api<Item>(`/api/items/${id}/acquire`, { method: "POST", body }),
     onSuccess: () => invalidate(id),
+  });
+}
+
+export function useUploadCover(itemId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => upload<Item>(`/api/items/${itemId}/cover`, file),
+    onSuccess: (item) => {
+      client.setQueryData(["item", itemId], item);
+      void client.invalidateQueries({ queryKey: ["items"] });
+    },
   });
 }
 

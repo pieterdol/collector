@@ -75,7 +75,7 @@ describe("PosterCard", () => {
   it("uses the stored cover image when present", () => {
     renderCard({ ...base, cover_path: "/media/covers/x.jpg" });
     const img = document.querySelector("img");
-    expect(img).toHaveAttribute("src", "/media/covers/x.jpg");
+    expect(img?.getAttribute("src")).toContain("/media/covers/x.jpg?v=");
   });
 });
 

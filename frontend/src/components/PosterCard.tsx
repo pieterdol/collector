@@ -20,6 +20,12 @@ function progressPercent(item: Item): number | null {
   return Number.isFinite(pct) ? Math.min(100, Math.round(pct)) : null;
 }
 
+/** Cover URL versioned by updated_at, so replaced covers bypass caches. */
+export function coverSrc(item: Item): string | null {
+  if (!item.cover_path) return null;
+  return `${item.cover_path}?v=${Date.parse(item.updated_at)}`;
+}
+
 export function describeItem(item: Item): string {
   const meta = item.metadata;
   const parts: string[] = [];
@@ -39,7 +45,7 @@ export function PosterCard({ item }: { item: Item }) {
     <Link to={`/items/${item.id}`} className="cardlink">
       <div className="poster" style={{ "--mc": `var(--${item.type})` } as React.CSSProperties}>
         {item.cover_path ? (
-          <img src={item.cover_path} alt="" loading="lazy" />
+          <img src={coverSrc(item)!} alt="" loading="lazy" />
         ) : (
           <span className="px-3 text-center font-mono text-[10.5px] tracking-[0.04em] text-text/45">
             {item.title}

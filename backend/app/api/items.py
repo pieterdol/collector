@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import Session
 
@@ -329,6 +329,43 @@ def acquire_item(
             "acquisition_date": _jsonable(item.acquisition_date),
         },
     )
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.post("/{item_id}/cover", response_model=ItemOut)
+async def upload_cover(
+    item_id: uuid.UUID,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> Item:
+    """Set a custom cover from an uploaded image (e.g. a photo of the box).
+
+    The file gets a fresh random-suffixed name so replaced covers never
+    fight browser or service-worker caches; old files are removed.
+    """
+    from pathlib import Path
+
+    from app.config import get_settings
+    from app.core.covers import _EXTENSIONS, MAX_BYTES
+
+    item = _get_owned_item(db, user, item_id)
+    extension = _EXTENSIONS.get((file.content_type or "").split(";")[0].strip())
+    if extension is None:
+        raise HTTPException(status_code=415, detail="Use a JPEG, PNG or WebP image")
+    content = await file.read()
+    if len(content) > MAX_BYTES:
+        raise HTTPException(status_code=413, detail="Image is too large (max 5 MB)")
+
+    covers_dir = Path(get_settings().media_dir) / "covers"
+    covers_dir.mkdir(parents=True, exist_ok=True)
+    for old in covers_dir.glob(f"{item.id}*"):
+        old.unlink(missing_ok=True)
+    name = f"{item.id}-{uuid.uuid4().hex[:8]}{extension}"
+    (covers_dir / name).write_bytes(content)
+    item.cover_path = f"/media/covers/{name}"
     db.commit()
     db.refresh(item)
     return item

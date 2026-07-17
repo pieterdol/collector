@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { AcquireDialog } from "../components/AcquireDialog";
 import { EmptyState } from "../components/EmptyState";
-import { describeItem } from "../components/PosterCard";
+import { coverSrc, describeItem } from "../components/PosterCard";
 import { PosterGridSkeleton } from "../components/Skeletons";
 import { useItems } from "../lib/queries";
 import type { Item } from "../lib/types";
@@ -60,7 +60,7 @@ function WishCard({ item, onAcquire }: { item: Item; onAcquire: () => void }) {
           } as React.CSSProperties}
         >
           {item.cover_path ? (
-            <img src={item.cover_path} alt="" loading="lazy" />
+            <img src={coverSrc(item)!} alt="" loading="lazy" />
           ) : (
             <span className="px-3 text-center font-mono text-[10.5px] text-text/45">{item.title}</span>
           )}
