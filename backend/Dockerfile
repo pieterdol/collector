@@ -5,8 +5,9 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 WORKDIR /app
 
 # Install dependencies first so code changes don't bust this layer.
+# Dev group included so `docker compose exec backend pytest` works.
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen
 
 COPY . .
 

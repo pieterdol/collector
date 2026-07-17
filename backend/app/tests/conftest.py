@@ -1,18 +1,38 @@
 """Shared test fixtures.
 
 Tests run against a real PostgreSQL (JSONB, tsvector and CHECK constraints
-are part of what we're testing). Locally: `make test-db` starts one on :5433.
-In the container: compose's db service is used.
+are part of what we're testing) — but ALWAYS against a dedicated `*_test`
+database, never the configured one. That makes `docker compose exec backend
+pytest` safe: it creates collector_test next to the real collector DB.
 """
 
 import os
 
-# Test database must be configured before app modules create the engine.
-os.environ.setdefault(
-    "DATABASE_URL",
-    "postgresql+psycopg://postgres:test@localhost:5433/collector_test",
+# Derive the test database from DATABASE_URL before app modules read it.
+_raw = os.environ.get(
+    "DATABASE_URL", "postgresql+psycopg://postgres:test@localhost:5433/collector"
 )
+_base, _name = _raw.rsplit("/", 1)
+if not _name.endswith("_test"):
+    _name = f"{_name}_test"
+os.environ["DATABASE_URL"] = f"{_base}/{_name}"
 os.environ.setdefault("MEDIA_DIR", "/tmp/collector-test-media")
+
+
+def _ensure_test_db() -> None:
+    from sqlalchemy import create_engine, text
+
+    admin = create_engine(f"{_base}/postgres", isolation_level="AUTOCOMMIT")
+    with admin.connect() as conn:
+        exists = conn.execute(
+            text("SELECT 1 FROM pg_database WHERE datname = :n"), {"n": _name}
+        ).scalar()
+        if not exists:
+            conn.execute(text(f'CREATE DATABASE "{_name}"'))
+    admin.dispose()
+
+
+_ensure_test_db()
 
 import pytest
 from fastapi.testclient import TestClient
