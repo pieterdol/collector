@@ -17,6 +17,7 @@ os.environ.setdefault("MEDIA_DIR", "/tmp/collector-test-media")
 import pytest
 from fastapi.testclient import TestClient
 
+import app.models  # noqa: F401  (register all tables on Base.metadata)
 from app.db import Base, engine
 from app.main import app
 
