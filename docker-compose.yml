@@ -1,0 +1,45 @@
+# Collector — full stack: postgres + FastAPI backend + nginx-served frontend.
+# Works with `docker compose up` and `podman compose up`.
+# Copy .env.example to .env first (API keys are optional; app degrades gracefully).
+
+services:
+  db:
+    image: docker.io/library/postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-collector}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-collector}
+      POSTGRES_DB: ${POSTGRES_DB:-collector}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-collector} -d ${POSTGRES_DB:-collector}"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-collector}:${POSTGRES_PASSWORD:-collector}@db:5432/${POSTGRES_DB:-collector}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      MEDIA_DIR: /data/media
+      TMDB_API_KEY: ${TMDB_API_KEY:-}
+      TWITCH_CLIENT_ID: ${TWITCH_CLIENT_ID:-}
+      TWITCH_CLIENT_SECRET: ${TWITCH_CLIENT_SECRET:-}
+      STEAM_API_KEY: ${STEAM_API_KEY:-}
+    volumes:
+      - media:/data/media
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "${APP_PORT:-8080}:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  media:

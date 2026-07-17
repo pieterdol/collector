@@ -1,0 +1,104 @@
+/* Design tokens — "midnight shelf" (dark, default) and "daybreak" (light).
+ *
+ * Themes are token sets ONLY: components never reference raw colors.
+ * Adding a theme later = one more [data-theme="…"] block, no component changes.
+ *
+ * Resolution order (must stay in this order):
+ *   1. :root                       → dark (app default)
+ *   2. @media prefers light        → light for first-visit users on light OS
+ *   3. [data-theme=…]              → explicit user choice wins over both
+ */
+
+:root {
+  --bg: #0f0d20;
+  --bg-glow: #1a1636;
+  --rail: #0b0a18;
+  --surface: #191631;
+  --raised: #232048;
+  --line: #2b2750;
+  --line-soft: #211d40;
+  --text: #f1f0f7;
+  --muted: #918dae;
+  --faint: #605c82;
+  --accent: #7263f2;
+  --accent-ink: #ffffff;
+  --go: #21c179;
+  --go-ink: #062517;
+  --book: #dfa14e;
+  --movie: #e8637c;
+  --game: #4ec9a4;
+  --shadow-card: 0 2px 6px rgba(4, 2, 18, 0.45), 0 14px 34px -12px rgba(4, 2, 18, 0.6);
+  --shadow-lift: 0 4px 10px rgba(4, 2, 18, 0.5), 0 24px 48px -14px rgba(4, 2, 18, 0.7);
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f4f3fa;
+    --bg-glow: #eae8f5;
+    --rail: #ffffff;
+    --surface: #ffffff;
+    --raised: #f7f6fc;
+    --line: #e2e0ef;
+    --line-soft: #eceaf5;
+    --text: #221f3a;
+    --muted: #6f6b8e;
+    --faint: #a7a4c0;
+    --accent: #5b4be0;
+    --accent-ink: #ffffff;
+    --go: #149e66;
+    --go-ink: #ffffff;
+    --book: #b77e2e;
+    --movie: #c74560;
+    --game: #1f9e7c;
+    --shadow-card: 0 1px 3px rgba(43, 38, 90, 0.1), 0 10px 28px -12px rgba(43, 38, 90, 0.18);
+    --shadow-lift: 0 3px 8px rgba(43, 38, 90, 0.12), 0 20px 44px -14px rgba(43, 38, 90, 0.26);
+    color-scheme: light;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0f0d20;
+  --bg-glow: #1a1636;
+  --rail: #0b0a18;
+  --surface: #191631;
+  --raised: #232048;
+  --line: #2b2750;
+  --line-soft: #211d40;
+  --text: #f1f0f7;
+  --muted: #918dae;
+  --faint: #605c82;
+  --accent: #7263f2;
+  --accent-ink: #ffffff;
+  --go: #21c179;
+  --go-ink: #062517;
+  --book: #dfa14e;
+  --movie: #e8637c;
+  --game: #4ec9a4;
+  --shadow-card: 0 2px 6px rgba(4, 2, 18, 0.45), 0 14px 34px -12px rgba(4, 2, 18, 0.6);
+  --shadow-lift: 0 4px 10px rgba(4, 2, 18, 0.5), 0 24px 48px -14px rgba(4, 2, 18, 0.7);
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --bg: #f4f3fa;
+  --bg-glow: #eae8f5;
+  --rail: #ffffff;
+  --surface: #ffffff;
+  --raised: #f7f6fc;
+  --line: #e2e0ef;
+  --line-soft: #eceaf5;
+  --text: #221f3a;
+  --muted: #6f6b8e;
+  --faint: #a7a4c0;
+  --accent: #5b4be0;
+  --accent-ink: #ffffff;
+  --go: #149e66;
+  --go-ink: #ffffff;
+  --book: #b77e2e;
+  --movie: #c74560;
+  --game: #1f9e7c;
+  --shadow-card: 0 1px 3px rgba(43, 38, 90, 0.1), 0 10px 28px -12px rgba(43, 38, 90, 0.18);
+  --shadow-lift: 0 3px 8px rgba(43, 38, 90, 0.12), 0 20px 44px -14px rgba(43, 38, 90, 0.26);
+  color-scheme: light;
+}
