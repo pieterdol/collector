@@ -66,6 +66,15 @@ describe("Shelf mobile filter grouping", () => {
     expect(toggle.textContent).toContain("2");
   });
 
+  it("offers the type chips as a compact select too", async () => {
+    renderShelf("/?type=game");
+    const select = await screen.findByLabelText<HTMLSelectElement>("Type");
+    expect(select.value).toBe("game");
+
+    fireEvent.change(select, { target: { value: "movie" } });
+    await waitFor(() => expect(itemCalls().some((url) => url.includes("type=movie"))).toBe(true));
+  });
+
   it("filters from inside the panel refetch the list", async () => {
     renderShelf("/?type=game");
     fireEvent.click(await screen.findByRole("button", { name: /^filters/i }));

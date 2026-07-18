@@ -56,17 +56,33 @@ export default function Shelf() {
     <>
       <LoanBanner />
       <section className="flex flex-wrap items-center gap-2">
-        {TYPE_CHIPS.map((chip) => (
-          <button
-            key={chip.value}
-            type="button"
-            className="chip"
-            aria-pressed={type === chip.value}
-            onClick={() => setParam("type", chip.value)}
-          >
-            {chip.label}
-          </button>
-        ))}
+        {/* Desktop: one chip per type; mobile: a single compact select so the
+            whole filter bar fits on one row. */}
+        <div className="flex flex-wrap items-center gap-2 max-[820px]:hidden">
+          {TYPE_CHIPS.map((chip) => (
+            <button
+              key={chip.value}
+              type="button"
+              className="chip"
+              aria-pressed={type === chip.value}
+              onClick={() => setParam("type", chip.value)}
+            >
+              {chip.label}
+            </button>
+          ))}
+        </div>
+        <select
+          aria-label="Type"
+          value={type}
+          onChange={(e) => setParam("type", e.target.value)}
+          className="input hidden cursor-pointer appearance-none py-[7px] text-[12.5px] font-semibold text-body max-[820px]:block"
+        >
+          {TYPE_CHIPS.map((chip) => (
+            <option key={chip.value} value={chip.value}>
+              {chip.value ? chip.label : "All types"}
+            </option>
+          ))}
+        </select>
         <div className="ml-auto flex items-center gap-2 text-[12.5px] text-faint">
           <span className="whitespace-nowrap">{total !== undefined ? `${total} item${total === 1 ? "" : "s"}` : ""}</span>
           <div className="flex items-center gap-2 max-[820px]:hidden">
