@@ -277,3 +277,41 @@ def test_igdb_steam_mapping_without_credentials_is_empty(db):
     from app.providers.igdb import covers_for_steam_appids
 
     assert covers_for_steam_appids(db, [21090]) == {}
+
+
+@respx.mock
+def test_igdb_release_dates_for_steam_appids(db, keys):
+    keys(TWITCH_CLIENT_ID="cid", TWITCH_CLIENT_SECRET="sec")
+    respx.post("https://id.twitch.tv/oauth2/token").mock(
+        return_value=httpx.Response(200, json={"access_token": "t", "expires_in": 9999})
+    )
+    respx.post("https://api.igdb.com/v4/external_games").mock(
+        return_value=httpx.Response(
+            200,
+            json=[
+                {"id": 1, "uid": "367520", "game": {"id": 5, "first_release_date": 1487894400}},
+                {"id": 2, "uid": "400", "game": {"id": 6}},  # no date known
+            ],
+        )
+    )
+    from app.providers.igdb import release_dates_for_steam_appids
+
+    out = release_dates_for_steam_appids(db, [367520, 400])
+    assert out == {367520: "2017-02-24"}
+
+
+@respx.mock
+def test_igdb_release_dates_for_igdb_ids(db, keys):
+    keys(TWITCH_CLIENT_ID="cid", TWITCH_CLIENT_SECRET="sec")
+    respx.post("https://id.twitch.tv/oauth2/token").mock(
+        return_value=httpx.Response(200, json={"access_token": "t", "expires_in": 9999})
+    )
+    respx.post("https://api.igdb.com/v4/games").mock(
+        return_value=httpx.Response(
+            200, json=[{"id": 119133, "first_release_date": 1645747200}]
+        )
+    )
+    from app.providers.igdb import release_dates_for_igdb_ids
+
+    out = release_dates_for_igdb_ids(db, [119133, 14593])
+    assert out == {119133: "2022-02-25"}

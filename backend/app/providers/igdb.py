@@ -32,6 +32,78 @@ def covers_for_steam_appids(db, steam_appids: list[int]) -> dict[int, str]:
     return provider.external_covers(steam_appids)
 
 
+def _iso(timestamp) -> str | None:
+    return datetime.fromtimestamp(timestamp, UTC).date().isoformat() if timestamp else None
+
+
+def release_dates_for_steam_appids(db, steam_appids: list[int]) -> dict[int, str]:
+    """Steam appid → ISO release date via IGDB's external mapping, batched."""
+    provider = IgdbProvider(db)
+    if not provider.available or not steam_appids:
+        return {}
+    out: dict[int, str] = {}
+    for start in range(0, len(steam_appids), 100):
+        chunk = steam_appids[start : start + 100]
+        uid_list = ",".join(f'"{appid}"' for appid in chunk)
+        body = (
+            "fields uid, game.first_release_date; "
+            f"where external_game_source = {STEAM_SOURCE} & uid = ({uid_list}); limit 500;"
+        )
+        try:
+            res = httpx.post(
+                EXTERNAL_GAMES_URL,
+                content=body,
+                headers={
+                    "Client-ID": get_settings().twitch_client_id,
+                    "Authorization": f"Bearer {provider._token()}",
+                },
+                timeout=15,
+            )
+            res.raise_for_status()
+        except httpx.HTTPError:
+            continue
+        for entry in res.json():
+            uid = entry.get("uid", "")
+            date = _iso((entry.get("game") or {}).get("first_release_date"))
+            if uid.isdigit() and date:
+                out[int(uid)] = date
+        if start + 100 < len(steam_appids):
+            time.sleep(0.3)
+    return out
+
+
+def release_dates_for_igdb_ids(db, igdb_ids: list[int]) -> dict[int, str]:
+    """IGDB game id → ISO release date, batched."""
+    provider = IgdbProvider(db)
+    if not provider.available or not igdb_ids:
+        return {}
+    out: dict[int, str] = {}
+    for start in range(0, len(igdb_ids), 100):
+        chunk = igdb_ids[start : start + 100]
+        id_list = ",".join(str(i) for i in chunk)
+        body = f"fields first_release_date; where id = ({id_list}); limit 500;"
+        try:
+            res = httpx.post(
+                GAMES_URL,
+                content=body,
+                headers={
+                    "Client-ID": get_settings().twitch_client_id,
+                    "Authorization": f"Bearer {provider._token()}",
+                },
+                timeout=15,
+            )
+            res.raise_for_status()
+        except httpx.HTTPError:
+            continue
+        for entry in res.json():
+            date = _iso(entry.get("first_release_date"))
+            if entry.get("id") and date:
+                out[int(entry["id"])] = date
+        if start + 100 < len(igdb_ids):
+            time.sleep(0.3)
+    return out
+
+
 class IgdbProvider(MetadataProvider):
     name = "igdb"
     item_type = ItemType.GAME
