@@ -1,7 +1,7 @@
 /** Add flow: pick a medium, then search a catalog / scan a barcode /
  * enter manually. Search and scan prefill the same confirm form. */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { BarcodeScanner } from "../components/BarcodeScanner";
 import { SearchIcon } from "../components/icons";
@@ -170,7 +170,9 @@ function SearchMode({
 }) {
   const [q, setQ] = useState("");
   const [debounced, setDebounced] = useState("");
-  useMemo(() => {
+  // useEffect, not useMemo: only effects run their cleanup, and the cleanup
+  // is what cancels the previous keystroke's timer (the actual debounce).
+  useEffect(() => {
     const t = setTimeout(() => setDebounced(q), 300);
     return () => clearTimeout(t);
   }, [q]);
