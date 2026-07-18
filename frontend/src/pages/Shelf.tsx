@@ -8,6 +8,7 @@ import { ItemTable } from "../components/ItemTable";
 import { PosterCard } from "../components/PosterCard";
 import { PosterGridSkeleton } from "../components/Skeletons";
 import { useItemsInfinite, usePlatforms, useStats, useUpdateItem } from "../lib/queries";
+import { MOVIE_MEDIA } from "../lib/types";
 
 const TYPE_CHIPS = [
   { value: "", label: "All" },
@@ -21,6 +22,7 @@ export default function Shelf() {
   const type = params.get("type") ?? "";
   const status = params.get("status") ?? "";
   const platform = params.get("platform") ?? "";
+  const media = params.get("media") ?? "";
   const q = params.get("q") ?? "";
   const sort = params.get("sort") ?? "added";
   const view = params.get("view") ?? "grid";
@@ -30,6 +32,7 @@ export default function Shelf() {
     // The library shows what you own; the wishlist is its own page.
     status: status ? [status] : ["backlog", "in_progress", "completed", "abandoned"],
     platform: platform || undefined,
+    media: media || undefined,
     q: q || undefined,
     sort,
   });
@@ -40,6 +43,7 @@ export default function Shelf() {
     if (value) next.set(key, value);
     else next.delete(key);
     if (key === "type" && value !== "game") next.delete("platform");
+    if (key === "type" && value !== "movie") next.delete("media");
     setParams(next, { replace: true });
   }
 
@@ -50,7 +54,7 @@ export default function Shelf() {
   // On mobile the selects don't fit next to the chips (a select is as wide
   // as its longest option), so they collapse behind a Filters toggle.
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const activeFilters = [platform, status].filter(Boolean).length;
+  const activeFilters = [platform, media, status].filter(Boolean).length;
 
   return (
     <>
@@ -88,9 +92,11 @@ export default function Shelf() {
           <div className="flex items-center gap-2 max-[820px]:hidden">
             <FilterSelects
               platform={platform}
+              media={media}
               status={status}
               sort={sort}
               platformOptions={type === "game" ? (platforms.data?.platforms ?? []) : []}
+              showMedia={type === "movie"}
               setParam={setParam}
             />
           </div>
@@ -133,9 +139,11 @@ export default function Shelf() {
         >
           <FilterSelects
             platform={platform}
+            media={media}
             status={status}
             sort={sort}
             platformOptions={type === "game" ? (platforms.data?.platforms ?? []) : []}
+            showMedia={type === "movie"}
             setParam={setParam}
             stacked
           />
@@ -187,16 +195,20 @@ export default function Shelf() {
  * mobile Filters panel. */
 function FilterSelects({
   platform,
+  media,
   status,
   sort,
   platformOptions,
+  showMedia,
   setParam,
   stacked = false,
 }: {
   platform: string;
+  media: string;
   status: string;
   sort: string;
   platformOptions: string[];
+  showMedia: boolean;
   setParam: (key: string, value: string) => void;
   stacked?: boolean;
 }) {
@@ -216,6 +228,21 @@ function FilterSelects({
           {platformOptions.map((p) => (
             <option key={p} value={p}>
               {p}
+            </option>
+          ))}
+        </select>
+      )}
+      {showMedia && (
+        <select
+          aria-label="Media"
+          value={media}
+          onChange={(e) => setParam("media", e.target.value)}
+          className={cls}
+        >
+          <option value="">All media</option>
+          {MOVIE_MEDIA.map((m) => (
+            <option key={m} value={m}>
+              {m}
             </option>
           ))}
         </select>

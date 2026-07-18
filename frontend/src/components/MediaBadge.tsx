@@ -1,8 +1,9 @@
 /** Media badge in the poster's bottom-right corner: disc format for
  * physical movies (4K ULTRA HD / Blu-ray / DVD), platform abbreviation
  * for games. Styled text that evokes the real disc logos — trademarked
- * artwork is never shipped. */
+ * artwork is never shipped. Clicking a badge filters the library on it. */
 
+import { useNavigate } from "react-router-dom";
 import type { Item } from "../lib/types";
 
 /** Compact 3–5 char platform label, or null when none fits the badge. */
@@ -51,36 +52,65 @@ const PLATFORM_ABBR: Record<string, string> = {
   Dreamcast: "DC",
 };
 
+/** The badge itself. The poster is one big <Link>, so this is a nested
+ * interactive element: a span with button semantics that swallows the
+ * click and deep-links into the filtered library instead. */
+function FilterBadge({
+  to,
+  title,
+  className = "",
+  children,
+}: {
+  to: string;
+  title: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const navigate = useNavigate();
+  function go(e: React.MouseEvent | React.KeyboardEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    navigate(to);
+  }
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      title={title}
+      className={`badge badge-media ${className}`}
+      onClick={go}
+      onKeyDown={(e) => e.key === "Enter" && go(e)}
+    >
+      {children}
+    </span>
+  );
+}
+
 export function MediaBadge({ item }: { item: Item }) {
   if (item.type === "movie" && item.format === "physical") {
     const media = item.metadata.media;
+    if (typeof media !== "string" || !media) return null;
+    const to = `/?type=movie&media=${encodeURIComponent(media)}`;
     if (media === "Ultra HD Blu-ray") {
       return (
-        <span className="badge badge-media badge-uhd" title="Ultra HD Blu-ray">
+        <FilterBadge to={to} title="Ultra HD Blu-ray" className="badge-uhd">
           <b>4K</b>
           <small>ULTRA HD</small>
-        </span>
+        </FilterBadge>
       );
     }
     if (media === "Blu-ray") {
       return (
-        <span className="badge badge-media badge-bd" title="Blu-ray">
+        <FilterBadge to={to} title="Blu-ray" className="badge-bd">
           Blu-ray
-        </span>
+        </FilterBadge>
       );
     }
-    if (media === "DVD") {
+    if (media === "DVD" || media === "VHS") {
       return (
-        <span className="badge badge-media badge-dvd" title="DVD">
-          DVD
-        </span>
-      );
-    }
-    if (media === "VHS") {
-      return (
-        <span className="badge badge-media" title="VHS">
-          VHS
-        </span>
+        <FilterBadge to={to} title={media} className={media === "DVD" ? "badge-dvd" : ""}>
+          {media}
+        </FilterBadge>
       );
     }
     return null;
@@ -90,9 +120,12 @@ export function MediaBadge({ item }: { item: Item }) {
     const abbr = platformAbbr(item.platform);
     if (!abbr) return null;
     return (
-      <span className="badge badge-media" title={item.platform}>
+      <FilterBadge
+        to={`/?type=game&platform=${encodeURIComponent(item.platform)}`}
+        title={item.platform}
+      >
         {abbr}
-      </span>
+      </FilterBadge>
     );
   }
 

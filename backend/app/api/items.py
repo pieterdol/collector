@@ -123,6 +123,7 @@ def list_items(
     format: Annotated[ItemFormat | None, Query()] = None,
     status: Annotated[list[ItemStatus] | None, Query()] = None,
     platform: Annotated[str | None, Query(max_length=100)] = None,
+    media: Annotated[str | None, Query(max_length=40)] = None,
     q: Annotated[str | None, Query(max_length=200)] = None,
     sort: Annotated[str, Query(pattern="^(added|title|rating|updated)$")] = "added",
     limit: Annotated[int, Query(ge=1, le=200)] = 100,
@@ -142,6 +143,9 @@ def list_items(
         query = query.where(
             Item.platform_id.in_(select(Platform.id).where(Platform.name == platform))
         )
+    if media:
+        # Disc format of physical movies, stored as metadata.media.
+        query = query.where(Item.meta["media"].astext == media)
     if q:
         query = query.where(
             or_(

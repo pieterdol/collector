@@ -97,3 +97,20 @@ def test_platforms_endpoint_lists_distinct_owned_platforms(client):
     res = client.get("/api/items/platforms", headers=headers)
     assert res.status_code == 200
     assert res.json()["platforms"] == ["Nintendo Switch", "Xbox One"]
+
+
+def test_filter_movies_by_media(client):
+    headers = auth_headers(client)
+    create_item(
+        client, headers, type="movie", title="Heat", metadata={"media": "Blu-ray"}
+    )
+    create_item(
+        client, headers, type="movie", title="Alien", metadata={"media": "Ultra HD Blu-ray"}
+    )
+    create_item(client, headers, type="movie", title="Se7en", metadata={})
+
+    assert titles(client.get("/api/items?media=Blu-ray", headers=headers)) == ["Heat"]
+    assert titles(
+        client.get("/api/items?media=Ultra+HD+Blu-ray", headers=headers)
+    ) == ["Alien"]
+    assert titles(client.get("/api/items?media=DVD", headers=headers)) == []

@@ -75,6 +75,16 @@ describe("Shelf mobile filter grouping", () => {
     await waitFor(() => expect(itemCalls().some((url) => url.includes("type=movie"))).toBe(true));
   });
 
+  it("offers a media filter for movies instead of platforms", async () => {
+    renderShelf("/?type=movie");
+    fireEvent.click(await screen.findByRole("button", { name: /^filters/i }));
+    const panel = screen.getByRole("group", { name: /filter options/i });
+    expect(within(panel).queryByLabelText("Platform")).not.toBeInTheDocument();
+
+    fireEvent.change(within(panel).getByLabelText("Media"), { target: { value: "DVD" } });
+    await waitFor(() => expect(itemCalls().some((url) => url.includes("media=DVD"))).toBe(true));
+  });
+
   it("filters from inside the panel refetch the list", async () => {
     renderShelf("/?type=game");
     fireEvent.click(await screen.findByRole("button", { name: /^filters/i }));

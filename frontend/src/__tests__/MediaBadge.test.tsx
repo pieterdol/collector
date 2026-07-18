@@ -1,7 +1,12 @@
-import { render, screen } from "@testing-library/react";
+import { render as rtlRender, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import { MediaBadge, platformAbbr } from "../components/MediaBadge";
 import type { Item } from "../lib/types";
+
+function render(ui: React.ReactElement) {
+  return rtlRender(ui, { wrapper: MemoryRouter });
+}
 
 const base: Item = {
   id: "11111111-1111-1111-1111-111111111111",

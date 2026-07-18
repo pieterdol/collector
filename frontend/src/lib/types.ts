@@ -124,6 +124,9 @@ export const STATUS_LABEL: Record<ItemStatus, string> = {
   abandoned: "Abandoned",
 };
 
+/** Disc formats a physical movie can be stored on (metadata.media). */
+export const MOVIE_MEDIA = ["DVD", "Blu-ray", "Ultra HD Blu-ray", "VHS"];
+
 /** Unit shown for progress, per medium. Movies don't track progress. */
 export function progressUnit(type: ItemType): string | null {
   return type === "book" ? "pages" : type === "game" ? "hours" : null;

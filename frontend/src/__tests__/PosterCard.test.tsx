@@ -1,8 +1,13 @@
-import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import { describeItem, PosterCard } from "../components/PosterCard";
 import type { Item } from "../lib/types";
+
+function LocationSpy() {
+  const location = useLocation();
+  return <div data-testid="loc">{location.pathname + location.search}</div>;
+}
 
 const base: Item = {
   id: "11111111-1111-1111-1111-111111111111",
@@ -33,6 +38,7 @@ function renderCard(item: Item) {
   return render(
     <MemoryRouter>
       <PosterCard item={item} />
+      <LocationSpy />
     </MemoryRouter>,
   );
 }
@@ -86,6 +92,18 @@ describe("PosterCard", () => {
   it("shows the platform badge for games", () => {
     renderCard({ ...base, type: "game", platform: "PlayStation 5" });
     expect(screen.getByTitle("PlayStation 5")).toHaveTextContent("PS5");
+  });
+
+  it("clicking the platform badge filters the library on that platform", () => {
+    renderCard({ ...base, type: "game", platform: "PlayStation 5" });
+    fireEvent.click(screen.getByTitle("PlayStation 5"));
+    expect(screen.getByTestId("loc").textContent).toBe("/?type=game&platform=PlayStation%205");
+  });
+
+  it("clicking the disc badge filters the library on that media", () => {
+    renderCard({ ...base, type: "movie", metadata: { media: "Blu-ray" } });
+    fireEvent.click(screen.getByTitle("Blu-ray"));
+    expect(screen.getByTestId("loc").textContent).toBe("/?type=movie&media=Blu-ray");
   });
 });
 

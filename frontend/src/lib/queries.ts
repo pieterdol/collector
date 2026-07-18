@@ -24,6 +24,7 @@ export interface ItemFilters {
   status?: string[];
   format?: string;
   platform?: string;
+  media?: string;
   q?: string;
   sort?: string;
 }

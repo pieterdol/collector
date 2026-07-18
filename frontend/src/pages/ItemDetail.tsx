@@ -20,6 +20,7 @@ import {
   useUploadCover,
 } from "../lib/queries";
 import type { Item, ItemStatus } from "../lib/types";
+import { MOVIE_MEDIA } from "../lib/types";
 import { STATUS_LABEL, progressUnit } from "../lib/types";
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -515,7 +516,6 @@ function ActivityPanel({ itemId }: { itemId: string }) {
   );
 }
 
-const MOVIE_MEDIA = ["DVD", "Blu-ray", "Ultra HD Blu-ray", "VHS"];
 const STOREFRONTS = [
   "Steam",
   "Epic Games Store",
