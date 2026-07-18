@@ -34,6 +34,7 @@ APPDETAILS = {
         "success": True,
         "data": {
             "short_description": "Forge your own path in Hallownest.",
+            "release_date": {"coming_soon": False, "date": "24 Feb, 2017"},
             "screenshots": [
                 {"id": i, "path_full": f"https://cdn.example.com/shots/{i}.png"}
                 for i in range(7)
@@ -63,6 +64,7 @@ def test_steam_game_gets_hero_shots_and_description(client):
     meta = res.json()["metadata"]
     assert meta["artwork_fetched"] is True
     assert meta["description"] == "Forge your own path in Hallownest."
+    assert meta["release_date"] == "2017-02-24"
     assert meta["hero_path"] == f"/media/artwork/{item['id']}/hero.png"
     assert len(meta["screenshot_paths"]) == 5  # capped
     for path in meta["screenshot_paths"]:

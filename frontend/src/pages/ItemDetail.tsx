@@ -538,7 +538,8 @@ function DetailsPanel({ item }: { item: Item }) {
   if (typeof meta.developer === "string") rows.push(["Developer", meta.developer]);
   if (item.platform) rows.push(["Platform", item.platform]);
   if (typeof meta.publisher === "string") rows.push(["Publisher", meta.publisher]);
-  if (meta.year) rows.push(["Year", String(meta.year)]);
+  const releaseDate = typeof meta.release_date === "string" ? meta.release_date : "";
+  if (meta.year && !releaseDate) rows.push(["Year", String(meta.year)]);
   if (meta.page_count) rows.push(["Pages", String(meta.page_count)]);
   if (meta.runtime) rows.push(["Runtime", `${meta.runtime} min`]);
   if (typeof meta.isbn === "string") rows.push(["ISBN", meta.isbn]);
@@ -577,6 +578,25 @@ function DetailsPanel({ item }: { item: Item }) {
           }
         />
       )}
+      <div className="flex items-center justify-between gap-3 border-b border-line/60 pb-2 text-[12.5px]">
+        <span className="text-faint">Released</span>
+        <input
+          type="date"
+          aria-label="Release date"
+          value={releaseDate}
+          onChange={(e) => {
+            const value = e.target.value;
+            update.mutate({
+              metadata: {
+                ...meta,
+                release_date: value || undefined,
+                year: value ? Number(value.slice(0, 4)) : meta.year,
+              },
+            });
+          }}
+          className="input w-auto cursor-pointer px-2 py-1 text-right text-[12.5px] font-medium"
+        />
+      </div>
       {rows.map(([key, value]) => (
         <div key={key} className="flex justify-between gap-3 border-b border-line/60 pb-2 text-[12.5px] last:border-b-0 last:pb-0">
           <span className="text-faint">{key}</span>

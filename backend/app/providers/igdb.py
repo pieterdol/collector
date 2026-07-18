@@ -136,7 +136,8 @@ class IgdbProvider(MetadataProvider):
             None,
         )
         release = game.get("first_release_date")
-        year = datetime.fromtimestamp(release, UTC).year if release else None
+        release_dt = datetime.fromtimestamp(release, UTC) if release else None
+        year = release_dt.year if release_dt else None
         platforms = ", ".join(p["name"] for p in game.get("platforms", []) if p.get("name"))
         cover = (game.get("cover") or {}).get("image_id")
         return MetadataResult(
@@ -147,6 +148,7 @@ class IgdbProvider(MetadataProvider):
                 "developer": developer,
                 "platform": platforms or None,
                 "year": year,
+                "release_date": release_dt.date().isoformat() if release_dt else None,
             },
             cover_url=COVER_URL.format(image_id=cover) if cover else None,
             external_id=str(game.get("id")),

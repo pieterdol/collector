@@ -63,6 +63,8 @@ def fetch_artwork(db, item: Item) -> bool:
         meta["screenshot_paths"] = shot_paths
     if found.get("description") and not meta.get("description"):
         meta["description"] = found["description"]
+    if found.get("release_date") and not meta.get("release_date"):
+        meta["release_date"] = found["release_date"]
     item.meta = meta
     db.commit()
     return True
@@ -88,7 +90,22 @@ def _from_steam(db, item: Item) -> dict | None:
         "hero_url": STEAM_HERO.format(appid=appid),
         "shot_urls": [s["path_full"] for s in details.get("screenshots", []) if s.get("path_full")],
         "description": details.get("short_description"),
+        "release_date": _parse_steam_date((details.get("release_date") or {}).get("date")),
     }
+
+
+def _parse_steam_date(raw: str | None) -> str | None:
+    """Steam formats dates like '24 Feb, 2017' (locale-dependent variants exist)."""
+    if not raw:
+        return None
+    from datetime import datetime
+
+    for fmt in ("%d %b, %Y", "%b %d, %Y", "%d %B, %Y", "%B %d, %Y"):
+        try:
+            return datetime.strptime(raw, fmt).date().isoformat()
+        except ValueError:
+            continue
+    return None
 
 
 def _from_igdb(db, item: Item) -> dict | None:

@@ -119,6 +119,7 @@ def test_tmdb_search_maps_results(db, keys):
     results = provider.search("blade runner")
     assert results[0].title == "Blade Runner 2049"
     assert results[0].metadata["year"] == 2017
+    assert results[0].metadata["release_date"] == "2017-10-04"
     assert results[0].metadata["tmdb_id"] == 335984
     assert results[0].cover_url == "https://image.tmdb.org/t/p/w500/poster.jpg"
 
@@ -185,6 +186,7 @@ def test_igdb_fetches_token_then_searches(db, keys):
     assert r.metadata["developer"] == "Team Cherry"
     assert r.metadata["platform"] == "PC, Switch"
     assert r.metadata["year"] == 2017
+    assert r.metadata["release_date"] == "2017-02-24"
     assert "co1rgi" in r.cover_url
 
 

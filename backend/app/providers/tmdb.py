@@ -77,6 +77,7 @@ class TmdbProvider(MetadataProvider):
             metadata={
                 "tmdb_id": movie.get("id"),
                 "year": int(release[:4]) if len(release) >= 4 else None,
+                "release_date": release if len(release) == 10 else None,
                 "overview": movie.get("overview"),
             },
             cover_url=POSTER_URL.format(path=poster) if poster else None,
