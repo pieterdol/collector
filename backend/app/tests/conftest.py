@@ -18,6 +18,12 @@ if not _name.endswith("_test"):
 os.environ["DATABASE_URL"] = f"{_base}/{_name}"
 os.environ.setdefault("MEDIA_DIR", "/tmp/collector-test-media")
 
+# The suite assumes a credential-free baseline (so `docker compose exec
+# backend pytest` works even when the container has real keys); tests that
+# need credentials set them via monkeypatch + get_settings.cache_clear().
+for _key in ("TMDB_API_KEY", "TWITCH_CLIENT_ID", "TWITCH_CLIENT_SECRET", "STEAM_API_KEY"):
+    os.environ.pop(_key, None)
+
 
 def _ensure_test_db() -> None:
     from sqlalchemy import create_engine, text
