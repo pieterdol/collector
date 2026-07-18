@@ -247,56 +247,124 @@ function StatusPill({ item }: { item: Item }) {
   );
 }
 
+/** Local-first progress editing: taps update instantly, one PATCH (and
+ * one activity record) fires after 5s of quiet — or immediately when the
+ * page unmounts. Tap the number to type a value directly. */
+function useDebouncedProgress(item: Item, save: (value: number) => void) {
+  const server = item.progress_current ? Number(item.progress_current) : 0;
+  const [local, setLocal] = useState<number | null>(null);
+  const pending = useRef<number | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const saveRef = useRef(save);
+  saveRef.current = save;
+
+  const flush = () => {
+    clearTimeout(timer.current);
+    if (pending.current !== null) {
+      saveRef.current(pending.current);
+      pending.current = null;
+    }
+  };
+  const set = (value: number) => {
+    const clamped = Math.max(0, value);
+    setLocal(clamped);
+    pending.current = clamped;
+    clearTimeout(timer.current);
+    timer.current = setTimeout(flush, 5000);
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => flush, []); // unmount → save whatever is pending
+  useEffect(() => {
+    // server caught up with the local value → drop the local override
+    if (local !== null && server === local) setLocal(null);
+  }, [server, local]);
+
+  return { shown: local ?? server, set, flush };
+}
+
 function ProgressPanel({ item }: { item: Item }) {
   const update = useUpdateItem(item.id);
   const unit = progressUnit(item.type)!;
-  const current = item.progress_current ? Number(item.progress_current) : 0;
+  const { shown, set, flush } = useDebouncedProgress(item, (value) =>
+    update.mutate({ progress_current: value }),
+  );
   const total = item.progress_total ? Number(item.progress_total) : null;
-  const pct = total ? Math.min(100, Math.round((current / total) * 100)) : null;
+  const pct = total ? Math.min(100, Math.round((shown / total) * 100)) : null;
   const step = unit === "pages" ? 10 : 1;
   const [editingTotal, setEditingTotal] = useState(false);
+  const [editingValue, setEditingValue] = useState(false);
 
-  // Games track open-ended play time: no target, no percentage, no bar.
+  const numberEditor = editingValue ? (
+    <input
+      autoFocus
+      type="number"
+      min={0}
+      step={unit === "pages" ? 1 : 0.5}
+      defaultValue={shown}
+      onBlur={(e) => {
+        setEditingValue(false);
+        if (e.target.value !== "") set(Number(e.target.value));
+        flush(); // typing a value is an explicit commit
+      }}
+      onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+      className="input w-24 px-2 py-0.5 font-display text-[22px] font-bold"
+    />
+  ) : (
+    <button
+      type="button"
+      title="Tap to type a value"
+      onClick={() => setEditingValue(true)}
+      className="font-display text-[26px] font-bold hover:text-accent"
+    >
+      {unit === "hours" ? `${shown} h` : (pct !== null ? `${pct}%` : shown)}
+    </button>
+  );
+
+  const stepper = (
+    <div className="flex overflow-hidden rounded-[9px] border border-line-strong">
+      <button
+        type="button"
+        aria-label={`${step} ${unit} less`}
+        onClick={() => set(shown - step)}
+        className="px-3 py-1 font-mono text-sm text-muted hover:bg-raised hover:text-text"
+      >
+        −
+      </button>
+      <button
+        type="button"
+        aria-label={`${step} ${unit} more`}
+        onClick={() => set(total !== null && unit === "pages" ? Math.min(total, shown + step) : shown + step)}
+        className="border-l border-line-strong px-3 py-1 font-mono text-sm text-muted hover:bg-raised hover:text-text"
+      >
+        +
+      </button>
+    </div>
+  );
+
   if (unit === "hours") {
     return (
       <div className="panel flex flex-col gap-3 p-4.5" style={{ padding: 18 }}>
         <div className="paneltitle">Play time</div>
         <div className="flex items-baseline justify-between">
-          <span className="font-display text-[26px] font-bold">{current} h</span>
-          <div className="flex overflow-hidden rounded-[9px] border border-line-strong">
-            <button
-              type="button"
-              aria-label="One hour less"
-              onClick={() => update.mutate({ progress_current: Math.max(0, current - 1) })}
-              className="px-3 py-1 font-mono text-sm text-muted hover:bg-raised hover:text-text"
-            >
-              −
-            </button>
-            <button
-              type="button"
-              aria-label="One hour more"
-              onClick={() => update.mutate({ progress_current: current + 1 })}
-              className="border-l border-line-strong px-3 py-1 font-mono text-sm text-muted hover:bg-raised hover:text-text"
-            >
-              +
-            </button>
-          </div>
+          {numberEditor}
+          {stepper}
         </div>
         <p className="m-0 text-xs text-faint">
-          Logged play time — add hours as you play. Steam imports prefill this.
+          Tap the number to type. Changes save a few seconds after you stop.
         </p>
       </div>
     );
   }
 
-  const detail = `p. ${current}${total ? ` / ${total}` : ""}`;
-
   return (
     <div className="panel flex flex-col gap-3 p-4.5" style={{ padding: 18 }}>
       <div className="paneltitle">Progress</div>
       <div className="flex items-baseline justify-between">
-        <span className="font-display text-[26px] font-bold">{pct !== null ? `${pct}%` : `${current}`}</span>
-        <span className="font-mono text-xs text-muted">{detail}</span>
+        {numberEditor}
+        <span className="font-mono text-xs text-muted">
+          p. {shown}
+          {total ? ` / ${total}` : ""}
+        </span>
       </div>
       <div className="h-1.5 overflow-hidden rounded-[3px]" style={{ background: "var(--line)" }}>
         <div
@@ -305,26 +373,7 @@ function ProgressPanel({ item }: { item: Item }) {
         />
       </div>
       <div className="flex items-center gap-2">
-        <div className="flex overflow-hidden rounded-[9px] border border-line-strong">
-          <button
-            type="button"
-            aria-label={`${step} ${unit} less`}
-            onClick={() => update.mutate({ progress_current: Math.max(0, current - step) })}
-            className="px-3 py-1 font-mono text-sm text-muted hover:bg-raised hover:text-text"
-          >
-            −
-          </button>
-          <button
-            type="button"
-            aria-label={`${step} ${unit} more`}
-            onClick={() =>
-              update.mutate({ progress_current: total !== null ? Math.min(total, current + step) : current + step })
-            }
-            className="border-l border-line-strong px-3 py-1 font-mono text-sm text-muted hover:bg-raised hover:text-text"
-          >
-            +
-          </button>
-        </div>
+        {stepper}
         {editingTotal ? (
           <input
             autoFocus
@@ -344,7 +393,7 @@ function ProgressPanel({ item }: { item: Item }) {
             onClick={() => setEditingTotal(true)}
             className="text-xs text-faint underline decoration-dotted hover:text-text"
           >
-            {total !== null ? `total ${total} ${unit === "pages" ? "pp" : "h"}` : `set total ${unit}`}
+            {total !== null ? `total ${total} pp` : `set total ${unit}`}
           </button>
         )}
       </div>
@@ -455,7 +504,7 @@ function ActivityPanel({ itemId }: { itemId: string }) {
               aria-label="Delete this entry"
               title="Delete this entry"
               onClick={() => setConfirming(event.id)}
-              className="flex-none text-faint opacity-0 transition-opacity hover:text-danger focus-visible:opacity-100 group-hover:opacity-100 max-[820px]:opacity-60"
+              className="grid h-7 w-7 flex-none place-items-center self-center rounded-md text-[16px] leading-none text-faint opacity-0 transition-opacity hover:bg-raised hover:text-danger focus-visible:opacity-100 group-hover:opacity-100 max-[820px]:opacity-70"
             >
               ×
             </button>
