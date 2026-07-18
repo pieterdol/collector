@@ -532,11 +532,20 @@ const STOREFRONTS = [
 function DetailsPanel({ item }: { item: Item }) {
   const update = useUpdateItem(item.id);
   const meta = item.metadata;
-  const rows: Array<[string, string]> = [];
+  const rows: Array<[string, React.ReactNode]> = [];
   if (Array.isArray(meta.authors) && meta.authors.length) rows.push(["Author", meta.authors.join(", ")]);
   if (typeof meta.director === "string") rows.push(["Director", meta.director]);
   if (typeof meta.developer === "string") rows.push(["Developer", meta.developer]);
-  if (item.platform) rows.push(["Platform", item.platform]);
+  if (item.platform)
+    rows.push([
+      "Platform",
+      <Link
+        to={`/?type=game&platform=${encodeURIComponent(item.platform)}`}
+        className="text-accent no-underline hover:underline"
+      >
+        {item.platform}
+      </Link>,
+    ]);
   if (typeof meta.publisher === "string") rows.push(["Publisher", meta.publisher]);
   const releaseDate = typeof meta.release_date === "string" ? meta.release_date : "";
   if (meta.year && !releaseDate) rows.push(["Year", String(meta.year)]);
