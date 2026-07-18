@@ -4,6 +4,7 @@
 import { Link } from "react-router-dom";
 import type { Item, ItemStatus } from "../lib/types";
 import { STATUS_LABEL } from "../lib/types";
+import { MediaBadge } from "./MediaBadge";
 import { RatingStars } from "./RatingStars";
 
 const STATUS_COLOR: Record<ItemStatus, string> = {
@@ -55,6 +56,7 @@ export function PosterCard({ item }: { item: Item }) {
           {STATUS_LABEL[item.status]}
         </span>
         {onLoan && <span className="badge badge-loan">→ {item.borrowed_by}</span>}
+        <MediaBadge item={item} />
         {pct !== null && item.status === "in_progress" && (
           <div className="pstrip" title={`${item.progress_current} / ${item.progress_total}`}>
             <i style={{ width: `${pct}%` }} />

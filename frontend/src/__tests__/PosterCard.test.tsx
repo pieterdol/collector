@@ -77,6 +77,16 @@ describe("PosterCard", () => {
     const img = document.querySelector("img");
     expect(img?.getAttribute("src")).toContain("/media/covers/x.jpg?v=");
   });
+
+  it("shows the disc-format badge for physical movies", () => {
+    renderCard({ ...base, type: "movie", metadata: { media: "Ultra HD Blu-ray" } });
+    expect(screen.getByTitle("Ultra HD Blu-ray")).toHaveTextContent("4K");
+  });
+
+  it("shows the platform badge for games", () => {
+    renderCard({ ...base, type: "game", platform: "PlayStation 5" });
+    expect(screen.getByTitle("PlayStation 5")).toHaveTextContent("PS5");
+  });
 });
 
 describe("describeItem", () => {

@@ -131,6 +131,46 @@ body {
   color: var(--accent);
 }
 
+/* Media badge (disc format / game platform) in the poster's bottom-right */
+.badge-media {
+  top: auto;
+  left: auto;
+  right: 8px;
+  bottom: 8px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.badge-uhd {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.15;
+  padding: 3px 8px;
+  color: var(--uhd);
+  border-color: color-mix(in oklch, var(--uhd) 55%, transparent);
+}
+.badge-uhd b {
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+.badge-uhd small {
+  font-size: 6.5px;
+  letter-spacing: 0.22em;
+}
+.badge-bd {
+  font-style: italic;
+  letter-spacing: 0.01em;
+  color: var(--bluray);
+  border-color: color-mix(in oklch, var(--bluray) 55%, transparent);
+}
+.badge-dvd {
+  letter-spacing: 0.16em;
+  color: var(--text);
+}
+
 /* Thin progress strip on the poster's bottom edge */
 .pstrip {
   position: absolute;
