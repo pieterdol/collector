@@ -7,7 +7,13 @@ import { GridIcon, RowsIcon } from "../components/icons";
 import { ItemTable } from "../components/ItemTable";
 import { PosterCard } from "../components/PosterCard";
 import { PosterGridSkeleton } from "../components/Skeletons";
-import { useItemsInfinite, usePlatforms, useStats, useUpdateItem } from "../lib/queries";
+import {
+  flattenItemPages,
+  useItemsInfinite,
+  usePlatforms,
+  useStats,
+  useUpdateItem,
+} from "../lib/queries";
 import { MOVIE_MEDIA } from "../lib/types";
 
 const TYPE_CHIPS = [
@@ -47,7 +53,7 @@ export default function Shelf() {
     setParams(next, { replace: true });
   }
 
-  const items = data?.pages.flatMap((page) => page.items) ?? [];
+  const items = flattenItemPages(data?.pages);
   const total = data?.pages[0]?.total;
   const filtersActive = Boolean(type || status || q);
 

@@ -162,7 +162,9 @@ def list_items(
         "rating": Item.rating.desc().nullslast(),
         "updated": Item.updated_at.desc(),
     }[sort]
-    items = db.scalars(query.order_by(order).limit(limit).offset(offset)).all()
+    # id tiebreaker: batch imports share created_at, and without a total
+    # order Postgres pages tied rows arbitrarily (duplicates/gaps in the UI).
+    items = db.scalars(query.order_by(order, Item.id.desc()).limit(limit).offset(offset)).all()
     return ItemListOut(items=[ItemOut.model_validate(i) for i in items], total=total)
 
 

@@ -114,3 +114,37 @@ def test_filter_movies_by_media(client):
         client.get("/api/items?media=Ultra+HD+Blu-ray", headers=headers)
     ) == ["Alien"]
     assert titles(client.get("/api/items?media=DVD", headers=headers)) == []
+
+
+def test_pagination_is_stable_when_created_at_ties(client):
+    """Steam imports batch-create items with identical created_at; offset
+    pages must still be disjoint and cover everything (stable tiebreaker).
+
+    The heap is shuffled after the timestamp update so ties have no
+    accidental physical order to fall back on."""
+    import random
+
+    from sqlalchemy import text
+
+    from app.db import SessionLocal
+
+    headers = auth_headers(client)
+    expected = {f"Tied game {i:02d}" for i in range(60)}
+    for title in expected:
+        create_item(client, headers, type="game", title=title, format="digital")
+
+    session = SessionLocal()
+    session.execute(text("UPDATE items SET created_at = '2026-07-01 12:00:00+00'"))
+    shuffled = list(expected)
+    random.shuffle(shuffled)
+    for title in shuffled:  # individual updates scatter heap order
+        session.execute(text("UPDATE items SET review = 'x' WHERE title = :t"), {"t": title})
+    session.commit()
+    session.close()
+
+    seen: list[str] = []
+    for offset in range(0, 63, 7):
+        res = client.get(f"/api/items?limit=7&offset={offset}", headers=headers)
+        seen.extend(titles(res))
+    assert len(seen) == len(set(seen)), f"pages overlap: {sorted(set(t for t in seen if seen.count(t) > 1))}"
+    assert set(seen) == expected

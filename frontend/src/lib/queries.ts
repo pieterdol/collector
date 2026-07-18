@@ -57,6 +57,21 @@ export function useItemsInfinite(filters: ItemFilters) {
   });
 }
 
+/** Flatten infinite-query pages, dropping items already seen on an earlier
+ * page — offset pagination drifts when items are added between page loads. */
+export function flattenItemPages(pages: Array<{ items: Item[]; total: number }> | undefined): Item[] {
+  const seen = new Set<string>();
+  const out: Item[] = [];
+  for (const page of pages ?? []) {
+    for (const item of page.items) {
+      if (seen.has(item.id)) continue;
+      seen.add(item.id);
+      out.push(item);
+    }
+  }
+  return out;
+}
+
 export function useItem(id: string | undefined) {
   return useQuery({
     queryKey: ["item", id],
