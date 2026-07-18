@@ -10,7 +10,7 @@ export default function SteamImport() {
   const importer = useSteamImport();
 
   return (
-    <section className="mx-auto max-w-[560px]">
+    <section className="mx-auto w-full max-w-[560px]">
       <div className="mb-1 flex items-center gap-3">
         <SteamIcon size={26} className="text-muted" />
         <h2 className="m-0 text-[26px] font-extrabold tracking-tight">Import from Steam</h2>

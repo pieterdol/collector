@@ -63,8 +63,11 @@ export default function AddItem() {
     return map;
   }, [providers.data]);
 
+  // w-full matters: without it, a flex-column item with mx-auto shrink-wraps
+  // to its content's intrinsic width, and long unbreakable result lines
+  // (game platform lists) push the page past the viewport on mobile.
   return (
-    <section className="mx-auto max-w-[640px]">
+    <section className="mx-auto w-full max-w-[640px]">
       <h2 className="m-0 mb-1 text-[26px] font-extrabold tracking-tight">Add to collection</h2>
       <p className="m-0 mb-6 text-[14.5px] text-muted">
         Search a catalog, scan a barcode, or enter it yourself.
