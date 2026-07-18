@@ -4,6 +4,18 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import AddItem from "../pages/AddItem";
 
+const SEKIRO = {
+  title: "Sekiro: Shadows Die Twice",
+  type: "game",
+  metadata: {
+    developer: "FromSoftware",
+    year: 2019,
+    platform: "Google Stadia, PlayStation 4, PC (Microsoft Windows), Xbox One",
+  },
+  cover_url: null,
+  external_id: "9617",
+};
+
 function mockFetch() {
   vi.stubGlobal(
     "fetch",
@@ -17,7 +29,16 @@ function mockFetch() {
               { name: "igdb", type: "game", available: true },
             ],
           }
-        : { provider: "openlibrary", available: true, results: [] };
+        : url.includes("/api/platforms")
+          ? {
+              platforms: [
+                { id: "p1", name: "Nintendo Switch", abbreviation: null },
+                { id: "p2", name: "PlayStation 4", abbreviation: "PS4" },
+              ],
+            }
+          : url.includes("type=game")
+            ? { provider: "igdb", available: true, results: [SEKIRO] }
+            : { provider: "openlibrary", available: true, results: [] };
       return Promise.resolve({
         ok: true,
         status: 200,
@@ -82,5 +103,42 @@ describe("AddItem search debounce", () => {
     vi.useRealTimers();
 
     expect(searchCalls()).toHaveLength(0);
+  });
+});
+
+describe("game platform options", () => {
+  beforeEach(() => mockFetch());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  async function pickSekiro() {
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: /game/i }));
+    const input = await screen.findByPlaceholderText(/Search IGDB/);
+    fireEvent.change(input, { target: { value: "Sekiro" } });
+    fireEvent.click(await screen.findByText("Sekiro: Shadows Die Twice"));
+    return screen.findByLabelText<HTMLSelectElement>(/Platform/);
+  }
+
+  it("offers only the platforms the found game was released on", async () => {
+    const select = await pickSekiro();
+    const options = [...select.options].map((o) => o.text);
+    expect(options).toContain("PlayStation 4");
+    expect(options).toContain("Google Stadia");
+    expect(options).toContain("Xbox One");
+    expect(options).toContain("Other…");
+    expect(options).not.toContain("Nintendo Switch");
+  });
+
+  it("keeps the full catalog for manual entry", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: /game/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /manual/i }));
+    const select = await screen.findByLabelText<HTMLSelectElement>(/Platform/);
+    const options = [...select.options].map((o) => o.text);
+    expect(options).toContain("Nintendo Switch");
+    expect(options).toContain("Xbox Series X|S");
   });
 });

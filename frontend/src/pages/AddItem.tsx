@@ -385,16 +385,17 @@ function ConfirmForm({
 
   // The catalog reports every platform a game was released on; the user
   // stores the ONE they own (so the library can filter per platform).
+  // When the game was found in the catalog, offer only its release
+  // platforms ("Other…" stays as the escape hatch); the full list is for
+  // manual entries.
   const detectedPlatforms =
     typeof meta.platform === "string" ? meta.platform.split(",").map((p) => p.trim()) : [];
-  const catalog = usePlatformCatalog(type === "game");
-  const platformOptions = [
-    ...new Set([
-      ...detectedPlatforms,
-      ...COMMON_PLATFORMS,
-      ...(catalog.data?.platforms.map((p) => p.name) ?? []),
-    ]),
-  ];
+  const catalog = usePlatformCatalog(type === "game" && detectedPlatforms.length === 0);
+  const platformOptions = detectedPlatforms.length
+    ? detectedPlatforms
+    : [
+        ...new Set([...COMMON_PLATFORMS, ...(catalog.data?.platforms.map((p) => p.name) ?? [])]),
+      ];
   const [platform, setPlatform] = useState(
     detectedPlatforms.length === 1 ? detectedPlatforms[0] : "",
   );
