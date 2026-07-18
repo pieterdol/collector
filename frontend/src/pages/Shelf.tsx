@@ -1,6 +1,6 @@
 /** Library: loan banner, type chips, status/sort dropdowns, poster grid ⇄ table. */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { EmptyState } from "../components/EmptyState";
 import { GridIcon, RowsIcon } from "../components/icons";
@@ -47,6 +47,11 @@ export default function Shelf() {
   const total = data?.pages[0]?.total;
   const filtersActive = Boolean(type || status || q);
 
+  // On mobile the selects don't fit next to the chips (a select is as wide
+  // as its longest option), so they collapse behind a Filters toggle.
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const activeFilters = [platform, status].filter(Boolean).length;
+
   return (
     <>
       <LoanBanner />
@@ -64,44 +69,23 @@ export default function Shelf() {
         ))}
         <div className="ml-auto flex items-center gap-2 text-[12.5px] text-faint">
           <span className="whitespace-nowrap">{total !== undefined ? `${total} item${total === 1 ? "" : "s"}` : ""}</span>
-          {type === "game" && (platforms.data?.platforms.length ?? 0) > 0 && (
-            <select
-              aria-label="Platform"
-              value={platform}
-              onChange={(e) => setParam("platform", e.target.value)}
-              className="input cursor-pointer appearance-none py-[7px] text-[12.5px] font-semibold text-body"
-            >
-              <option value="">All platforms</option>
-              {platforms.data!.platforms.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          )}
-          <select
-            aria-label="Status"
-            value={status}
-            onChange={(e) => setParam("status", e.target.value)}
-            className="input cursor-pointer appearance-none py-[7px] text-[12.5px] font-semibold text-body"
+          <div className="flex items-center gap-2 max-[820px]:hidden">
+            <FilterSelects
+              platform={platform}
+              status={status}
+              sort={sort}
+              platformOptions={type === "game" ? (platforms.data?.platforms ?? []) : []}
+              setParam={setParam}
+            />
+          </div>
+          <button
+            type="button"
+            className="chip hidden max-[820px]:block"
+            aria-expanded={filtersOpen}
+            onClick={() => setFiltersOpen((open) => !open)}
           >
-            <option value="">Any status</option>
-            <option value="in_progress">In progress</option>
-            <option value="completed">Completed</option>
-            <option value="backlog">Backlog</option>
-            <option value="abandoned">Abandoned</option>
-          </select>
-          <select
-            aria-label="Sort"
-            value={sort}
-            onChange={(e) => setParam("sort", e.target.value)}
-            className="input cursor-pointer appearance-none py-[7px] text-[12.5px] font-semibold text-body"
-          >
-            <option value="added">Recently added</option>
-            <option value="title">Title A–Z</option>
-            <option value="rating">Rating</option>
-            <option value="updated">Recently updated</option>
-          </select>
+            Filters{activeFilters > 0 && ` · ${activeFilters}`}
+          </button>
           <div className="hidden gap-0.5 rounded-[9px] border border-line bg-surface p-0.5 max-[820px]:flex">
             <button
               type="button"
@@ -124,6 +108,23 @@ export default function Shelf() {
           </div>
         </div>
       </section>
+
+      {filtersOpen && (
+        <section
+          role="group"
+          aria-label="Filter options"
+          className="panel flex flex-col gap-2.5 p-3.5 min-[821px]:hidden"
+        >
+          <FilterSelects
+            platform={platform}
+            status={status}
+            sort={sort}
+            platformOptions={type === "game" ? (platforms.data?.platforms ?? []) : []}
+            setParam={setParam}
+            stacked
+          />
+        </section>
+      )}
 
       {isLoading ? (
         <PosterGridSkeleton />
@@ -162,6 +163,70 @@ export default function Shelf() {
         loading={isFetchingNextPage}
         onLoad={fetchNextPage}
       />
+    </>
+  );
+}
+
+/** The platform/status/sort selects; inline on desktop, stacked in the
+ * mobile Filters panel. */
+function FilterSelects({
+  platform,
+  status,
+  sort,
+  platformOptions,
+  setParam,
+  stacked = false,
+}: {
+  platform: string;
+  status: string;
+  sort: string;
+  platformOptions: string[];
+  setParam: (key: string, value: string) => void;
+  stacked?: boolean;
+}) {
+  const cls = `input cursor-pointer appearance-none py-[7px] text-[12.5px] font-semibold text-body${
+    stacked ? " w-full" : ""
+  }`;
+  return (
+    <>
+      {platformOptions.length > 0 && (
+        <select
+          aria-label="Platform"
+          value={platform}
+          onChange={(e) => setParam("platform", e.target.value)}
+          className={cls}
+        >
+          <option value="">All platforms</option>
+          {platformOptions.map((p) => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
+        </select>
+      )}
+      <select
+        aria-label="Status"
+        value={status}
+        onChange={(e) => setParam("status", e.target.value)}
+        className={cls}
+      >
+        <option value="">Any status</option>
+        <option value="in_progress">In progress</option>
+        <option value="completed">Completed</option>
+        <option value="backlog">Backlog</option>
+        <option value="abandoned">Abandoned</option>
+      </select>
+      <select
+        aria-label="Sort"
+        value={sort}
+        onChange={(e) => setParam("sort", e.target.value)}
+        className={cls}
+      >
+        <option value="added">Recently added</option>
+        <option value="title">Title A–Z</option>
+        <option value="rating">Rating</option>
+        <option value="updated">Recently updated</option>
+      </select>
     </>
   );
 }
