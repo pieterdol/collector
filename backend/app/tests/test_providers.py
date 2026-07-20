@@ -174,6 +174,28 @@ def test_tmdb_search_orders_by_popularity(db, keys):
 
 
 @respx.mock
+def test_tmdb_movie_and_tv_search_do_not_share_cache(db, keys):
+    keys(TMDB_API_KEY="k")
+    respx.get("https://api.themoviedb.org/3/search/movie").mock(
+        return_value=httpx.Response(
+            200, json={"results": [{"id": 111, "title": "Lost (the movie)"}]}
+        )
+    )
+    respx.get("https://api.themoviedb.org/3/search/tv").mock(
+        return_value=httpx.Response(
+            200, json={"results": [{"id": 222, "name": "Lost (the show)"}]}
+        )
+    )
+    # Same query, same provider name ("tmdb"): the endpoints must not
+    # collide in provider_cache, or TV reads movie rows (title vs name)
+    # and every title degrades to "Unknown".
+    movie = get_provider(ItemType.MOVIE, db).search("lost")
+    tv = get_provider(ItemType.TV, db).search("lost")
+    assert movie[0].title == "Lost (the movie)"
+    assert tv[0].title == "Lost (the show)"
+
+
+@respx.mock
 def test_tmdb_movie_details_adds_director_and_runtime(db, keys):
     keys(TMDB_API_KEY="k")
     respx.get("https://api.themoviedb.org/3/movie/335984").mock(

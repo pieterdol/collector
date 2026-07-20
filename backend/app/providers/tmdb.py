@@ -38,7 +38,7 @@ class TmdbProvider(MetadataProvider):
             return res.json()
 
         try:
-            data = cached_fetch(self.db, self.name, f"search:{query.lower()}", fetch)
+            data = cached_fetch(self.db, self.name, f"search:{endpoint}:{query.lower()}", fetch)
         except httpx.HTTPError:
             return []
         # TMDB's own ranking mixes relevance and recency; surface the most
@@ -67,7 +67,7 @@ class TmdbProvider(MetadataProvider):
             return res.json()
 
         try:
-            data = cached_fetch(self.db, self.name, f"details:{external_id}", fetch)
+            data = cached_fetch(self.db, self.name, f"details:{endpoint}:{external_id}", fetch)
         except httpx.HTTPError:
             return None
         result = self._map_result(data)
