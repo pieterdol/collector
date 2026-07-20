@@ -20,6 +20,7 @@ const TYPE_CHIPS = [
   { value: "", label: "All" },
   { value: "book", label: "Books" },
   { value: "movie", label: "Movies" },
+  { value: "tv", label: "TV" },
   { value: "game", label: "Games" },
 ];
 
@@ -49,7 +50,7 @@ export default function Shelf() {
     if (value) next.set(key, value);
     else next.delete(key);
     if (key === "type" && value !== "game") next.delete("platform");
-    if (key === "type" && value !== "movie") next.delete("media");
+    if (key === "type" && value !== "movie" && value !== "tv") next.delete("media");
     setParams(next, { replace: true });
   }
 
@@ -102,7 +103,7 @@ export default function Shelf() {
               status={status}
               sort={sort}
               platformOptions={type === "game" ? (platforms.data?.platforms ?? []) : []}
-              showMedia={type === "movie"}
+              showMedia={type === "movie" || type === "tv"}
               setParam={setParam}
             />
           </div>
@@ -149,7 +150,7 @@ export default function Shelf() {
             status={status}
             sort={sort}
             platformOptions={type === "game" ? (platforms.data?.platforms ?? []) : []}
-            showMedia={type === "movie"}
+            showMedia={type === "movie" || type === "tv"}
             setParam={setParam}
             stacked
           />

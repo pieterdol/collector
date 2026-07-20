@@ -169,9 +169,19 @@ def test_migration_produces_schema(tmp_path):
             tables = conn.execute(
                 text("SELECT tablename FROM pg_tables WHERE schemaname='public'")
             ).scalars().all()
+            type_check = conn.execute(
+                text(
+                    "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
+                    "WHERE conname = 'ck_items_type'"
+                )
+            ).scalar_one()
         scratch_engine.dispose()
         for t in ["users", "items", "activity_events", "provider_cache", "platforms", "alembic_version"]:
             assert t in tables, f"missing table {t}"
+        # Every ItemType must survive a real migration chain, not just
+        # create_all — the CHECK is what the live DB enforces.
+        for value in ["book", "movie", "tv", "game"]:
+            assert f"'{value}'" in type_check, f"{value} missing from {type_check}"
     finally:
         with admin.connect() as conn:
             conn.execute(text(f'DROP DATABASE "{scratch}" WITH (FORCE)'))

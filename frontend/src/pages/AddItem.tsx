@@ -18,6 +18,7 @@ import type { EnrichResult, ItemStatus, ItemType } from "../lib/types";
 const PROVIDER_LABEL: Record<ItemType, string> = {
   book: "Open Library",
   movie: "TMDB",
+  tv: "TMDB",
   game: "IGDB",
 };
 
@@ -73,7 +74,7 @@ export default function AddItem() {
         Search a catalog, scan a barcode, or enter it yourself.
       </p>
 
-      <div className="mb-5 grid grid-cols-3 gap-2.5">
+      <div className="mb-5 grid grid-cols-4 gap-2.5">
         {(Object.keys(PROVIDER_LABEL) as ItemType[]).map((t) => (
           <button
             key={t}
@@ -183,8 +184,8 @@ function SearchMode({
   const details = useEnrichDetails();
 
   function pick(result: EnrichResult) {
-    // Movies get a richer record (director, runtime) on selection.
-    if (type === "movie" && result.external_id) {
+    // Movies and TV get a richer record (director/creator, runtime) on selection.
+    if ((type === "movie" || type === "tv") && result.external_id) {
       details.mutate(
         { type, externalId: result.external_id },
         {
@@ -371,7 +372,13 @@ function ConfirmForm({
   );
   const [year, setYear] = useState(meta.year ? String(meta.year) : "");
   const [count, setCount] = useState(
-    meta.page_count ? String(meta.page_count) : meta.runtime ? String(meta.runtime) : "",
+    meta.page_count
+      ? String(meta.page_count)
+      : meta.runtime
+        ? String(meta.runtime)
+        : meta.number_of_seasons
+          ? String(meta.number_of_seasons)
+          : "",
   );
   const [format, setFormat] = useState("physical");
   const [media, setMedia] = useState("");
@@ -380,8 +387,22 @@ function ConfirmForm({
   const [price, setPrice] = useState("");
   const [date, setDate] = useState("");
 
-  const countLabel = type === "book" ? "Pages" : type === "movie" ? "Runtime (min)" : "Platform";
-  const creatorLabel = type === "book" ? "Author(s)" : type === "movie" ? "Director" : "Developer";
+  const countLabel =
+    type === "book"
+      ? "Pages"
+      : type === "movie"
+        ? "Runtime (min)"
+        : type === "tv"
+          ? "Seasons"
+          : "Platform";
+  const creatorLabel =
+    type === "book"
+      ? "Author(s)"
+      : type === "movie"
+        ? "Director"
+        : type === "tv"
+          ? "Creator"
+          : "Developer";
 
   // The catalog reports every platform a game was released on; the user
   // stores the ONE they own (so the library can filter per platform).
@@ -410,6 +431,10 @@ function ConfirmForm({
     } else if (type === "movie") {
       if (creator) metadata.director = creator;
       if (count) metadata.runtime = Number(count);
+      if (media && format === "physical" && status !== "wishlist") metadata.media = media;
+    } else if (type === "tv") {
+      if (creator) metadata.director = creator;
+      if (count) metadata.number_of_seasons = Number(count);
       if (media && format === "physical" && status !== "wishlist") metadata.media = media;
     } else {
       if (creator) metadata.developer = creator;
@@ -520,7 +545,7 @@ function ConfirmForm({
               <option value="digital">Digital</option>
             </select>
           </label>
-          {type === "movie" && format === "physical" && (
+          {(type === "movie" || type === "tv") && format === "physical" && (
             <label className="field">
               Media
               <select value={media} onChange={(e) => setMedia(e.target.value)}>

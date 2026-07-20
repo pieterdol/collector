@@ -85,6 +85,16 @@ describe("Shelf mobile filter grouping", () => {
     await waitFor(() => expect(itemCalls().some((url) => url.includes("media=DVD"))).toBe(true));
   });
 
+  it("offers a media filter for TV too", async () => {
+    renderShelf("/?type=tv");
+    fireEvent.click(await screen.findByRole("button", { name: /^filters/i }));
+    const panel = screen.getByRole("group", { name: /filter options/i });
+    expect(within(panel).queryByLabelText("Platform")).not.toBeInTheDocument();
+
+    fireEvent.change(within(panel).getByLabelText("Media"), { target: { value: "Blu-ray" } });
+    await waitFor(() => expect(itemCalls().some((url) => url.includes("media=Blu-ray"))).toBe(true));
+  });
+
   it("filters from inside the panel refetch the list", async () => {
     renderShelf("/?type=game");
     fireEvent.click(await screen.findByRole("button", { name: /^filters/i }));

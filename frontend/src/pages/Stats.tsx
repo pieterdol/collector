@@ -18,7 +18,7 @@ export default function StatsPage() {
     );
   }
 
-  const { book, movie, game, value } = data.tiles;
+  const { book, movie, tv, game, value } = data.tiles;
   const symbol = value.currency === "EUR" ? "€" : value.currency === "USD" ? "$" : value.currency;
 
   return (
@@ -35,6 +35,12 @@ export default function StatsPage() {
           label="Movies"
           number={movie.total}
           sub={`${movie.physical} physical · ${movie.digital} digital`}
+        />
+        <Tile
+          dot="var(--tv)"
+          label="TV"
+          number={tv.total}
+          sub={`${tv.physical} physical · ${tv.digital} digital`}
         />
         <Tile
           dot="var(--game)"

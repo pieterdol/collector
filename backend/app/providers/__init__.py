@@ -11,12 +11,15 @@ from app.providers.tmdb import TmdbProvider
 _REGISTRY: dict[ItemType, type[MetadataProvider]] = {
     ItemType.BOOK: OpenLibraryProvider,
     ItemType.MOVIE: TmdbProvider,
+    ItemType.TV: TmdbProvider,
     ItemType.GAME: IgdbProvider,
 }
 
 
 def get_provider(item_type: ItemType, db: Session) -> MetadataProvider:
-    return _REGISTRY[item_type](db)
+    provider = _REGISTRY[item_type](db)
+    provider.item_type = item_type
+    return provider
 
 
 def all_providers(db: Session) -> list[MetadataProvider]:

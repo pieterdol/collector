@@ -27,6 +27,7 @@ def stats(db: Session = Depends(get_db), user: User = Depends(get_current_user))
         "tiles": {
             "book": _book_tile(db, user),
             "movie": _movie_tile(db, user),
+            "tv": _tv_tile(db, user),
             "game": _game_tile(db, user),
             "value": _value_tile(db, user),
         },
@@ -61,6 +62,18 @@ def _movie_tile(db, user) -> dict:
             func.count().filter(Item.format == "physical"),
             func.count().filter(Item.format == "digital"),
         ).where(Item.user_id == user.id, Item.type == ItemType.MOVIE.value),
+    )
+    return {"total": row[0], "physical": row[1], "digital": row[2]}
+
+
+def _tv_tile(db, user) -> dict:
+    row = _one(
+        db,
+        select(
+            func.count(),
+            func.count().filter(Item.format == "physical"),
+            func.count().filter(Item.format == "digital"),
+        ).where(Item.user_id == user.id, Item.type == ItemType.TV.value),
     )
     return {"total": row[0], "physical": row[1], "digital": row[2]}
 

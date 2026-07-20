@@ -20,6 +20,7 @@
   --color-done: var(--done);
   --color-book: var(--book);
   --color-movie: var(--movie);
+  --color-tv: var(--tv);
   --color-game: var(--game);
 
   --font-sans: "IBM Plex Sans Variable", system-ui, sans-serif;

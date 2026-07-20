@@ -12,6 +12,7 @@ from enum import StrEnum
 class ItemType(StrEnum):
     BOOK = "book"
     MOVIE = "movie"
+    TV = "tv"
     GAME = "game"
 
 

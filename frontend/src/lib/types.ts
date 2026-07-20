@@ -1,5 +1,5 @@
 /** Mirrors backend/app/domain/enums.py — keep in sync when adding values. */
-export type ItemType = "book" | "movie" | "game";
+export type ItemType = "book" | "movie" | "tv" | "game";
 export type ItemFormat = "physical" | "digital";
 export type ItemStatus = "wishlist" | "backlog" | "in_progress" | "completed" | "abandoned";
 
@@ -85,6 +85,7 @@ export interface SteamImportResult {
 export interface Stats {
   tiles: {
     book: { total: number; in_progress: number; completed_this_year: number };
+    tv: { total: number; physical: number; digital: number };
     movie: { total: number; physical: number; digital: number };
     game: { total: number; via_steam: number; hours_played: number };
     value: { total: string; this_month: string; currency: string };
@@ -112,6 +113,7 @@ export interface Stats {
 
 export const TYPE_LABEL: Record<ItemType, string> = {
   book: "Book",
+  tv: "TV",
   movie: "Movie",
   game: "Game",
 };

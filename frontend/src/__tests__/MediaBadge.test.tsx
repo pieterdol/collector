@@ -75,6 +75,22 @@ describe("MediaBadge — movies", () => {
   });
 });
 
+describe("MediaBadge — tv", () => {
+  function tv(media?: string, format: Item["format"] = "physical"): Item {
+    return { ...base, type: "tv", format, metadata: media ? { media } : {} };
+  }
+
+  it("shows the disc badge for physical TV box sets", () => {
+    render(<MediaBadge item={tv("Blu-ray")} />);
+    expect(screen.getByTitle("Blu-ray")).toHaveTextContent("Blu-ray");
+  });
+
+  it("renders nothing for digital TV", () => {
+    const { container } = render(<MediaBadge item={tv("DVD", "digital")} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+});
+
 describe("MediaBadge — games", () => {
   it("shows the abbreviated platform", () => {
     render(<MediaBadge item={game("PlayStation 5")} />);

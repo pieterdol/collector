@@ -31,12 +31,12 @@ const GAME = {
   completed_at: null,
 };
 
-function mockFetch() {
+function mockFetch(item: object = GAME) {
   vi.stubGlobal(
     "fetch",
     vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
-      const body = url.includes("/activity") ? { events: [] } : GAME;
+      const body = url.includes("/activity") ? { events: [] } : item;
       return Promise.resolve({
         ok: true,
         status: 200,
@@ -47,23 +47,42 @@ function mockFetch() {
   );
 }
 
+function renderDetail() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={[`/items/${ID}`]}>
+        <Routes>
+          <Route path="/items/:id" element={<ItemDetail />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
 describe("ItemDetail details panel", () => {
   beforeEach(() => mockFetch());
   afterEach(() => vi.unstubAllGlobals());
 
   it("links the platform to the filtered library", async () => {
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(
-      <QueryClientProvider client={client}>
-        <MemoryRouter initialEntries={[`/items/${ID}`]}>
-          <Routes>
-            <Route path="/items/:id" element={<ItemDetail />} />
-          </Routes>
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
+    renderDetail();
 
     const link = await screen.findByRole("link", { name: "PlayStation 4" });
     expect(link).toHaveAttribute("href", "/?type=game&platform=PlayStation%204");
+  });
+
+  it("labels the TV creator as Creator, not Director", async () => {
+    vi.unstubAllGlobals();
+    mockFetch({
+      ...GAME,
+      type: "tv",
+      platform: null,
+      metadata: { director: "Vince Gilligan", year: 2008, artwork_fetched: true },
+    });
+    renderDetail();
+
+    expect(await screen.findByText("Creator")).toBeInTheDocument();
+    expect(screen.getByText("Vince Gilligan")).toBeInTheDocument();
+    expect(screen.queryByText("Director")).not.toBeInTheDocument();
   });
 });

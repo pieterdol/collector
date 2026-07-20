@@ -534,7 +534,8 @@ function DetailsPanel({ item }: { item: Item }) {
   const meta = item.metadata;
   const rows: Array<[string, React.ReactNode]> = [];
   if (Array.isArray(meta.authors) && meta.authors.length) rows.push(["Author", meta.authors.join(", ")]);
-  if (typeof meta.director === "string") rows.push(["Director", meta.director]);
+  if (typeof meta.director === "string")
+    rows.push([item.type === "tv" ? "Creator" : "Director", meta.director]);
   if (typeof meta.developer === "string") rows.push(["Developer", meta.developer]);
   if (item.platform)
     rows.push([
@@ -561,7 +562,7 @@ function DetailsPanel({ item }: { item: Item }) {
     new Date(item.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }),
   ]);
 
-  const showMedia = item.type === "movie" && item.format === "physical";
+  const showMedia = (item.type === "movie" || item.type === "tv") && item.format === "physical";
   const showStorefront = item.type === "game" && item.format === "digital";
   const media = typeof meta.media === "string" ? meta.media : "";
   const storefront = typeof meta.storefront === "string" ? meta.storefront : "";

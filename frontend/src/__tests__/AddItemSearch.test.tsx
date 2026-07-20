@@ -26,6 +26,7 @@ function mockFetch() {
             providers: [
               { name: "openlibrary", type: "book", available: true },
               { name: "tmdb", type: "movie", available: true },
+              { name: "tmdb", type: "tv", available: true },
               { name: "igdb", type: "game", available: true },
             ],
           }
@@ -140,5 +141,29 @@ describe("game platform options", () => {
     const options = [...select.options].map((o) => o.text);
     expect(options).toContain("Nintendo Switch");
     expect(options).toContain("Xbox Series X|S");
+  });
+});
+
+describe("TV type", () => {
+  beforeEach(() => mockFetch());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it("is a selectable type backed by TMDB", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: /tv/i }));
+    expect(await screen.findByPlaceholderText(/Search TMDB/)).toBeInTheDocument();
+  });
+
+  it("offers the disc-media select for physical TV in manual entry", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: /tv/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /manual/i }));
+    const media = await screen.findByLabelText<HTMLSelectElement>("Media");
+    const options = [...media.options].map((o) => o.text);
+    expect(options).toContain("Blu-ray");
+    expect(options).toContain("Ultra HD Blu-ray");
   });
 });

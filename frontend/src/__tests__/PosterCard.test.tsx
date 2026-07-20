@@ -105,6 +105,12 @@ describe("PosterCard", () => {
     fireEvent.click(screen.getByTitle("Blu-ray"));
     expect(screen.getByTestId("loc").textContent).toBe("/?type=movie&media=Blu-ray");
   });
+
+  it("shows the disc badge for physical TV and deep-links to the TV type", () => {
+    renderCard({ ...base, type: "tv", metadata: { media: "DVD" } });
+    fireEvent.click(screen.getByTitle("DVD"));
+    expect(screen.getByTestId("loc").textContent).toBe("/?type=tv&media=DVD");
+  });
 });
 
 describe("describeItem", () => {

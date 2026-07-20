@@ -26,9 +26,11 @@ class TmdbProvider(MetadataProvider):
         if not self.available:
             return []
 
+        endpoint = "tv" if self.item_type == ItemType.TV else "movie"
+
         def fetch() -> dict:
             res = httpx.get(
-                f"{BASE}/search/movie",
+                f"{BASE}/search/{endpoint}",
                 params={"api_key": get_settings().tmdb_api_key, "query": query},
                 timeout=10,
             )
@@ -39,16 +41,18 @@ class TmdbProvider(MetadataProvider):
             data = cached_fetch(self.db, self.name, f"search:{query.lower()}", fetch)
         except httpx.HTTPError:
             return []
-        return [self._map_movie(m) for m in data.get("results", [])[:10]]
+        return [self._map_result(m) for m in data.get("results", [])[:10]]
 
     def details(self, external_id: str) -> MetadataResult | None:
-        """Full record (director, runtime) once the user picks a result."""
+        """Full record (director/creator, runtime) once the user picks a result."""
         if not self.available:
             return None
 
+        endpoint = "tv" if self.item_type == ItemType.TV else "movie"
+
         def fetch() -> dict:
             res = httpx.get(
-                f"{BASE}/movie/{external_id}",
+                f"{BASE}/{endpoint}/{external_id}",
                 params={"api_key": get_settings().tmdb_api_key, "append_to_response": "credits"},
                 timeout=10,
             )
@@ -56,30 +60,43 @@ class TmdbProvider(MetadataProvider):
             return res.json()
 
         try:
-            movie = cached_fetch(self.db, self.name, f"details:{external_id}", fetch)
+            data = cached_fetch(self.db, self.name, f"details:{external_id}", fetch)
         except httpx.HTTPError:
             return None
-        result = self._map_movie(movie)
-        result.metadata["runtime"] = movie.get("runtime")
+        result = self._map_result(data)
+        if self.item_type == ItemType.MOVIE:
+            result.metadata["runtime"] = data.get("runtime")
+        else:
+            result.metadata["episode_runtime"] = data.get("episode_run_time", [None])[0]
+            result.metadata["number_of_episodes"] = data.get("number_of_episodes", [None])
+            result.metadata["number_of_seasons"] = data.get("number_of_seasons", [None])
+
         director = next(
-            (c["name"] for c in movie.get("credits", {}).get("crew", []) if c.get("job") == "Director"),
+            (c["name"] for c in data.get("credits", {}).get("crew", []) if c.get("job") == "Director"),
             None,
         )
+        if not director and self.item_type == ItemType.TV:
+            director = next(
+                (c["name"] for c in data.get("created_by", [])),
+                None,
+            )
         result.metadata["director"] = director
         return result
 
-    def _map_movie(self, movie: dict) -> MetadataResult:
-        release = movie.get("release_date") or ""
-        poster = movie.get("poster_path")
+    def _map_result(self, data: dict) -> MetadataResult:
+        is_tv = self.item_type == ItemType.TV
+        title = data.get("name" if is_tv else "title", "Unknown")
+        release = data.get("first_air_date" if is_tv else "release_date") or ""
+        poster = data.get("poster_path")
         return MetadataResult(
-            title=movie.get("title", "Unknown"),
-            item_type=ItemType.MOVIE,
+            title=title,
+            item_type=self.item_type,
             metadata={
-                "tmdb_id": movie.get("id"),
+                "tmdb_id": data.get("id"),
                 "year": int(release[:4]) if len(release) >= 4 else None,
                 "release_date": release if len(release) == 10 else None,
-                "overview": movie.get("overview"),
+                "overview": data.get("overview"),
             },
             cover_url=POSTER_URL.format(path=poster) if poster else None,
-            external_id=str(movie.get("id")),
+            external_id=str(data.get("id")),
         )

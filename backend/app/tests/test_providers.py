@@ -89,15 +89,16 @@ def test_openlibrary_isbn_lookup(db):
     assert result.metadata["authors"] == ["Frank Herbert"]
 
 
-def test_tmdb_unavailable_without_key(db, keys):
+@pytest.mark.parametrize("item_type", [ItemType.MOVIE, ItemType.TV])
+def test_tmdb_unavailable_without_key(db, keys, item_type):
     keys(TMDB_API_KEY="")
-    provider = get_provider(ItemType.MOVIE, db)
+    provider = get_provider(item_type, db)
     assert not provider.available
     assert provider.search("blade runner") == []
 
 
 @respx.mock
-def test_tmdb_search_maps_results(db, keys):
+def test_tmdb_movie_search_maps_results(db, keys):
     keys(TMDB_API_KEY="k")
     respx.get("https://api.themoviedb.org/3/search/movie").mock(
         return_value=httpx.Response(
@@ -125,7 +126,35 @@ def test_tmdb_search_maps_results(db, keys):
 
 
 @respx.mock
-def test_tmdb_details_adds_director_and_runtime(db, keys):
+def test_tmdb_tv_search_maps_results(db, keys):
+    keys(TMDB_API_KEY="k")
+    respx.get("https://api.themoviedb.org/3/search/tv").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "results": [
+                    {
+                        "id": 1396,
+                        "name": "Breaking Bad",
+                        "first_air_date": "2008-01-20",
+                        "poster_path": "/poster.jpg",
+                        "overview": "When Walter White, a New Mexico chemistry teacher...",
+                    }
+                ]
+            },
+        )
+    )
+    provider = get_provider(ItemType.TV, db)
+    results = provider.search("breaking bad")
+    assert results[0].title == "Breaking Bad"
+    assert results[0].metadata["year"] == 2008
+    assert results[0].metadata["release_date"] == "2008-01-20"
+    assert results[0].metadata["tmdb_id"] == 1396
+    assert results[0].cover_url == "https://image.tmdb.org/t/p/w500/poster.jpg"
+
+
+@respx.mock
+def test_tmdb_movie_details_adds_director_and_runtime(db, keys):
     keys(TMDB_API_KEY="k")
     respx.get("https://api.themoviedb.org/3/movie/335984").mock(
         return_value=httpx.Response(
@@ -149,6 +178,35 @@ def test_tmdb_details_adds_director_and_runtime(db, keys):
     result = provider.details("335984")
     assert result.metadata["director"] == "Denis Villeneuve"
     assert result.metadata["runtime"] == 164
+
+
+@respx.mock
+def test_tmdb_tv_details_adds_episode_runtime(db, keys):
+    keys(TMDB_API_KEY="k")
+    respx.get("https://api.themoviedb.org/3/tv/1399").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "id": 1399,
+                "name": "Game of Thrones",
+                "first_air_date": "2011-04-17",
+                "episode_run_time": [60],
+                "poster_path": "/poster.jpg",
+                "created_by": [
+                    {"name": "David Benioff"},
+                    {"name": "D.B. Weiss"},
+                ],
+                "number_of_episodes": 73,
+                "number_of_seasons": 8,
+            },
+        )
+    )
+    provider = get_provider(ItemType.TV, db)
+    result = provider.details("1399")
+    assert result.metadata["director"] == "David Benioff"
+    assert result.metadata["episode_runtime"] == 60
+    assert result.metadata["number_of_episodes"] == 73
+    assert result.metadata["number_of_seasons"] == 8
 
 
 @respx.mock

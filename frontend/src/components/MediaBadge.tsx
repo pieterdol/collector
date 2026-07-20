@@ -1,7 +1,8 @@
 /** Media badge in the poster's bottom-right corner: disc format for
- * physical movies (4K ULTRA HD / Blu-ray / DVD), platform abbreviation
- * for games. Styled text that evokes the real disc logos — trademarked
- * artwork is never shipped. Clicking a badge filters the library on it. */
+ * physical movies and TV (4K ULTRA HD / Blu-ray / DVD), platform
+ * abbreviation for games. Styled text that evokes the real disc logos —
+ * trademarked artwork is never shipped. Clicking a badge filters the
+ * library on it. */
 
 import { useNavigate } from "react-router-dom";
 import type { Item } from "../lib/types";
@@ -87,10 +88,10 @@ function FilterBadge({
 }
 
 export function MediaBadge({ item }: { item: Item }) {
-  if (item.type === "movie" && item.format === "physical") {
+  if ((item.type === "movie" || item.type === "tv") && item.format === "physical") {
     const media = item.metadata.media;
     if (typeof media !== "string" || !media) return null;
-    const to = `/?type=movie&media=${encodeURIComponent(media)}`;
+    const to = `/?type=${item.type}&media=${encodeURIComponent(media)}`;
     if (media === "Ultra HD Blu-ray") {
       return (
         <FilterBadge to={to} title="Ultra HD Blu-ray" className="badge-uhd">
