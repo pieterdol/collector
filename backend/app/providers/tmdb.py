@@ -41,7 +41,14 @@ class TmdbProvider(MetadataProvider):
             data = cached_fetch(self.db, self.name, f"search:{query.lower()}", fetch)
         except httpx.HTTPError:
             return []
-        return [self._map_result(m) for m in data.get("results", [])[:10]]
+        # TMDB's own ranking mixes relevance and recency; surface the most
+        # popular titles first so the obvious pick sits at the top.
+        ranked = sorted(
+            data.get("results", []),
+            key=lambda m: m.get("popularity") or 0,
+            reverse=True,
+        )
+        return [self._map_result(m) for m in ranked[:10]]
 
     def details(self, external_id: str) -> MetadataResult | None:
         """Full record (director/creator, runtime) once the user picks a result."""

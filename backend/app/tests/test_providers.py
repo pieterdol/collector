@@ -154,6 +154,26 @@ def test_tmdb_tv_search_maps_results(db, keys):
 
 
 @respx.mock
+def test_tmdb_search_orders_by_popularity(db, keys):
+    keys(TMDB_API_KEY="k")
+    respx.get("https://api.themoviedb.org/3/search/tv").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "results": [
+                    {"id": 1, "name": "Obscure Spinoff", "popularity": 3.2},
+                    {"id": 2, "name": "The Hit Show", "popularity": 88.7},
+                    {"id": 3, "name": "Mid Show", "popularity": 40.0},
+                ]
+            },
+        )
+    )
+    provider = get_provider(ItemType.TV, db)
+    titles = [r.title for r in provider.search("show")]
+    assert titles == ["The Hit Show", "Mid Show", "Obscure Spinoff"]
+
+
+@respx.mock
 def test_tmdb_movie_details_adds_director_and_runtime(db, keys):
     keys(TMDB_API_KEY="k")
     respx.get("https://api.themoviedb.org/3/movie/335984").mock(
