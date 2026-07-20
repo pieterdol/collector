@@ -70,4 +70,5 @@ def test_providers_status_lists_all(client):
     body = {p["type"]: p for p in res.json()["providers"]}
     assert body["book"]["available"] is True  # Open Library needs no key
     assert body["movie"]["available"] is False
+    assert body["tv"]["available"] is False  # TMDB, reported distinctly from movies
     assert body["game"]["available"] is False

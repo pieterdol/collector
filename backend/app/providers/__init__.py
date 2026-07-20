@@ -23,7 +23,7 @@ def get_provider(item_type: ItemType, db: Session) -> MetadataProvider:
 
 
 def all_providers(db: Session) -> list[MetadataProvider]:
-    return [cls(db) for cls in _REGISTRY.values()]
+    return [get_provider(item_type, db) for item_type in _REGISTRY]
 
 
 __all__ = ["MetadataProvider", "MetadataResult", "get_provider", "all_providers"]
