@@ -1,0 +1,35 @@
+# Local development overlay. Layer it on top of the base stack:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#   (podman compose -f docker-compose.yml -f docker-compose.dev.yml up)
+#
+# It live-mounts the backend source, adds pgAdmin, and — crucially —
+# re-runs `uv sync` on every start so dependency changes land in the
+# cached venv volume WITHOUT a rebuild or `down -v`.
+
+services:
+  pgadmin:
+    image: docker.io/dpage/pgadmin4:9.16
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+
+  backend:
+    volumes:
+      - ./backend:/app:Z
+      # Named volume keeps the container's Linux venv from being shadowed
+      # by the bind mount (and any host .venv). `uv sync` below refreshes
+      # it in place whenever uv.lock changes — no volume reset needed.
+      - backend_venv:/app/.venv
+      - media:/data/media
+    command:
+      - sh
+      - -c
+      - uv sync --frozen && alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  backend_venv:

@@ -55,6 +55,20 @@ new migration after changing models:
 docker compose exec backend alembic revision --autogenerate -m "describe change"
 ```
 
+### Live-reload dev stack
+
+Layer `docker-compose.dev.yml` on top for a hot-reloading backend (source
+bind-mounted, `--reload`) plus pgAdmin on <http://localhost:5050>
+(`admin@example.com` / `admin`):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+```
+
+It re-runs `uv sync` on every start, so changing a dependency in
+`backend/pyproject.toml` just needs another `up` — no rebuild and no
+`down -v` to refresh the cached venv.
+
 ## Development without Docker
 
 Backend (needs a Postgres; `podman run -d -e POSTGRES_PASSWORD=test -e POSTGRES_DB=collector_test -p 5433:5432 docker.io/library/postgres:16-alpine`):
