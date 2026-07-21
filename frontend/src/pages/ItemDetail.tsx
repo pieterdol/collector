@@ -8,6 +8,7 @@ import { AcquireDialog } from "../components/AcquireDialog";
 import { Lightbox } from "../components/Lightbox";
 import { BackIcon } from "../components/icons";
 import { coverSrc, describeItem } from "../components/PosterCard";
+import { formatDate } from "../lib/dates";
 import { RatingStars } from "../components/RatingStars";
 import { SeasonsPanel } from "../components/SeasonsPanel";
 import { DetailSkeleton } from "../components/Skeletons";
@@ -517,7 +518,7 @@ function ActivityPanel({ itemId }: { itemId: string }) {
       {events.slice(0, 12).map((event) => (
         <div key={event.id} className="group flex items-baseline gap-3 text-[12.5px]">
           <span className="whitespace-nowrap font-mono text-dim">
-            {new Date(event.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short" })}
+            {formatDate(event.created_at)}
           </span>
           <span className="min-w-0 flex-1 text-body">
             {describeEvent(event.event_type, event.old_value, event.new_value)}
@@ -604,7 +605,7 @@ function DetailsPanel({ item }: { item: Item }) {
     rows.push(["Paid", `${currencySymbol(item.currency)} ${Number(item.purchase_price).toFixed(2)}`]);
   rows.push([
     "Added",
-    new Date(item.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }),
+    formatDate(item.created_at),
   ]);
 
   // Game/movie release dates come from the provider and are facts — only
@@ -641,7 +642,7 @@ function DetailsPanel({ item }: { item: Item }) {
         <div className="flex justify-between gap-3 border-b border-line/60 pb-2 text-[12.5px]">
           <span className="text-faint">Released</span>
           <span className="text-right font-medium text-text">
-            {new Date(releaseDate).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}
+            {formatDate(releaseDate)}
           </span>
         </div>
       ) : (
@@ -694,7 +695,7 @@ function LoanPanel({ item }: { item: Item }) {
         <div className="text-[13px] text-body">
           Currently with <strong>{item.borrowed_by}</strong>
           {item.loaned_date &&
-            ` · since ${new Date(item.loaned_date).toLocaleDateString(undefined, { day: "numeric", month: "short" })}`}
+            ` · since ${formatDate(item.loaned_date)}`}
         </div>
         <button
           type="button"
@@ -735,7 +736,7 @@ function LoanPanel({ item }: { item: Item }) {
       {item.returned_date && (
         <p className="m-0 text-xs text-faint">
           Returned by {item.borrowed_by} on{" "}
-          {new Date(item.returned_date).toLocaleDateString(undefined, { day: "numeric", month: "short" })}
+          {formatDate(item.returned_date)}
         </p>
       )}
     </div>

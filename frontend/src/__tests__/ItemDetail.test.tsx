@@ -169,7 +169,7 @@ describe("ItemDetail details panel", () => {
 
     expect(await screen.findByText("Released")).toBeInTheDocument();
     expect(screen.queryByLabelText("Release date")).not.toBeInTheDocument();
-    expect(screen.getByText("Mar 22, 2019")).toBeInTheDocument();
+    expect(screen.getByText("22-03-2019")).toBeInTheDocument();
   });
 
   it("keeps the release date editable while it is unset", async () => {

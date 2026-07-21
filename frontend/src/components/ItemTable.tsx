@@ -1,6 +1,7 @@
 /** Dense table view, graphite design: grid rows inside one surface card. */
 
 import { useNavigate } from "react-router-dom";
+import { formatDate } from "../lib/dates";
 import type { Item, ItemStatus } from "../lib/types";
 import { STATUS_LABEL } from "../lib/types";
 import { RatingStars } from "./RatingStars";
@@ -56,7 +57,7 @@ export function ItemTable({ items }: { items: Item[] }) {
               )}
             </span>
             <span className="font-mono text-xs tabular-nums text-muted">
-              {new Date(item.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short" })}
+              {formatDate(item.created_at)}
             </span>
           </div>
         ))}

@@ -7,6 +7,7 @@ import { GridIcon, RowsIcon } from "../components/icons";
 import { ItemTable } from "../components/ItemTable";
 import { PosterCard } from "../components/PosterCard";
 import { PosterGridSkeleton } from "../components/Skeletons";
+import { formatDate } from "../lib/dates";
 import {
   flattenItemPages,
   useItemsInfinite,
@@ -330,7 +331,7 @@ function LoanBanner() {
       <span className="min-w-0">
         <strong>{first.title}</strong> is with {first.borrowed_by}
         {first.loaned_date &&
-          ` since ${new Date(first.loaned_date).toLocaleDateString(undefined, { day: "numeric", month: "short" })}`}
+          ` since ${formatDate(first.loaned_date)}`}
         {loans.length > 1 && ` · +${loans.length - 1} more on loan`}
       </span>
       <MarkReturned id={first.id} />

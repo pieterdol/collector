@@ -2,6 +2,7 @@
  * /api/stats, which is pure queries over the activity-event log. */
 
 import { Link } from "react-router-dom";
+import { formatDate } from "../lib/dates";
 import { useStats } from "../lib/queries";
 import type { Stats } from "../lib/types";
 
@@ -125,7 +126,7 @@ function LoansPanel({ loans }: { loans: Stats["loans"] }) {
           <span className="text-xs text-faint">
             {loan.borrowed_by}
             {loan.loaned_date &&
-              ` · since ${new Date(loan.loaned_date).toLocaleDateString(undefined, { day: "numeric", month: "short" })}`}
+              ` · since ${formatDate(loan.loaned_date)}`}
           </span>
         </Link>
       ))}

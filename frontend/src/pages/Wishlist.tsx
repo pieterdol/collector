@@ -6,6 +6,7 @@ import { AcquireDialog } from "../components/AcquireDialog";
 import { EmptyState } from "../components/EmptyState";
 import { coverSrc, describeItem } from "../components/PosterCard";
 import { PosterGridSkeleton } from "../components/Skeletons";
+import { formatDate } from "../lib/dates";
 import { useItems } from "../lib/queries";
 import type { Item } from "../lib/types";
 
@@ -69,7 +70,7 @@ function WishCard({ item, onAcquire }: { item: Item; onAcquire: () => void }) {
           <div className="truncate text-[13.5px] font-semibold leading-[1.3]">{item.title}</div>
           <div className="truncate text-xs text-faint">
             {describeItem(item) || "wanted since"}{" "}
-            {new Date(item.created_at).toLocaleDateString(undefined, { month: "short", year: "numeric" })}
+            {formatDate(item.created_at)}
           </div>
         </div>
       </Link>
