@@ -239,6 +239,20 @@ describe("ItemDetail details panel", () => {
     expect(screen.getByText("Season 1 acquired (Blu-ray)")).toBeInTheDocument();
   });
 
+  it("shows the TMDB rating for movies and TV", async () => {
+    vi.unstubAllGlobals();
+    mockFetch({
+      ...GAME,
+      type: "movie",
+      platform: null,
+      metadata: { tmdb_rating: 8.5, artwork_fetched: true },
+    });
+    renderDetail();
+
+    expect(await screen.findByText("TMDB rating")).toBeInTheDocument();
+    expect(screen.getByText("8.5 / 10")).toBeInTheDocument();
+  });
+
   it("credits TMDB as the metadata source for TV", async () => {
     vi.unstubAllGlobals();
     mockFetch({

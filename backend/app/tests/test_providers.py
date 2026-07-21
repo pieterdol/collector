@@ -252,6 +252,40 @@ def test_tmdb_tv_details_adds_episode_runtime(db, keys):
 
 
 @respx.mock
+def test_tmdb_details_capture_rating(db, keys):
+    keys(TMDB_API_KEY="k")
+    respx.get("https://api.themoviedb.org/3/movie/335984").mock(
+        return_value=httpx.Response(
+            200,
+            json={"id": 335984, "title": "Blade Runner 2049", "vote_average": 8.456},
+        )
+    )
+    respx.get("https://api.themoviedb.org/3/tv/1399").mock(
+        return_value=httpx.Response(
+            200,
+            json={"id": 1399, "name": "Game of Thrones", "vote_average": 8.4},
+        )
+    )
+    movie = get_provider(ItemType.MOVIE, db).details("335984")
+    tv = get_provider(ItemType.TV, db).details("1399")
+    assert movie.metadata["tmdb_rating"] == 8.5  # rounded to one decimal
+    assert tv.metadata["tmdb_rating"] == 8.4
+
+
+@respx.mock
+def test_tmdb_details_treats_unrated_as_none(db, keys):
+    keys(TMDB_API_KEY="k")
+    respx.get("https://api.themoviedb.org/3/movie/42").mock(
+        return_value=httpx.Response(
+            200,
+            json={"id": 42, "title": "Obscure Film", "vote_average": 0},
+        )
+    )
+    result = get_provider(ItemType.MOVIE, db).details("42")
+    assert result.metadata["tmdb_rating"] is None
+
+
+@respx.mock
 def test_tmdb_tv_details_captures_seasons(db, keys):
     keys(TMDB_API_KEY="k")
     respx.get("https://api.themoviedb.org/3/tv/1399").mock(

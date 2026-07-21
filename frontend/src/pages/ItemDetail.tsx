@@ -598,6 +598,8 @@ function DetailsPanel({ item }: { item: Item }) {
     rows.push(["Episodes", String(meta.number_of_episodes)]);
   if (item.type === "tv" && meta.episode_runtime)
     rows.push(["Episode runtime", `${meta.episode_runtime} min`]);
+  if ((item.type === "movie" || item.type === "tv") && typeof meta.tmdb_rating === "number")
+    rows.push(["TMDB rating", `${meta.tmdb_rating.toFixed(1)} / 10`]);
   if (typeof meta.isbn === "string") rows.push(["ISBN", meta.isbn]);
   if (typeof meta.upc === "string") rows.push(["Barcode", meta.upc]);
   if (item.format) rows.push(["Format", item.format]);

@@ -91,6 +91,10 @@ class TmdbProvider(MetadataProvider):
                 if s.get("season_number") is not None
             ]
 
+        # TMDB community score; 0 means unrated, not "rated zero".
+        rating = data.get("vote_average")
+        result.metadata["tmdb_rating"] = round(rating, 1) if rating else None
+
         director = next(
             (c["name"] for c in data.get("credits", {}).get("crew", []) if c.get("job") == "Director"),
             None,
