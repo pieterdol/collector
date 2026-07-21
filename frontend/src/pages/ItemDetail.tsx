@@ -297,6 +297,7 @@ function ProgressPanel({ item }: { item: Item }) {
   const step = unit === "pages" ? 10 : 1;
   const [editingTotal, setEditingTotal] = useState(false);
   const [editingValue, setEditingValue] = useState(false);
+  const [editingPage, setEditingPage] = useState(false);
 
   const numberEditor = editingValue ? (
     <input
@@ -365,9 +366,62 @@ function ProgressPanel({ item }: { item: Item }) {
       <div className="paneltitle">Progress</div>
       <div className="flex items-baseline justify-between">
         {numberEditor}
+        {/* Both numbers are tap-to-type; an unknown total shows as "?". */}
         <span className="font-mono text-xs text-muted">
-          p. {shown}
-          {total ? ` / ${total}` : ""}
+          {"p. "}
+          {editingPage ? (
+            <input
+              autoFocus
+              type="number"
+              min={0}
+              aria-label="Current page"
+              defaultValue={shown}
+              onBlur={(e) => {
+                setEditingPage(false);
+                if (e.target.value !== "") set(Number(e.target.value));
+                flush(); // typing a value is an explicit commit
+              }}
+              onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+              className="input w-16 px-1 py-0.5 text-xs"
+            />
+          ) : (
+            <button
+              type="button"
+              aria-label="Edit current page"
+              title="Tap to type the page"
+              onClick={() => setEditingPage(true)}
+              className="underline decoration-dotted hover:text-text"
+            >
+              {shown}
+            </button>
+          )}
+          {" / "}
+          {editingTotal ? (
+            <input
+              autoFocus
+              type="number"
+              min={0}
+              aria-label="Total pages"
+              defaultValue={total ?? ""}
+              onBlur={(e) => {
+                setEditingTotal(false);
+                const value = e.target.value ? Number(e.target.value) : null;
+                if (value !== total) update.mutate({ progress_total: value });
+              }}
+              onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+              className="input w-16 px-1 py-0.5 text-xs"
+            />
+          ) : (
+            <button
+              type="button"
+              aria-label="Edit total pages"
+              title="Tap to set the total"
+              onClick={() => setEditingTotal(true)}
+              className="underline decoration-dotted hover:text-text"
+            >
+              {total ?? "?"}
+            </button>
+          )}
         </span>
       </div>
       <div className="h-1.5 overflow-hidden rounded-[3px]" style={{ background: "var(--line)" }}>
@@ -376,31 +430,7 @@ function ProgressPanel({ item }: { item: Item }) {
           style={{ width: `${pct ?? 0}%`, background: `var(--${item.type})` }}
         />
       </div>
-      <div className="flex items-center gap-2">
-        {stepper}
-        {editingTotal ? (
-          <input
-            autoFocus
-            type="number"
-            defaultValue={total ?? ""}
-            onBlur={(e) => {
-              setEditingTotal(false);
-              const value = e.target.value ? Number(e.target.value) : null;
-              if (value !== total) update.mutate({ progress_total: value });
-            }}
-            onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-            className="input w-24 py-1 text-xs"
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setEditingTotal(true)}
-            className="text-xs text-faint underline decoration-dotted hover:text-text"
-          >
-            {total !== null ? `total ${total} pp` : `set total ${unit}`}
-          </button>
-        )}
-      </div>
+      <div className="flex items-center gap-2">{stepper}</div>
     </div>
   );
 }

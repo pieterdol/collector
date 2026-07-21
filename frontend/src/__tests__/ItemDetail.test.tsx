@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ItemDetail from "../pages/ItemDetail";
@@ -59,6 +59,59 @@ function renderDetail() {
     </QueryClientProvider>,
   );
 }
+
+const BOOK = {
+  ...GAME,
+  type: "book",
+  platform: null,
+  status: "in_progress",
+  title: "Dune",
+  metadata: { authors: ["Frank Herbert"], artwork_fetched: true },
+  progress_current: "100",
+  progress_total: "400",
+};
+
+function patchBodies(fetchMock: ReturnType<typeof vi.fn>) {
+  return fetchMock.mock.calls
+    .filter(([, init]) => (init as RequestInit | undefined)?.method === "PATCH")
+    .map(([, init]) => JSON.parse(String((init as RequestInit).body)));
+}
+
+describe("ItemDetail book progress", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("lets you type the current page from the p. line", async () => {
+    mockFetch(BOOK);
+    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+    renderDetail();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Edit current page" }));
+    const input = screen.getByLabelText("Current page");
+    fireEvent.change(input, { target: { value: "150" } });
+    fireEvent.blur(input);
+
+    await waitFor(() => {
+      expect(patchBodies(fetchMock)).toContainEqual({ progress_current: 150 });
+    });
+  });
+
+  it("shows ? for an unknown total and lets you set it inline", async () => {
+    mockFetch({ ...BOOK, progress_total: null });
+    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+    renderDetail();
+
+    const totalButton = await screen.findByRole("button", { name: "Edit total pages" });
+    expect(totalButton).toHaveTextContent("?");
+    fireEvent.click(totalButton);
+    const input = screen.getByLabelText("Total pages");
+    fireEvent.change(input, { target: { value: "400" } });
+    fireEvent.blur(input);
+
+    await waitFor(() => {
+      expect(patchBodies(fetchMock)).toContainEqual({ progress_total: 400 });
+    });
+  });
+});
 
 describe("ItemDetail details panel", () => {
   beforeEach(() => mockFetch());
