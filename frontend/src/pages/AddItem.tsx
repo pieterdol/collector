@@ -468,14 +468,24 @@ function ConfirmForm({
   return (
     <form onSubmit={submit} className="grid grid-cols-2 gap-3.5">
       {draft && (
-        <p className="col-span-2 m-0 flex items-center justify-between rounded-lg bg-surface px-4 py-2.5 text-[13px] text-muted">
-          Prefilled from {PROVIDER_LABEL[type]} — check and adjust.
+        <div className="col-span-2 flex items-center gap-3.5 rounded-lg bg-surface px-4 py-2.5">
+          {draft.cover_url && (
+            <img
+              src={draft.cover_url}
+              alt={`Cover of ${draft.title}`}
+              className="h-16 w-11 flex-none rounded-md border border-line-strong object-cover"
+              style={{ background: "var(--raised)" }}
+            />
+          )}
+          <p className="m-0 flex-1 text-[13px] text-muted">
+            Prefilled from {PROVIDER_LABEL[type]} — check and adjust.
+          </p>
           {onBack && (
-            <button type="button" onClick={onBack} className="font-semibold text-accent">
+            <button type="button" onClick={onBack} className="flex-none text-[13px] font-semibold text-accent">
               ← results
             </button>
           )}
-        </p>
+        </div>
       )}
       <label className="field col-span-2">
         Title

@@ -12,7 +12,7 @@ const SEKIRO = {
     year: 2019,
     platform: "Google Stadia, PlayStation 4, PC (Microsoft Windows), Xbox One",
   },
-  cover_url: null,
+  cover_url: "https://images.igdb.com/covers/t_cover_big/sekiro.jpg",
   external_id: "9617",
 };
 
@@ -141,6 +141,28 @@ describe("game platform options", () => {
     const options = [...select.options].map((o) => o.text);
     expect(options).toContain("Nintendo Switch");
     expect(options).toContain("Xbox Series X|S");
+  });
+});
+
+describe("confirm form", () => {
+  beforeEach(() => mockFetch());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it("shows the fetched cover on the confirm step", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: /game/i }));
+    const input = await screen.findByPlaceholderText(/Search IGDB/);
+    fireEvent.change(input, { target: { value: "Sekiro" } });
+    fireEvent.click(await screen.findByText("Sekiro: Shadows Die Twice"));
+
+    const cover = await screen.findByAltText("Cover of Sekiro: Shadows Die Twice");
+    expect(cover).toHaveAttribute(
+      "src",
+      "https://images.igdb.com/covers/t_cover_big/sekiro.jpg",
+    );
   });
 });
 
