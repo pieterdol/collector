@@ -577,6 +577,10 @@ function DetailsPanel({ item }: { item: Item }) {
     new Date(item.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }),
   ]);
 
+  // Game/movie release dates come from the provider and are facts — only
+  // editable while still unknown. Books/TV vary by edition, so they stay open.
+  const lockedRelease =
+    (item.type === "game" || item.type === "movie") && Boolean(releaseDate);
   const showMedia = (item.type === "movie" || item.type === "tv") && item.format === "physical";
   const showStorefront = item.type === "game" && item.format === "digital";
   const media = typeof meta.media === "string" ? meta.media : "";
@@ -603,6 +607,14 @@ function DetailsPanel({ item }: { item: Item }) {
           }
         />
       )}
+      {lockedRelease ? (
+        <div className="flex justify-between gap-3 border-b border-line/60 pb-2 text-[12.5px]">
+          <span className="text-faint">Released</span>
+          <span className="text-right font-medium text-text">
+            {new Date(releaseDate).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}
+          </span>
+        </div>
+      ) : (
       <div className="flex items-center justify-between gap-3 border-b border-line/60 pb-2 text-[12.5px]">
         <span className="text-faint">Released</span>
         <input
@@ -622,6 +634,7 @@ function DetailsPanel({ item }: { item: Item }) {
           className="input w-auto cursor-pointer px-2 py-1 text-right text-[12.5px] font-medium"
         />
       </div>
+      )}
       {rows.map(([key, value]) => (
         <div key={key} className="flex justify-between gap-3 border-b border-line/60 pb-2 text-[12.5px] last:border-b-0 last:pb-0">
           <span className="text-faint">{key}</span>

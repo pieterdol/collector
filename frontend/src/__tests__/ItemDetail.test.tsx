@@ -106,6 +106,38 @@ describe("ItemDetail details panel", () => {
     expect(screen.getByText("73")).toBeInTheDocument();
   });
 
+  it("locks the release date for a game once it is set", async () => {
+    vi.unstubAllGlobals();
+    mockFetch({
+      ...GAME,
+      metadata: { ...GAME.metadata, release_date: "2019-03-22" },
+    });
+    renderDetail();
+
+    expect(await screen.findByText("Released")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Release date")).not.toBeInTheDocument();
+    expect(screen.getByText("Mar 22, 2019")).toBeInTheDocument();
+  });
+
+  it("keeps the release date editable while it is unset", async () => {
+    renderDetail(); // default GAME has no release_date
+
+    expect(await screen.findByLabelText("Release date")).toBeInTheDocument();
+  });
+
+  it("keeps the release date editable for books even when set", async () => {
+    vi.unstubAllGlobals();
+    mockFetch({
+      ...GAME,
+      type: "book",
+      platform: null,
+      metadata: { release_date: "1965-08-01", artwork_fetched: true },
+    });
+    renderDetail();
+
+    expect(await screen.findByLabelText("Release date")).toBeInTheDocument();
+  });
+
   it("describes season activity events", async () => {
     vi.unstubAllGlobals();
     const item = {
