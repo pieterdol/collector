@@ -3,7 +3,8 @@
 Sources, in order of preference:
   game  + steam_appid → Steam store appdetails (keyless) + Steam CDN hero
   game  + igdb_id     → IGDB artworks/screenshots/summary (Twitch creds)
-  movie + tmdb_id     → TMDB /images backdrops; description = stored overview
+  movie + tmdb_id     → TMDB /movie/{id}/images backdrops; description = stored overview
+  tv    + tmdb_id     → TMDB /tv/{id}/images backdrops; description = stored overview
   book                → nothing to fetch (cover-only layout)
 
 Results are stored in item.meta:
@@ -41,7 +42,7 @@ def fetch_artwork(db, item: Item) -> bool:
         found = _from_steam(db, item)
     elif item.type == "game" and item.meta.get("igdb_id"):
         found = _from_igdb(db, item)
-    elif item.type == "movie" and item.meta.get("tmdb_id"):
+    elif item.type in ("movie", "tv") and item.meta.get("tmdb_id"):
         found = _from_tmdb(db, item)
     else:
         found = {}  # books and manual items: nothing to fetch, mark done
@@ -155,10 +156,11 @@ def _from_tmdb(db, item: Item) -> dict | None:
     if not api_key:
         return {}
     tmdb_id = item.meta["tmdb_id"]
+    endpoint = "tv" if item.type == "tv" else "movie"
 
     def fetch() -> dict:
         res = httpx.get(
-            f"https://api.themoviedb.org/3/movie/{tmdb_id}/images",
+            f"https://api.themoviedb.org/3/{endpoint}/{tmdb_id}/images",
             params={"api_key": api_key},
             timeout=15,
         )
@@ -166,7 +168,8 @@ def _from_tmdb(db, item: Item) -> dict | None:
         return res.json()
 
     try:
-        data = cached_fetch(db, "tmdb", f"images:{tmdb_id}", fetch)
+        # Movie and TV ids overlap; namespace by endpoint like search/details.
+        data = cached_fetch(db, "tmdb", f"images:{endpoint}:{tmdb_id}", fetch)
     except httpx.HTTPError:
         return None
     backdrops = [b["file_path"] for b in data.get("backdrops", []) if b.get("file_path")]

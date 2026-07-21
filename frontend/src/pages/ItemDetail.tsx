@@ -26,6 +26,7 @@ import { STATUS_LABEL, progressUnit } from "../lib/types";
 const SOURCE_LABEL: Record<string, string> = {
   book: "Open Library",
   movie: "TMDB",
+  tv: "TMDB",
   game: "Steam Store / IGDB",
 };
 
@@ -552,6 +553,12 @@ function DetailsPanel({ item }: { item: Item }) {
   if (meta.year && !releaseDate) rows.push(["Year", String(meta.year)]);
   if (meta.page_count) rows.push(["Pages", String(meta.page_count)]);
   if (meta.runtime) rows.push(["Runtime", `${meta.runtime} min`]);
+  if (item.type === "tv" && meta.number_of_seasons)
+    rows.push(["Seasons", String(meta.number_of_seasons)]);
+  if (item.type === "tv" && meta.number_of_episodes)
+    rows.push(["Episodes", String(meta.number_of_episodes)]);
+  if (item.type === "tv" && meta.episode_runtime)
+    rows.push(["Episode runtime", `${meta.episode_runtime} min`]);
   if (typeof meta.isbn === "string") rows.push(["ISBN", meta.isbn]);
   if (typeof meta.upc === "string") rows.push(["Barcode", meta.upc]);
   if (item.format) rows.push(["Format", item.format]);

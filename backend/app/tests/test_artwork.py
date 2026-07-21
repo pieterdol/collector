@@ -115,6 +115,57 @@ def test_movie_uses_tmdb_backdrops(client, keys):
 
 
 @respx.mock
+def test_tv_uses_tmdb_tv_backdrops(client, keys):
+    keys(TMDB_API_KEY="k")
+    respx.get("https://api.themoviedb.org/3/tv/1399/images").mock(
+        return_value=httpx.Response(
+            200,
+            json={"backdrops": [{"file_path": f"/b{i}.jpg"} for i in range(6)]},
+        )
+    )
+    respx.get(url__regex=r"https://image\.tmdb\.org/t/p/.*").mock(side_effect=png_response)
+    headers = auth_headers(client)
+    item = create_item(
+        client, headers, type="tv", title="Game of Thrones", format="physical",
+        metadata={"tmdb_id": 1399, "overview": "Nine noble families..."},
+    )
+    res = client.post(f"/api/items/{item['id']}/artwork", headers=headers)
+    meta = res.json()["metadata"]
+    assert meta["hero_path"].endswith("hero.png")
+    assert len(meta["screenshot_paths"]) == 5
+    assert meta["description"] == "Nine noble families..."  # overview reused
+
+
+@respx.mock
+def test_tv_and_movie_artwork_do_not_share_cache(client, keys):
+    keys(TMDB_API_KEY="k")
+    respx.get("https://api.themoviedb.org/3/movie/600/images").mock(
+        return_value=httpx.Response(
+            200, json={"backdrops": [{"file_path": "/movie-hero.jpg"}]}
+        )
+    )
+    tv_route = respx.get("https://api.themoviedb.org/3/tv/600/images").mock(
+        return_value=httpx.Response(
+            200, json={"backdrops": []}
+        )
+    )
+    respx.get(url__regex=r"https://image\.tmdb\.org/t/p/.*").mock(side_effect=png_response)
+    headers = auth_headers(client)
+    movie = create_item(client, headers, type="movie", title="Movie 600",
+                        format="digital", metadata={"tmdb_id": 600})
+    show = create_item(client, headers, type="tv", title="Show 600",
+                       format="digital", metadata={"tmdb_id": 600})
+    # Same TMDB id: the /images cache rows must not collide, or the show
+    # inherits the movie's backdrops.
+    movie_meta = client.post(f"/api/items/{movie['id']}/artwork", headers=headers).json()["metadata"]
+    show_meta = client.post(f"/api/items/{show['id']}/artwork", headers=headers).json()["metadata"]
+    assert movie_meta["hero_path"].endswith("hero.png")
+    assert tv_route.called  # TV asked its own endpoint, not the movie cache
+    assert "hero_path" not in show_meta
+    assert show_meta["artwork_fetched"] is True
+
+
+@respx.mock
 def test_igdb_game_without_steam_uses_igdb(client, keys):
     keys(TWITCH_CLIENT_ID="cid", TWITCH_CLIENT_SECRET="sec")
     respx.post("https://id.twitch.tv/oauth2/token").mock(

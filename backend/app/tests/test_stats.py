@@ -56,6 +56,14 @@ def test_stats_tiles(client):
     assert float(value["this_month"]) == 20.0  # only the acquisition dated this month
 
 
+def test_tv_tile_counts_formats(client):
+    headers = auth_headers(client)
+    create_item(client, headers, type="tv", title="Boxed Show", format="physical")
+    create_item(client, headers, type="tv", title="Streamed Show", format="digital")
+    body = client.get("/api/stats", headers=headers).json()
+    assert body["tiles"]["tv"] == {"total": 2, "physical": 1, "digital": 1}
+
+
 def test_stats_continue_lists_in_progress_items(client):
     headers = auth_headers(client)
     seed_stats_data(client, headers)

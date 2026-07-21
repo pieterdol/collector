@@ -75,8 +75,8 @@ class TmdbProvider(MetadataProvider):
             result.metadata["runtime"] = data.get("runtime")
         else:
             result.metadata["episode_runtime"] = data.get("episode_run_time", [None])[0]
-            result.metadata["number_of_episodes"] = data.get("number_of_episodes", [None])
-            result.metadata["number_of_seasons"] = data.get("number_of_seasons", [None])
+            result.metadata["number_of_episodes"] = data.get("number_of_episodes")
+            result.metadata["number_of_seasons"] = data.get("number_of_seasons")
 
         director = next(
             (c["name"] for c in data.get("credits", {}).get("crew", []) if c.get("job") == "Director"),

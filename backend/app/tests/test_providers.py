@@ -252,6 +252,26 @@ def test_tmdb_tv_details_adds_episode_runtime(db, keys):
 
 
 @respx.mock
+def test_tmdb_tv_details_defaults_missing_counts_to_none(db, keys):
+    keys(TMDB_API_KEY="k")
+    respx.get("https://api.themoviedb.org/3/tv/999").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "id": 999,
+                "name": "Sparse Show",
+                "first_air_date": "2020-01-01",
+            },
+        )
+    )
+    provider = get_provider(ItemType.TV, db)
+    result = provider.details("999")
+    assert result.metadata["episode_runtime"] is None
+    assert result.metadata["number_of_episodes"] is None
+    assert result.metadata["number_of_seasons"] is None
+
+
+@respx.mock
 def test_igdb_fetches_token_then_searches(db, keys):
     keys(TWITCH_CLIENT_ID="cid", TWITCH_CLIENT_SECRET="secret")
     token_route = respx.post("https://id.twitch.tv/oauth2/token").mock(

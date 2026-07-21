@@ -85,4 +85,37 @@ describe("ItemDetail details panel", () => {
     expect(screen.getByText("Vince Gilligan")).toBeInTheDocument();
     expect(screen.queryByText("Director")).not.toBeInTheDocument();
   });
+
+  it("shows seasons and episodes for a TV show", async () => {
+    vi.unstubAllGlobals();
+    mockFetch({
+      ...GAME,
+      type: "tv",
+      platform: null,
+      metadata: {
+        number_of_seasons: 8,
+        number_of_episodes: 73,
+        artwork_fetched: true,
+      },
+    });
+    renderDetail();
+
+    expect(await screen.findByText("Seasons")).toBeInTheDocument();
+    expect(screen.getByText("8")).toBeInTheDocument();
+    expect(screen.getByText("Episodes")).toBeInTheDocument();
+    expect(screen.getByText("73")).toBeInTheDocument();
+  });
+
+  it("credits TMDB as the metadata source for TV", async () => {
+    vi.unstubAllGlobals();
+    mockFetch({
+      ...GAME,
+      type: "tv",
+      platform: null,
+      metadata: { description: "Nine noble families...", artwork_fetched: true },
+    });
+    renderDetail();
+
+    expect(await screen.findByText("Metadata via TMDB")).toBeInTheDocument();
+  });
 });
