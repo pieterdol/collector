@@ -346,6 +346,26 @@ def test_tmdb_tv_details_defaults_missing_counts_to_none(db, keys):
 
 
 @respx.mock
+def test_tmdb_tv_details_handles_empty_episode_runtime_list(db, keys):
+    """Ongoing shows often report episode_run_time as [] — must not crash."""
+    keys(TMDB_API_KEY="k")
+    respx.get("https://api.themoviedb.org/3/tv/888").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "id": 888,
+                "name": "Ongoing Show",
+                "first_air_date": "2023-01-01",
+                "episode_run_time": [],
+            },
+        )
+    )
+    provider = get_provider(ItemType.TV, db)
+    result = provider.details("888")
+    assert result.metadata["episode_runtime"] is None
+
+
+@respx.mock
 def test_igdb_fetches_token_then_searches(db, keys):
     keys(TWITCH_CLIENT_ID="cid", TWITCH_CLIENT_SECRET="secret")
     token_route = respx.post("https://id.twitch.tv/oauth2/token").mock(

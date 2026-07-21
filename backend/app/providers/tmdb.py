@@ -74,7 +74,8 @@ class TmdbProvider(MetadataProvider):
         if self.item_type == ItemType.MOVIE:
             result.metadata["runtime"] = data.get("runtime")
         else:
-            result.metadata["episode_runtime"] = data.get("episode_run_time", [None])[0]
+            # Ongoing shows report episode_run_time as [] — treat like missing.
+            result.metadata["episode_runtime"] = (data.get("episode_run_time") or [None])[0]
             result.metadata["number_of_episodes"] = data.get("number_of_episodes")
             result.metadata["number_of_seasons"] = data.get("number_of_seasons")
             # Consumed at item creation (core/seasons.py) into item_seasons rows.
