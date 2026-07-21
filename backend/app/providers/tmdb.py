@@ -77,6 +77,19 @@ class TmdbProvider(MetadataProvider):
             result.metadata["episode_runtime"] = data.get("episode_run_time", [None])[0]
             result.metadata["number_of_episodes"] = data.get("number_of_episodes")
             result.metadata["number_of_seasons"] = data.get("number_of_seasons")
+            # Consumed at item creation (core/seasons.py) into item_seasons rows.
+            result.metadata["seasons"] = [
+                {
+                    "tmdb_season_id": s.get("id"),
+                    "season_number": s["season_number"],
+                    "name": s.get("name"),
+                    "episode_count": s.get("episode_count"),
+                    "air_date": s.get("air_date") or None,
+                    "poster_path": s.get("poster_path"),
+                }
+                for s in data.get("seasons", [])
+                if s.get("season_number") is not None
+            ]
 
         director = next(
             (c["name"] for c in data.get("credits", {}).get("crew", []) if c.get("job") == "Director"),

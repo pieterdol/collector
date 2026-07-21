@@ -10,10 +10,11 @@ from app.core.artwork import fetch_artwork
 from app.core.covers import download_cover
 from app.core.events import record_event
 from app.core.platforms import find_or_create_platform
+from app.core.seasons import create_seasons_from_metadata
 from app.core.security import get_current_user
 from app.db import get_db
 from app.domain.enums import EventType, ItemFormat, ItemStatus, ItemType
-from app.models import ActivityEvent, Item, User
+from app.models import ActivityEvent, Item, ItemSeason, User
 from app.schemas.item import (
     AcquireIn,
     ActivityListOut,
@@ -80,6 +81,7 @@ def create_item(
         # Fetched once, stored locally; the item saves fine without it.
         item.cover_path = download_cover(body.cover_url, item.id)
         item.meta = {**item.meta, "cover_source_url": body.cover_url}
+    create_seasons_from_metadata(db, item)  # TV: metadata.seasons → rows
     record_event(
         db,
         item_id=item.id,
@@ -144,8 +146,14 @@ def list_items(
             Item.platform_id.in_(select(Platform.id).where(Platform.name == platform))
         )
     if media:
-        # Disc format of physical movies, stored as metadata.media.
-        query = query.where(Item.meta["media"].astext == media)
+        # Disc format of physical movies/TV (metadata.media), or of any
+        # tracked TV season.
+        query = query.where(
+            or_(
+                Item.meta["media"].astext == media,
+                Item.id.in_(select(ItemSeason.item_id).where(ItemSeason.media == media)),
+            )
+        )
     if q:
         query = query.where(
             or_(

@@ -29,6 +29,22 @@ class ItemStatus(StrEnum):
     ABANDONED = "abandoned"
 
 
+class SeasonOwnership(StrEnum):
+    """Per-season ownership for TV; NULL on the row = not tracked yet."""
+
+    OWNED = "owned"
+    WISHLIST = "wishlist"
+
+
+class DiscMedia(StrEnum):
+    """Disc media of a physical movie or TV season; mirrors MOVIE_MEDIA in types.ts."""
+
+    DVD = "DVD"
+    BLU_RAY = "Blu-ray"
+    UHD_BLU_RAY = "Ultra HD Blu-ray"
+    VHS = "VHS"
+
+
 class EventType(StrEnum):
     ITEM_ADDED = "item_added"
     STATUS_CHANGE = "status_change"
@@ -38,6 +54,9 @@ class EventType(StrEnum):
     LOAN_OUT = "loan_out"
     LOAN_RETURN = "loan_return"
     ITEM_DELETED = "item_deleted"
+    SEASON_ACQUIRED = "season_acquired"
+    SEASON_WATCHED = "season_watched"
+    SEASON_UPDATED = "season_updated"
 
 
 def values(enum_cls: type[StrEnum]) -> list[str]:

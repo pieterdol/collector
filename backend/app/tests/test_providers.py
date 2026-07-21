@@ -252,6 +252,46 @@ def test_tmdb_tv_details_adds_episode_runtime(db, keys):
 
 
 @respx.mock
+def test_tmdb_tv_details_captures_seasons(db, keys):
+    keys(TMDB_API_KEY="k")
+    respx.get("https://api.themoviedb.org/3/tv/1399").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "id": 1399,
+                "name": "Game of Thrones",
+                "first_air_date": "2011-04-17",
+                "number_of_seasons": 2,
+                "seasons": [
+                    {"id": 3624, "season_number": 0, "name": "Specials",
+                     "episode_count": 14, "air_date": "2010-12-05",
+                     "poster_path": "/s0.jpg", "vote_average": 0},
+                    {"id": 3627, "season_number": 1, "name": "Season 1",
+                     "episode_count": 10, "air_date": "2011-04-17",
+                     "poster_path": "/s1.jpg", "vote_average": 8.3},
+                    {"id": 3625, "season_number": 2, "name": "Season 2",
+                     "episode_count": 10, "air_date": None,
+                     "poster_path": None},
+                ],
+            },
+        )
+    )
+    provider = get_provider(ItemType.TV, db)
+    result = provider.details("1399")
+    seasons = result.metadata["seasons"]
+    assert [s["season_number"] for s in seasons] == [0, 1, 2]
+    assert seasons[1] == {
+        "tmdb_season_id": 3627,
+        "season_number": 1,
+        "name": "Season 1",
+        "episode_count": 10,
+        "air_date": "2011-04-17",
+        "poster_path": "/s1.jpg",
+    }
+    assert seasons[2]["air_date"] is None
+
+
+@respx.mock
 def test_tmdb_tv_details_defaults_missing_counts_to_none(db, keys):
     keys(TMDB_API_KEY="k")
     respx.get("https://api.themoviedb.org/3/tv/999").mock(
