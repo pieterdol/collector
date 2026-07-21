@@ -15,6 +15,8 @@ import type {
   ItemList,
   ItemType,
   ProviderStatus,
+  Season,
+  SeasonList,
   Stats,
   SteamImportResult,
 } from "./types";
@@ -155,6 +157,27 @@ export function useDeleteActivity(itemId: string) {
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ["activity", itemId] });
       void client.invalidateQueries({ queryKey: ["stats"] });
+    },
+  });
+}
+
+export function useSeasons(itemId: string | undefined) {
+  return useQuery({
+    queryKey: ["seasons", itemId],
+    queryFn: () => api<SeasonList>(`/api/items/${itemId}/seasons`),
+    enabled: Boolean(itemId),
+  });
+}
+
+export function useUpdateSeason(itemId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ seasonNumber, body }: { seasonNumber: number; body: Record<string, unknown> }) =>
+      api<Season>(`/api/items/${itemId}/seasons/${seasonNumber}`, { method: "PATCH", body }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["seasons", itemId] });
+      void client.invalidateQueries({ queryKey: ["activity", itemId] });
+      void client.invalidateQueries({ queryKey: ["items"] }); // media filter uses seasons
     },
   });
 }

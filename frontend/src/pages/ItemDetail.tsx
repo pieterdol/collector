@@ -9,6 +9,7 @@ import { Lightbox } from "../components/Lightbox";
 import { BackIcon } from "../components/icons";
 import { coverSrc, describeItem } from "../components/PosterCard";
 import { RatingStars } from "../components/RatingStars";
+import { SeasonsPanel } from "../components/SeasonsPanel";
 import { DetailSkeleton } from "../components/Skeletons";
 import {
   useActivity,
@@ -176,6 +177,7 @@ function Detail({ item }: { item: Item }) {
             </div>
           )}
 
+          {item.type === "tv" && <SeasonsPanel itemId={item.id} />}
           <ReviewPanel item={item} />
           <ActivityPanel itemId={item.id} />
         </div>
@@ -459,6 +461,12 @@ function describeEvent(
       return `Lent to ${newValue?.borrowed_by ?? "someone"}`;
     case "loan_return":
       return `Returned by ${oldValue?.borrowed_by ?? "borrower"}`;
+    case "season_watched":
+      return `Season ${newValue?.season_number} ${newValue?.watched ? "watched" : "unwatched"}`;
+    case "season_acquired":
+      return `Season ${newValue?.season_number} acquired${newValue?.media ? ` (${newValue.media})` : ""}`;
+    case "season_updated":
+      return `Season ${newValue?.season_number} updated`;
     default:
       return EVENT_LABEL[type] ?? type;
   }

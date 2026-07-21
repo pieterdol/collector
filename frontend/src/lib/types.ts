@@ -41,6 +41,34 @@ export interface ItemList {
   total: number;
 }
 
+export type SeasonOwnership = "owned" | "wishlist";
+
+/** One tracked TV season — mirrors backend SeasonOut. */
+export interface Season {
+  id: string;
+  item_id: string;
+  season_number: number;
+  tmdb_season_id: number | null;
+  name: string | null;
+  episode_count: number | null;
+  air_date: string | null;
+  poster_path: string | null;
+  ownership: SeasonOwnership | null;
+  format: ItemFormat | null;
+  media: string | null;
+  watched: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SeasonList {
+  seasons: Season[];
+  /** Aggregates skip Specials (season 0). */
+  total_seasons: number;
+  owned_seasons: number;
+  watched_seasons: number;
+}
+
 export interface ActivityEvent {
   id: string;
   event_type: string;
@@ -126,7 +154,8 @@ export const STATUS_LABEL: Record<ItemStatus, string> = {
   abandoned: "Abandoned",
 };
 
-/** Disc formats a physical movie can be stored on (metadata.media). */
+/** Disc formats a physical movie or TV season can be stored on
+ * (metadata.media / item_seasons.media — mirrors DiscMedia in enums.py). */
 export const MOVIE_MEDIA = ["DVD", "Blu-ray", "Ultra HD Blu-ray", "VHS"];
 
 /** Unit shown for progress, per medium. Movies don't track progress. */

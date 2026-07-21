@@ -106,6 +106,54 @@ describe("ItemDetail details panel", () => {
     expect(screen.getByText("73")).toBeInTheDocument();
   });
 
+  it("describes season activity events", async () => {
+    vi.unstubAllGlobals();
+    const item = {
+      ...GAME,
+      type: "tv",
+      platform: null,
+      metadata: { artwork_fetched: true },
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+        const body = url.includes("/activity")
+          ? {
+              events: [
+                {
+                  id: "e1",
+                  event_type: "season_watched",
+                  old_value: { season_number: 3, watched: false },
+                  new_value: { season_number: 3, watched: true },
+                  created_at: "2026-07-21T10:00:00Z",
+                },
+                {
+                  id: "e2",
+                  event_type: "season_acquired",
+                  old_value: null,
+                  new_value: { season_number: 1, ownership: "owned", media: "Blu-ray" },
+                  created_at: "2026-07-20T10:00:00Z",
+                },
+              ],
+            }
+          : url.includes("/seasons")
+            ? { seasons: [], total_seasons: 0, owned_seasons: 0, watched_seasons: 0 }
+            : item;
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          statusText: "OK",
+          json: () => Promise.resolve(body),
+        } as Response);
+      }),
+    );
+    renderDetail();
+
+    expect(await screen.findByText("Season 3 watched")).toBeInTheDocument();
+    expect(screen.getByText("Season 1 acquired (Blu-ray)")).toBeInTheDocument();
+  });
+
   it("credits TMDB as the metadata source for TV", async () => {
     vi.unstubAllGlobals();
     mockFetch({

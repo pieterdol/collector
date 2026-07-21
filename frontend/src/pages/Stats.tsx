@@ -167,6 +167,12 @@ function summarize(event: Stats["recent"][number]): React.ReactNode {
       return <>Lent {title} to {String(event.new_value?.borrowed_by ?? "")}</>;
     case "loan_return":
       return <>{title} returned</>;
+    case "season_watched":
+      return event.new_value?.watched
+        ? <>Watched {title} S{String(event.new_value?.season_number ?? "?")}</>
+        : title;
+    case "season_acquired":
+      return <>Acquired {title} S{String(event.new_value?.season_number ?? "?")}</>;
     default:
       return title;
   }
