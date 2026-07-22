@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SeasonsPanel } from "../components/SeasonsPanel";
 import type { Season } from "../lib/types";
@@ -52,7 +53,9 @@ function renderPanel() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <SeasonsPanel itemId={ID} />
+      <MemoryRouter>
+        <SeasonsPanel itemId={ID} />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -67,8 +70,9 @@ describe("SeasonsPanel", () => {
     ]);
     renderPanel();
 
-    expect(await screen.findByText("Season 1")).toBeInTheDocument();
-    expect(screen.getByText("Season 2")).toBeInTheDocument();
+    // name appears on the poster placeholder and in the caption
+    expect(await screen.findAllByText("Season 1")).not.toHaveLength(0);
+    expect(screen.getAllByText("Season 2")).not.toHaveLength(0);
     expect(screen.getByText("10 eps")).toBeInTheDocument();
     expect(screen.getByText("8 eps")).toBeInTheDocument();
   });
@@ -127,6 +131,38 @@ describe("SeasonsPanel", () => {
     expect(options).toContain("Blu-ray");
     expect(screen.queryByRole("combobox", { name: "Season 2 media" })).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Season 3 media" })).not.toBeInTheDocument();
+  });
+
+  it("shows the disc media badge on the season poster", async () => {
+    mockSeasons([
+      season({
+        season_number: 1, name: "Season 1",
+        ownership: "owned", format: "physical", media: "DVD",
+        poster_path: "/media/seasons/x/s1.png",
+      }),
+    ]);
+    renderPanel();
+
+    expect(await screen.findByTitle("DVD")).toBeInTheDocument();
+  });
+
+  it("offers removal only for manually added seasons", async () => {
+    const fetchMock = mockSeasons([
+      season({ season_number: 1, name: "Season 1", tmdb_season_id: 3627 }),
+      season({ season_number: 7, name: "Season 7" }), // manual: no tmdb id
+    ]);
+    renderPanel();
+
+    await screen.findAllByText("Season 1");
+    expect(screen.queryByRole("button", { name: "Remove Season 1" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Remove Season 7" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => {
+      const del = fetchMock.mock.calls.find(([, init]) => init?.method === "DELETE");
+      expect(del).toBeTruthy();
+      expect(String(del![0])).toContain(`/api/items/${ID}/seasons/7`);
+    });
   });
 
   it("offers to track a season when none exist yet", async () => {

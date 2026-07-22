@@ -74,6 +74,39 @@ def update_season(
     return season
 
 
+@router.delete("/{season_number}", status_code=204)
+def delete_season(
+    item_id: uuid.UUID,
+    season_number: SeasonNumber,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> None:
+    """Remove one tracked season (e.g. a manually added row)."""
+    item = _get_owned_item(db, user, item_id)
+    season = db.scalar(
+        select(ItemSeason).where(
+            ItemSeason.item_id == item.id, ItemSeason.season_number == season_number
+        )
+    )
+    if season is None:
+        raise HTTPException(status_code=404, detail="Season not found")
+    record_event(
+        db,
+        item_id=item.id,
+        user_id=user.id,
+        event_type=EventType.SEASON_REMOVED,
+        old_value={
+            "season_number": season.season_number,
+            "ownership": season.ownership,
+            "format": season.format,
+            "media": season.media,
+            "watched": season.watched,
+        },
+    )
+    db.delete(season)
+    db.commit()
+
+
 def _get_or_create_season(db: Session, item: Item, season_number: int) -> ItemSeason:
     season = db.scalar(
         select(ItemSeason).where(

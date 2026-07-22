@@ -220,6 +220,13 @@ describe("ItemDetail details panel", () => {
                   new_value: { season_number: 1, ownership: "owned", media: "Blu-ray" },
                   created_at: "2026-07-20T10:00:00Z",
                 },
+                {
+                  id: "e3",
+                  event_type: "season_removed",
+                  old_value: { season_number: 7, watched: false },
+                  new_value: null,
+                  created_at: "2026-07-19T10:00:00Z",
+                },
               ],
             }
           : url.includes("/seasons")
@@ -237,6 +244,7 @@ describe("ItemDetail details panel", () => {
 
     expect(await screen.findByText("Season 3 watched")).toBeInTheDocument();
     expect(screen.getByText("Season 1 acquired (Blu-ray)")).toBeInTheDocument();
+    expect(screen.getByText("Season 7 removed")).toBeInTheDocument();
   });
 
   it("shows the TMDB rating for movies and TV", async () => {

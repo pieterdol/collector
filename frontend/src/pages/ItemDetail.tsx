@@ -498,6 +498,8 @@ function describeEvent(
       return `Season ${newValue?.season_number} acquired${newValue?.media ? ` (${newValue.media})` : ""}`;
     case "season_updated":
       return `Season ${newValue?.season_number} updated`;
+    case "season_removed":
+      return `Season ${oldValue?.season_number} removed`;
     default:
       return EVENT_LABEL[type] ?? type;
   }

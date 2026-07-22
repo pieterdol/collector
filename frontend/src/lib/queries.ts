@@ -182,6 +182,19 @@ export function useUpdateSeason(itemId: string) {
   });
 }
 
+export function useDeleteSeason(itemId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (seasonNumber: number) =>
+      api<void>(`/api/items/${itemId}/seasons/${seasonNumber}`, { method: "DELETE" }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["seasons", itemId] });
+      void client.invalidateQueries({ queryKey: ["activity", itemId] });
+      void client.invalidateQueries({ queryKey: ["items"] }); // media filter uses seasons
+    },
+  });
+}
+
 export function useEnrichSearch(type: ItemType, q: string) {
   return useQuery({
     queryKey: ["enrich", type, q],

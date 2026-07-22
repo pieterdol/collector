@@ -87,34 +87,39 @@ function FilterBadge({
   );
 }
 
+/** Disc-format badge for a media string; shared by item posters and the
+ * per-season cards. Clicking deep-links into the media-filtered library. */
+export function DiscBadge({ media, to }: { media: string; to: string }) {
+  if (media === "Ultra HD Blu-ray") {
+    return (
+      <FilterBadge to={to} title="Ultra HD Blu-ray" className="badge-uhd">
+        <b>4K</b>
+        <small>ULTRA HD</small>
+      </FilterBadge>
+    );
+  }
+  if (media === "Blu-ray") {
+    return (
+      <FilterBadge to={to} title="Blu-ray" className="badge-bd">
+        Blu-ray
+      </FilterBadge>
+    );
+  }
+  if (media === "DVD" || media === "VHS") {
+    return (
+      <FilterBadge to={to} title={media} className={media === "DVD" ? "badge-dvd" : ""}>
+        {media}
+      </FilterBadge>
+    );
+  }
+  return null;
+}
+
 export function MediaBadge({ item }: { item: Item }) {
   if ((item.type === "movie" || item.type === "tv") && item.format === "physical") {
     const media = item.metadata.media;
     if (typeof media !== "string" || !media) return null;
-    const to = `/?type=${item.type}&media=${encodeURIComponent(media)}`;
-    if (media === "Ultra HD Blu-ray") {
-      return (
-        <FilterBadge to={to} title="Ultra HD Blu-ray" className="badge-uhd">
-          <b>4K</b>
-          <small>ULTRA HD</small>
-        </FilterBadge>
-      );
-    }
-    if (media === "Blu-ray") {
-      return (
-        <FilterBadge to={to} title="Blu-ray" className="badge-bd">
-          Blu-ray
-        </FilterBadge>
-      );
-    }
-    if (media === "DVD" || media === "VHS") {
-      return (
-        <FilterBadge to={to} title={media} className={media === "DVD" ? "badge-dvd" : ""}>
-          {media}
-        </FilterBadge>
-      );
-    }
-    return null;
+    return <DiscBadge media={media} to={`/?type=${item.type}&media=${encodeURIComponent(media)}`} />;
   }
 
   if (item.type === "game" && item.platform) {

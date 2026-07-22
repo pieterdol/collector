@@ -252,6 +252,43 @@ def test_seasons_404_for_other_users_item(client):
     assert res.status_code == 404
 
 
+def test_delete_season_removes_row_and_records_event(client):
+    headers = auth_headers(client)
+    item = tv_item(client, headers, seasons=None)
+    client.patch(
+        f"/api/items/{item['id']}/seasons/1",
+        json={"watched": True, "media": "DVD", "format": "physical"},
+        headers=headers,
+    )
+    res = client.delete(f"/api/items/{item['id']}/seasons/1", headers=headers)
+    assert res.status_code == 204
+
+    body = client.get(f"/api/items/{item['id']}/seasons", headers=headers).json()
+    assert body["seasons"] == []
+
+    events = client.get(f"/api/items/{item['id']}/activity", headers=headers).json()["events"]
+    removed = [e for e in events if e["event_type"] == "season_removed"]
+    assert len(removed) == 1
+    assert removed[0]["old_value"]["season_number"] == 1
+    assert removed[0]["old_value"]["watched"] is True
+    assert removed[0]["old_value"]["media"] == "DVD"
+
+
+def test_delete_season_404_when_missing(client):
+    headers = auth_headers(client)
+    item = tv_item(client, headers, seasons=None)
+    res = client.delete(f"/api/items/{item['id']}/seasons/3", headers=headers)
+    assert res.status_code == 404
+
+
+def test_delete_season_404_for_other_users_item(client):
+    mine = auth_headers(client, email="mine@example.com")
+    other = auth_headers(client, email="other@example.com")
+    item = tv_item(client, mine)
+    res = client.delete(f"/api/items/{item['id']}/seasons/1", headers=other)
+    assert res.status_code == 404
+
+
 # --- shelf media filter -------------------------------------------------------
 
 

@@ -57,6 +57,7 @@ class EventType(StrEnum):
     SEASON_ACQUIRED = "season_acquired"
     SEASON_WATCHED = "season_watched"
     SEASON_UPDATED = "season_updated"
+    SEASON_REMOVED = "season_removed"
 
 
 def values(enum_cls: type[StrEnum]) -> list[str]:
