@@ -91,6 +91,19 @@ def test_progress_update_records_event(client):
     assert evs[-1].new_value["progress_current"] == "100"
 
 
+def test_unchanged_progress_records_no_event(client):
+    headers = auth_headers(client)
+    item = create_item(client, headers, progress_current=100, progress_total=412)
+    client.patch(f"/api/items/{item['id']}", json={"progress_current": 100}, headers=headers)
+    client.patch(
+        f"/api/items/{item['id']}",
+        json={"progress_current": 100, "progress_total": 412},
+        headers=headers,
+    )
+    evs = events_for(item["id"])
+    assert [e.event_type for e in evs] == ["item_added"]
+
+
 def test_rating_set_records_event(client):
     headers = auth_headers(client)
     item = create_item(client, headers)

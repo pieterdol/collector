@@ -262,13 +262,17 @@ function useDebouncedProgress(item: Item, save: (value: number) => void) {
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const saveRef = useRef(save);
   saveRef.current = save;
+  const serverRef = useRef(server);
+  serverRef.current = server;
 
   const flush = () => {
     clearTimeout(timer.current);
-    if (pending.current !== null) {
+    // Landing back on the server value is not a change — no PATCH, no
+    // "Progress 0 → 0" activity entry.
+    if (pending.current !== null && pending.current !== serverRef.current) {
       saveRef.current(pending.current);
-      pending.current = null;
     }
+    pending.current = null;
   };
   const set = (value: number) => {
     const clamped = Math.max(0, value);

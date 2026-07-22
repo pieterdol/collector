@@ -95,6 +95,20 @@ describe("ItemDetail book progress", () => {
     });
   });
 
+  it("does not save when the page number is left unchanged", async () => {
+    mockFetch(BOOK);
+    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+    renderDetail();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Edit current page" }));
+    fireEvent.blur(screen.getByLabelText("Current page"));
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText("Current page")).not.toBeInTheDocument();
+    });
+    expect(patchBodies(fetchMock)).toHaveLength(0);
+  });
+
   it("shows ? for an unknown total and lets you set it inline", async () => {
     mockFetch({ ...BOOK, progress_total: null });
     const fetchMock = global.fetch as ReturnType<typeof vi.fn>;

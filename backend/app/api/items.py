@@ -238,14 +238,20 @@ def _apply_status_change(db, item, user, fields) -> None:
 def _apply_progress_change(db, item, user, fields) -> None:
     if "progress_current" not in fields and "progress_total" not in fields:
         return
+    new_current = (
+        fields.pop("progress_current") if "progress_current" in fields else item.progress_current
+    )
+    new_total = (
+        fields.pop("progress_total") if "progress_total" in fields else item.progress_total
+    )
+    if new_current == item.progress_current and new_total == item.progress_total:
+        return  # no-op PATCH: don't pollute the activity log
     old = {
         "progress_current": _jsonable(item.progress_current),
         "progress_total": _jsonable(item.progress_total),
     }
-    if "progress_current" in fields:
-        item.progress_current = fields.pop("progress_current")
-    if "progress_total" in fields:
-        item.progress_total = fields.pop("progress_total")
+    item.progress_current = new_current
+    item.progress_total = new_total
     record_event(
         db,
         item_id=item.id,
