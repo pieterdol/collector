@@ -180,7 +180,7 @@ function Detail({ item }: { item: Item }) {
 
           {item.type === "tv" && <SeasonsPanel itemId={item.id} />}
           <ReviewPanel item={item} />
-          <ActivityPanel itemId={item.id} />
+          <ActivityPanel itemId={item.id} unit={progressUnit(item.type)} />
         </div>
 
         <div className="flex flex-col gap-3.5">
@@ -480,16 +480,34 @@ const EVENT_LABEL: Record<string, string> = {
   item_deleted: "Removed",
 };
 
+/** "412.00"/412/null → "412"/null, for readable progress labels. */
+function progressNumber(value: unknown): string | null {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  return Number.isNaN(n) ? null : String(n);
+}
+
 function describeEvent(
   type: string,
   oldValue: Record<string, unknown> | null,
   newValue: Record<string, unknown> | null,
+  unit: string | null = null,
 ): string {
   switch (type) {
     case "status_change":
       return `${labelOf(oldValue?.status)} → ${labelOf(newValue?.status)}`;
-    case "progress_update":
-      return `Progress ${oldValue?.progress_current ?? 0} → ${newValue?.progress_current ?? "?"}`;
+    case "progress_update": {
+      const oldCurrent = progressNumber(oldValue?.progress_current);
+      const newCurrent = progressNumber(newValue?.progress_current);
+      const oldTotal = progressNumber(oldValue?.progress_total);
+      const newTotal = progressNumber(newValue?.progress_total);
+      if (oldCurrent === newCurrent && oldTotal !== newTotal) {
+        return newTotal === null
+          ? "Total cleared"
+          : `Total set to ${newTotal}${unit ? ` ${unit}` : ""}`;
+      }
+      return `Progress ${oldCurrent ?? 0} → ${newCurrent ?? "?"}`;
+    }
     case "rating_set":
       return newValue?.rating ? `Rated ${newValue.rating} ★` : "Rating cleared";
     case "loan_out":
@@ -513,7 +531,7 @@ function labelOf(status: unknown): string {
   return STATUS_LABEL[status as ItemStatus] ?? String(status ?? "?");
 }
 
-function ActivityPanel({ itemId }: { itemId: string }) {
+function ActivityPanel({ itemId, unit }: { itemId: string; unit: string | null }) {
   const { data } = useActivity(itemId);
   const del = useDeleteActivity(itemId);
   const [confirming, setConfirming] = useState<string | null>(null);
@@ -527,7 +545,7 @@ function ActivityPanel({ itemId }: { itemId: string }) {
             {formatDate(event.created_at)}
           </span>
           <span className="min-w-0 flex-1 text-body">
-            {describeEvent(event.event_type, event.old_value, event.new_value)}
+            {describeEvent(event.event_type, event.old_value, event.new_value, unit)}
           </span>
           {confirming === event.id ? (
             <span className="flex flex-none items-center gap-2 text-xs">

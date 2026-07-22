@@ -109,6 +109,42 @@ describe("ItemDetail book progress", () => {
     expect(patchBodies(fetchMock)).toHaveLength(0);
   });
 
+  it("describes a total-only change as setting the total", async () => {
+    const events = [
+      {
+        id: "e1",
+        event_type: "progress_update",
+        old_value: { progress_current: "0.00", progress_total: null },
+        new_value: { progress_current: "0.00", progress_total: "412.00" },
+        created_at: "2026-07-22T10:00:00Z",
+      },
+      {
+        id: "e2",
+        event_type: "progress_update",
+        old_value: { progress_current: "100.00", progress_total: "412.00" },
+        new_value: { progress_current: "150.00", progress_total: "412.00" },
+        created_at: "2026-07-21T10:00:00Z",
+      },
+    ];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+        const body = url.includes("/activity") ? { events } : BOOK;
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          statusText: "OK",
+          json: () => Promise.resolve(body),
+        } as Response);
+      }),
+    );
+    renderDetail();
+
+    expect(await screen.findByText("Total set to 412 pages")).toBeInTheDocument();
+    expect(screen.getByText("Progress 100 → 150")).toBeInTheDocument();
+  });
+
   it("shows ? for an unknown total and lets you set it inline", async () => {
     mockFetch({ ...BOOK, progress_total: null });
     const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
