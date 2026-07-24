@@ -51,6 +51,8 @@ _MEDIA_APPS = {
     "spotify", "disney+", "crunchyroll", "hulu", "plex", "apple tv",
     "wwe network", "hbo max", "paramount+", "pluto tv", "tubi", "funimation",
     "vlc", "now tv", "videostream",
+    # Dutch storefront names.
+    "mediaspeler", "nlziet",
 }
 
 

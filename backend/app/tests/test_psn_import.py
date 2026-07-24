@@ -227,6 +227,20 @@ JUNK = [
         "platform": "PS4",
         "subscriptionService": "NONE",
     },
+    {
+        # Dutch storefront names: the localized Media Player app…
+        "name": "Mediaspeler",
+        "titleId": "CUSA44444_00",
+        "platform": "PS4",
+        "subscriptionService": "NONE",
+    },
+    {
+        # …and the NLZIET streaming service.
+        "name": "NLZIET",
+        "titleId": "CUSA33333_00",
+        "platform": "PS4",
+        "subscriptionService": "NONE",
+    },
 ]
 
 
@@ -249,6 +263,8 @@ def test_non_games_pause_in_the_excluded_review_list(client):
         "Concord Beta",
         "FairGame$ Playtest",
         "Some Streaming Thing",
+        "Mediaspeler",
+        "NLZIET",
     }
     assert all(excluded.values())  # every exclusion explains itself
 
