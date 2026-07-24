@@ -3,6 +3,7 @@
  * loan + danger zone (right). Artwork is fetched once, lazily. */
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { AcquireDialog } from "../components/AcquireDialog";
 import { Lightbox } from "../components/Lightbox";
@@ -727,14 +728,16 @@ function DetailsPanel({ item }: { item: Item }) {
 }
 
 /** Search the catalog and point this item at a different record — the
- * fix for a wrong or missing automatic metadata match. */
+ * fix for a wrong or missing automatic metadata match. Rendered through
+ * a portal: fixed positioning must anchor to the viewport, not to
+ * whichever ancestor happens to gain a transform. */
 function RelinkDialog({ item, onClose }: { item: Item; onClose: () => void }) {
   const [q, setQ] = useState(item.title);
   const search = useEnrichSearch(item.type, q);
   const relink = useRelinkItem(item.id);
   const results = search.data?.results ?? [];
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4"
       onClick={onClose}
@@ -796,7 +799,8 @@ function RelinkDialog({ item, onClose }: { item: Item; onClose: () => void }) {
           Cancel
         </button>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
