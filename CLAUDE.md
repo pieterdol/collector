@@ -17,8 +17,9 @@ then the full suite green. No exceptions for "small" changes.
 - Frontend: logic and components get vitest coverage in
   `frontend/src/__tests__/` (api client, stores, key components). Pure
   styling changes don't need tests, but any behavior does.
-- A feature is done when: new tests pass, the FULL suite passes, and the
-  compose stack still boots.
+- A feature is done when: new tests pass, the FULL suite passes, the
+  compose stack still boots, and `README.md` reflects it (features,
+  API keys, project layout — whatever the change touches).
 
 ## Commands
 
