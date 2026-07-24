@@ -120,6 +120,10 @@ browser ──:8080──▶ frontend (nginx)
 
 - **Add items** by catalog search (Open Library / TMDB / IGDB), by barcode,
   or manually. Missing keys degrade to manual entry with a hint.
+- **Library search** covers titles (Postgres full-text plus substring) and
+  synopses, so "batman" finds *Batman Begins* and *The Dark Knight*.
+  Title matches always rank above description-only ones, whatever sort is
+  active.
 - **Barcode scanning** uses the camera (native `BarcodeDetector`, falls
   back to `@zxing/browser`). ISBNs auto-fill books. Movie/game barcodes
   (UPC/EAN) have **no public catalog** — the code is stored on the item and

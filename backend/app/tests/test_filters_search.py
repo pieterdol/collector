@@ -148,3 +148,58 @@ def test_pagination_is_stable_when_created_at_ties(client):
         seen.extend(titles(res))
     assert len(seen) == len(set(seen)), f"pages overlap: {sorted(set(t for t in seen if seen.count(t) > 1))}"
     assert set(seen) == expected
+
+
+def seed_batman(client, headers):
+    """A title match, two description-only matches, and a non-match."""
+    create_item(client, headers, type="movie", title="Batman Begins", status="completed")
+    create_item(
+        client, headers, type="movie", title="The Dark Knight", status="completed",
+        # TMDB stores the synopsis as `overview`; artwork enrichment writes
+        # `description` for games.
+        metadata={"overview": "Batman raises the stakes in his war on crime."},
+    )
+    create_item(
+        client, headers, type="game", title="Gotham Knights", status="backlog",
+        metadata={"description": "Batman is dead. Step into the Batfamily's shoes."},
+    )
+    create_item(client, headers, type="book", title="Dune", status="backlog")
+
+
+def test_search_matches_descriptions_after_titles(client):
+    headers = auth_headers(client)
+    seed_batman(client, headers)
+
+    found = titles(client.get("/api/items?q=batman", headers=headers))
+    # Title match ranks first; description-only matches follow.
+    assert found[0] == "Batman Begins"
+    assert set(found[1:]) == {"The Dark Knight", "Gotham Knights"}
+    assert "Dune" not in found
+
+
+def test_search_ranking_survives_an_explicit_sort(client):
+    headers = auth_headers(client)
+    seed_batman(client, headers)
+
+    found = titles(client.get("/api/items?q=batman&sort=title", headers=headers))
+    assert found[0] == "Batman Begins"  # still the title tier
+    assert found[1:] == ["Gotham Knights", "The Dark Knight"]  # A→Z within tier
+
+
+def test_description_search_respects_other_filters(client):
+    headers = auth_headers(client)
+    seed_batman(client, headers)
+
+    assert titles(client.get("/api/items?q=batman&type=game", headers=headers)) == [
+        "Gotham Knights"
+    ]
+
+
+def test_search_still_ignores_unrelated_metadata_text(client):
+    headers = auth_headers(client)
+    create_item(
+        client, headers, type="game", title="Some Game",
+        metadata={"storefront": "Batman Store", "platform": "PC (Microsoft Windows)"},
+    )
+    # Only human-readable synopsis fields are searched, not bookkeeping.
+    assert titles(client.get("/api/items?q=batman", headers=headers)) == []

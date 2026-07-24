@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from sqlalchemy import func, or_, select, text
+from sqlalchemy import case, func, or_, select, text
 from sqlalchemy.orm import Session
 
 from app.core.artwork import fetch_artwork
@@ -156,13 +156,20 @@ def list_items(
                 Item.id.in_(select(ItemSeason.item_id).where(ItemSeason.media == media)),
             )
         )
+    # Searching also reaches the synopsis ("Batman" should find The Dark
+    # Knight), but title matches always outrank description-only ones.
+    title_match = or_(
+        Item.title.ilike(f"%{q}%"),
+        text("title_tsv @@ plainto_tsquery('simple', :q)").bindparams(q=q),
+    ) if q else None
     if q:
-        query = query.where(
-            or_(
-                Item.title.ilike(f"%{q}%"),
-                text("title_tsv @@ plainto_tsquery('simple', :q)").bindparams(q=q),
-            )
+        description_match = or_(
+            *[
+                Item.meta[field].astext.ilike(f"%{q}%")
+                for field in ("description", "overview")
+            ]
         )
+        query = query.where(or_(title_match, description_match))
     release = Item.meta["release_date"].astext
     if upcoming:
         # Release dates are ISO strings, full ("2026-12-18") or partial
@@ -185,7 +192,12 @@ def list_items(
     }[sort]
     # id tiebreaker: batch imports share created_at, and without a total
     # order Postgres pages tied rows arbitrarily (duplicates/gaps in the UI).
-    items = db.scalars(query.order_by(order, Item.id.desc()).limit(limit).offset(offset)).all()
+    ordering = [order, Item.id.desc()]
+    if q:
+        # Tier before the chosen sort, so "sort by title" still lists the
+        # title matches first.
+        ordering.insert(0, case((title_match, 0), else_=1))
+    items = db.scalars(query.order_by(*ordering).limit(limit).offset(offset)).all()
     return ItemListOut(items=[ItemOut.model_validate(i) for i in items], total=total)
 
 
