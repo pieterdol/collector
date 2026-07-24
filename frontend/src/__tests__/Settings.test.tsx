@@ -79,49 +79,105 @@ describe("Settings Epic import", () => {
   });
 });
 
+/** PSN runs as a polled background job: POST returns a job id, GET
+ * reports progress until done/error. */
+function mockPsnFetch(job: object) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      const polling = url.includes("/api/psn/import/");
+      return Promise.resolve({
+        ok: true,
+        status: polling ? 200 : 202,
+        statusText: "OK",
+        json: () => Promise.resolve(polling ? job : { job_id: "j1" }),
+      } as Response);
+    }),
+  );
+}
+
+function startPsnImport() {
+  fireEvent.change(screen.getByLabelText("NPSSO token"), {
+    target: { value: "npsso-cookie-value" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Import PlayStation library" }));
+}
+
 describe("Settings PSN import", () => {
-  beforeEach(() => mockFetch({ imported: 4, skipped: 1, total: 5 }));
   afterEach(() => vi.unstubAllGlobals());
 
-  it("sends the NPSSO token with PS Plus excluded by default", async () => {
+  it("starts a job with PS Plus excluded by default and shows the result", async () => {
+    mockPsnFetch({ status: "done", phase: "Done", done: 0, total: 5, imported: 4, skipped: 1 });
     renderSettings();
-    fireEvent.change(screen.getByLabelText("NPSSO token"), {
-      target: { value: "npsso-cookie-value" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Import PlayStation library" }));
+    startPsnImport();
 
-    await waitFor(() => {
-      const calls = (fetch as ReturnType<typeof vi.fn>).mock.calls;
-      expect(calls.some(([url]) => String(url).includes("/api/psn/import"))).toBe(true);
-    });
-    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls.find(([url]) =>
-      String(url).includes("/api/psn/import"),
+    expect(await screen.findByText("Imported 4 games.")).toBeInTheDocument();
+    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls.find(
+      ([url, options]) =>
+        String(url).includes("/api/psn/import") &&
+        (options as RequestInit | undefined)?.method === "POST",
     )!;
     expect(JSON.parse(String((init as RequestInit).body))).toEqual({
       npsso: "npsso-cookie-value",
       include_ps_plus: false,
+      dedupe_cross_gen: false,
     });
-    expect(await screen.findByText("Imported 4 games.")).toBeInTheDocument();
+  });
+
+  it("drops PS4 twins when the dedupe toggle is checked", async () => {
+    mockPsnFetch({ status: "done", phase: "Done", done: 0, total: 4, imported: 4, skipped: 0 });
+    renderSettings();
+    fireEvent.click(screen.getByLabelText("Skip PS4 versions of games you also own on PS5"));
+    startPsnImport();
+
+    await waitFor(() => {
+      const call = (fetch as ReturnType<typeof vi.fn>).mock.calls.find(
+        ([url, options]) =>
+          String(url).includes("/api/psn/import") &&
+          (options as RequestInit | undefined)?.method === "POST",
+      );
+      expect(call).toBeDefined();
+      expect(JSON.parse(String((call![1] as RequestInit).body)).dedupe_cross_gen).toBe(true);
+    });
   });
 
   it("includes PS Plus games when the toggle is checked", async () => {
+    mockPsnFetch({ status: "done", phase: "Done", done: 0, total: 5, imported: 5, skipped: 0 });
     renderSettings();
-    fireEvent.change(screen.getByLabelText("NPSSO token"), {
-      target: { value: "npsso-cookie-value" },
-    });
     fireEvent.click(screen.getByLabelText("Include PS Plus games"));
-    fireEvent.click(screen.getByRole("button", { name: "Import PlayStation library" }));
+    startPsnImport();
 
     await waitFor(() => {
-      const call = (fetch as ReturnType<typeof vi.fn>).mock.calls.find(([url]) =>
-        String(url).includes("/api/psn/import"),
+      const call = (fetch as ReturnType<typeof vi.fn>).mock.calls.find(
+        ([url, options]) =>
+          String(url).includes("/api/psn/import") &&
+          (options as RequestInit | undefined)?.method === "POST",
       );
       expect(call).toBeDefined();
       expect(JSON.parse(String((call![1] as RequestInit).body)).include_ps_plus).toBe(true);
     });
   });
 
+  it("shows the job's phase and progress while it runs", async () => {
+    mockPsnFetch({ status: "running", phase: "Fetching purchased games", done: 400, total: 1400 });
+    renderSettings();
+    startPsnImport();
+
+    expect(await screen.findByText(/Fetching purchased games/)).toBeInTheDocument();
+    expect(screen.getByText("400/1400")).toBeInTheDocument();
+  });
+
+  it("shows the job's error when it fails", async () => {
+    mockPsnFetch({ status: "error", phase: "Failed", done: 0, total: 0, detail: "NPSSO token was rejected" });
+    renderSettings();
+    startPsnImport();
+
+    expect(await screen.findByText(/NPSSO token was rejected/)).toBeInTheDocument();
+  });
+
   it("keeps the import button disabled until a token is entered", () => {
+    mockPsnFetch({});
     renderSettings();
     expect(screen.getByRole("button", { name: "Import PlayStation library" })).toBeDisabled();
   });

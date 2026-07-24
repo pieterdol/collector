@@ -6,6 +6,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { api, upload } from "./api";
 import type {
   ActivityEvent,
@@ -290,15 +291,46 @@ export function useEpicImport() {
   });
 }
 
-/** PSN import: the pasted NPSSO token is exchanged server-side and
- * used once — never stored. */
-export function usePsnImport() {
-  const invalidate = useInvalidateItems();
+/** A PSN import runs as a background job the UI polls (big libraries
+ * outlive proxy timeouts). Mirrors backend schemas/psn.py. */
+export interface PsnImportJob {
+  status: "running" | "done" | "error";
+  phase: string;
+  done: number;
+  total: number;
+  imported: number | null;
+  skipped: number | null;
+  detail: string | null;
+}
+
+/** Start a PSN import job: the pasted NPSSO token is exchanged
+ * server-side and used once — never stored. */
+export function useStartPsnImport() {
   return useMutation({
-    mutationFn: (body: { npsso: string; include_ps_plus: boolean }) =>
-      api<ImportSummary>("/api/psn/import", { method: "POST", body }),
-    onSuccess: () => invalidate(),
+    mutationFn: (body: { npsso: string; include_ps_plus: boolean; dedupe_cross_gen: boolean }) =>
+      api<{ job_id: string }>("/api/psn/import", { method: "POST", body }),
   });
+}
+
+/** Poll a PSN import job every second while it runs; refresh the
+ * library once it completes. */
+export function usePsnImportJob(jobId: string | null) {
+  const client = useQueryClient();
+  const query = useQuery({
+    queryKey: ["psn-import", jobId],
+    queryFn: () => api<PsnImportJob>(`/api/psn/import/${jobId}`),
+    enabled: Boolean(jobId),
+    refetchInterval: (q) => (q.state.data?.status === "running" ? 1000 : false),
+  });
+
+  const finished = query.data?.status === "done";
+  useEffect(() => {
+    if (!finished) return;
+    void client.invalidateQueries({ queryKey: ["items"] });
+    void client.invalidateQueries({ queryKey: ["stats"] });
+  }, [finished]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return query;
 }
 
 /** GOG import: upload Heroic's gog_library.json store cache. */

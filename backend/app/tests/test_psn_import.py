@@ -1,27 +1,36 @@
 """PSN import: exchange an NPSSO cookie for a token, pull the purchased
-list, and keep PS Plus-gated titles out unless explicitly included."""
+list, and keep PS Plus-gated titles out unless explicitly included.
+
+The import runs as a background job (big libraries outlive proxy
+timeouts); the API returns a job id that the UI polls for progress.
+Under TestClient, background tasks complete before the response returns,
+so the first poll already sees the final state."""
 
 import json
 
 import httpx
 import respx
 
-from app.providers.psn import AUTH_BASE, GRAPHQL_URL
+from app.providers.psn import AUTH_BASE, GAMELIST_URL, GRAPHQL_URL
 from app.tests.helpers import auth_headers
 
 REDIRECT = "com.scee.psxandroid.scecompcall://redirect?code=v3.AbCdEf"
 
+# Real entries carry a "_00" service suffix on titleId and a per-title
+# subscriptionService tag ("NONE" for purchases, "PS_PLUS" for claims).
 PURCHASED = [
     {
         "name": "Returnal",
-        "titleId": "PPSA01284",
+        "titleId": "PPSA01284_00",
         "platform": "PS5",
+        "subscriptionService": "NONE",
         "image": {"url": "https://cdn.psn.test/returnal.png"},
     },
     {
         "name": "Bloodborne",
-        "titleId": "CUSA00207",
+        "titleId": "CUSA00207_00",
         "platform": "PS4",
+        "subscriptionService": "NONE",
         "image": {"url": "https://cdn.psn.test/bloodborne.png"},
     },
 ]
@@ -29,14 +38,15 @@ PURCHASED = [
 PS_PLUS = [
     {
         "name": "Stray",
-        "titleId": "PPSA04640",
+        "titleId": "PPSA04640_00",
         "platform": "PS5",
+        "subscriptionService": "PS_PLUS",
         "image": {"url": "https://cdn.psn.test/stray.png"},
     },
 ]
 
 
-def mock_psn(purchased=None, ps_plus=None, code_ok=True):
+def mock_psn(purchased=None, ps_plus=None, code_ok=True, played=None):
     respx.get(f"{AUTH_BASE}/authz/v3/oauth/authorize").mock(
         return_value=httpx.Response(
             302,
@@ -52,11 +62,20 @@ def mock_psn(purchased=None, ps_plus=None, code_ok=True):
     respx.get(url__regex=r"https://cdn\.psn\.test/.*").mock(
         return_value=httpx.Response(404)
     )
+    respx.get(GAMELIST_URL).mock(
+        return_value=httpx.Response(
+            200, json={"titles": played or [], "totalItemCount": len(played or [])}
+        )
+    )
 
     def graphql(request):
+        # Sony semantics (verified live): "NONE" means UNFILTERED — the
+        # response mixes purchases and PS Plus claims; per-title
+        # subscriptionService is the only reliable distinction.
         variables = json.loads(request.content)["variables"]
-        games = purchased if variables["subscriptionService"] == "NONE" else ps_plus
-        games = games or []
+        games = (purchased or []) + (ps_plus or [])
+        if variables["subscriptionService"] == "PS_PLUS":
+            games = ps_plus or []
         start = variables["start"]
         page = games[start : start + variables["size"]]
         return httpx.Response(
@@ -74,19 +93,29 @@ def mock_psn(purchased=None, ps_plus=None, code_ok=True):
     respx.post(GRAPHQL_URL).mock(side_effect=graphql)
 
 
-def do_import(client, headers, **body):
-    return client.post(
+def do_import(client, headers, **body) -> dict:
+    """Start an import job and return its (already final) status."""
+    res = client.post(
         "/api/psn/import", json={"npsso": "npsso-cookie-value", **body}, headers=headers
     )
+    assert res.status_code == 202, res.text
+    job_id = res.json()["job_id"]
+    status = client.get(f"/api/psn/import/{job_id}", headers=headers)
+    assert status.status_code == 200, status.text
+    return status.json()
+
+
+def counts(job: dict) -> dict:
+    return {k: job[k] for k in ("imported", "skipped", "total")}
 
 
 @respx.mock
 def test_import_excludes_ps_plus_by_default(client):
     mock_psn(purchased=PURCHASED, ps_plus=PS_PLUS)
     headers = auth_headers(client)
-    res = do_import(client, headers)
-    assert res.status_code == 200, res.text
-    assert res.json() == {"imported": 2, "skipped": 0, "total": 2}
+    job = do_import(client, headers)
+    assert job["status"] == "done"
+    assert counts(job) == {"imported": 2, "skipped": 0, "total": 2}
 
     items = client.get("/api/items?type=game", headers=headers).json()["items"]
     by_title = {i["title"]: i for i in items}
@@ -106,12 +135,40 @@ def test_import_excludes_ps_plus_by_default(client):
 def test_include_ps_plus_imports_and_marks_them(client):
     mock_psn(purchased=PURCHASED, ps_plus=PS_PLUS)
     headers = auth_headers(client)
-    res = do_import(client, headers, include_ps_plus=True)
-    assert res.json() == {"imported": 3, "skipped": 0, "total": 3}
+    job = do_import(client, headers, include_ps_plus=True)
+    assert counts(job) == {"imported": 3, "skipped": 0, "total": 3}
 
     items = client.get("/api/items?type=game", headers=headers).json()["items"]
     stray = next(i for i in items if i["title"] == "Stray")
     assert stray["metadata"]["subscription"] == "PS Plus"
+
+
+@respx.mock
+def test_dedupe_option_keeps_only_the_ps5_version(client):
+    cross_gen = PURCHASED + [
+        {
+            # Same game as the PS5 "Returnal" entry, modulo the ™ mark.
+            "name": "Returnal™",
+            "titleId": "CUSA11111_00",
+            "platform": "PS4",
+            "subscriptionService": "NONE",
+            "image": {"url": "https://cdn.psn.test/returnal-ps4.png"},
+        },
+    ]
+    mock_psn(purchased=cross_gen)
+    headers = auth_headers(client)
+
+    # Off by default: both versions import.
+    job = do_import(client, headers)
+    assert job["imported"] == 3
+
+    # On: the PS4 twin is dropped before item creation.
+    other = auth_headers(client, email="dedupe@example.com")
+    job = do_import(client, other, dedupe_cross_gen=True)
+    assert counts(job) == {"imported": 2, "skipped": 0, "total": 2}
+    items = client.get("/api/items?type=game", headers=other).json()["items"]
+    platforms = {i["title"]: i["platform"] for i in items}
+    assert platforms == {"Returnal": "PlayStation 5", "Bloodborne": "PlayStation 4"}
 
 
 @respx.mock
@@ -123,31 +180,76 @@ def test_purchased_list_is_paginated(client):
     ]
     mock_psn(purchased=many)
     headers = auth_headers(client)
-    res = do_import(client, headers)
-    assert res.json()["imported"] == 120
+    assert do_import(client, headers)["imported"] == 120
 
 
 @respx.mock
 def test_reimport_skips_existing_titles(client):
     mock_psn(purchased=PURCHASED)
     headers = auth_headers(client)
-    assert do_import(client, headers).json()["imported"] == 2
+    assert do_import(client, headers)["imported"] == 2
 
-    res = do_import(client, headers)
-    assert res.json() == {"imported": 0, "skipped": 2, "total": 2}
+    job = do_import(client, headers)
+    assert counts(job) == {"imported": 0, "skipped": 2, "total": 2}
 
 
 @respx.mock
-def test_rejected_npsso_is_a_clear_401(client):
+def test_rejected_npsso_fails_the_job_with_a_clear_message(client):
     mock_psn(code_ok=False)
     headers = auth_headers(client)
-    res = do_import(client, headers)
-    assert res.status_code == 401
-    assert "NPSSO" in res.json()["detail"]
+    job = do_import(client, headers)
+    assert job["status"] == "error"
+    assert "NPSSO" in job["detail"]
 
 
 def test_import_requires_auth(client):
     assert client.post("/api/psn/import", json={"npsso": "x" * 20}).status_code == 401
+
+
+@respx.mock
+def test_job_status_is_scoped_to_its_owner(client):
+    mock_psn(purchased=PURCHASED)
+    mine = auth_headers(client, email="job-owner@example.com")
+    theirs = auth_headers(client, email="job-snoop@example.com")
+
+    res = client.post(
+        "/api/psn/import", json={"npsso": "npsso-cookie-value"}, headers=mine
+    )
+    job_id = res.json()["job_id"]
+    assert client.get(f"/api/psn/import/{job_id}", headers=theirs).status_code == 404
+    assert client.get("/api/psn/import/nope", headers=mine).status_code == 404
+
+
+@respx.mock
+def test_playtime_prefills_progress_hours(client):
+    mock_psn(
+        purchased=PURCHASED,
+        played=[
+            {"titleId": "PPSA01284_00", "playDuration": "PT62H30M"},
+            {"titleId": "CUSA99999_00", "playDuration": "PT9H"},  # not owned
+        ],
+    )
+    headers = auth_headers(client)
+    do_import(client, headers)
+
+    items = client.get("/api/items?type=game", headers=headers).json()["items"]
+    by_title = {i["title"]: i for i in items}
+    returnal = by_title["Returnal"]
+    assert returnal["metadata"]["playtime_minutes"] == 3750
+    assert float(returnal["progress_current"]) == 62.5
+    # Never played: no fake zero-hour progress.
+    assert by_title["Bloodborne"]["progress_current"] is None
+    assert "playtime_minutes" not in by_title["Bloodborne"]["metadata"]
+
+
+@respx.mock
+def test_playtime_failure_does_not_block_the_import(client):
+    mock_psn(purchased=PURCHASED)
+    respx.get(GAMELIST_URL).mock(return_value=httpx.Response(403))
+    headers = auth_headers(client)
+    job = do_import(client, headers)
+    assert job["status"] == "done"
+    assert job["imported"] == 2
 
 
 @respx.mock

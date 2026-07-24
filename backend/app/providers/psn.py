@@ -8,12 +8,14 @@ access token and query the purchased-games GraphQL. The token is used
 once per import and never stored.
 """
 
+import re
 from urllib.parse import parse_qs, urlparse
 
 import httpx
 
 AUTH_BASE = "https://ca.account.sony.com/api"
 GRAPHQL_URL = "https://web.np.playstation.com/api/graphql/v1/op"
+GAMELIST_URL = "https://m.np.playstation.com/api/gamelist/v2/users/me/titles"
 
 # The PlayStation App's public OAuth client (id:secret, base64) and
 # redirect — constants every community PSN library ships with.
@@ -71,24 +73,77 @@ def exchange_npsso(npsso: str) -> str:
     return res.json()["access_token"]
 
 
-def purchased_games(token: str, include_ps_plus: bool = False) -> list[dict]:
+_SERVICE_LABELS = {"PS_PLUS": "PS Plus"}
+
+
+def purchased_games(token: str, include_ps_plus: bool = False, on_progress=None) -> list[dict]:
     """Purchased titles, each with `subscription` set for PS Plus claims.
 
-    Sony tags every entitlement with how it was obtained, so the
-    subscription-gated "free monthly games" are a separate, exact list.
+    The request's subscriptionService variable is NOT a purchased-only
+    filter — "NONE" means *unfiltered* (verified against a real library:
+    it returned every PS Plus claim too). Every title does carry its own
+    subscriptionService field, so we fetch the full list once and split
+    on that, which is exact.
     """
-    games = _fetch_list(token, "NONE")
+    games = _fetch_list(token, "NONE", on_progress)
+    out: list[dict] = []
     for game in games:
-        game["subscription"] = None
-    if include_ps_plus:
-        plus = _fetch_list(token, "PS_PLUS")
-        for game in plus:
-            game["subscription"] = "PS Plus"
-        games += plus
-    return games
+        service = game.get("subscriptionService")
+        gated = isinstance(service, str) and service not in ("", "NONE")
+        if gated and not include_ps_plus:
+            continue
+        game["subscription"] = _SERVICE_LABELS.get(service, service) if gated else None
+        out.append(game)
+    return out
 
 
-def _fetch_list(token: str, subscription_service: str) -> list[dict]:
+def play_durations(token: str) -> dict[str, int]:
+    """titleId → minutes played, from the played-games list (the numbers
+    the PS App shows on your profile). Best-effort: an error here should
+    never block an import, so failures return what was gathered so far."""
+    out: dict[str, int] = {}
+    offset = 0
+    try:
+        while True:
+            res = httpx.get(
+                GAMELIST_URL,
+                params={
+                    "categories": "ps4_game,ps5_native_game",
+                    "limit": 200,
+                    "offset": offset,
+                },
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=30,
+            )
+            if res.status_code != 200:
+                return out
+            payload = res.json()
+            titles = payload.get("titles") or []
+            for title in titles:
+                # gamelist ids carry a "_00" service suffix; purchased ids don't.
+                title_id = str(title.get("titleId", "")).split("_")[0]
+                minutes = _duration_minutes(title.get("playDuration"))
+                if title_id and minutes:
+                    out[title_id] = max(out.get(title_id, 0), minutes)
+            offset += len(titles)
+            if not titles or offset >= payload.get("totalItemCount", 0):
+                return out
+    except httpx.HTTPError:
+        return out
+
+
+def _duration_minutes(value) -> int:
+    """ISO-8601 duration ("PT62H30M10S") → whole minutes."""
+    if not isinstance(value, str):
+        return 0
+    match = re.fullmatch(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", value)
+    if not match:
+        return 0
+    hours, minutes, seconds = (int(part or 0) for part in match.groups())
+    return hours * 60 + minutes + round(seconds / 60)
+
+
+def _fetch_list(token: str, subscription_service: str, on_progress=None) -> list[dict]:
     out: list[dict] = []
     while True:
         res = httpx.post(
@@ -115,5 +170,7 @@ def _fetch_list(token: str, subscription_service: str) -> list[dict]:
         page = payload.get("games") or []
         out.extend(g for g in page if isinstance(g, dict))
         total = (payload.get("pageInfo") or {}).get("totalCount", len(out))
+        if on_progress:
+            on_progress(len(out), total)
         if not page or len(out) >= total:
             return out

@@ -4,7 +4,13 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { SteamIcon } from "../components/icons";
-import { useEpicImport, useGogImport, usePsnImport, useSteamImport } from "../lib/queries";
+import {
+  useEpicImport,
+  useGogImport,
+  usePsnImportJob,
+  useStartPsnImport,
+  useSteamImport,
+} from "../lib/queries";
 import type { ImportSummary } from "../lib/types";
 
 export default function Settings() {
@@ -135,7 +141,11 @@ function GogConnection() {
 function PsnConnection() {
   const [npsso, setNpsso] = useState("");
   const [includePlus, setIncludePlus] = useState(false);
-  const importer = usePsnImport();
+  const [dedupe, setDedupe] = useState(false);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const start = useStartPsnImport();
+  const { data: job } = usePsnImportJob(jobId);
+  const running = start.isPending || job?.status === "running";
 
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-line px-4 py-3.5">
@@ -156,8 +166,11 @@ function PsnConnection() {
         className="flex gap-2.5 max-[560px]:flex-col"
         onSubmit={(e) => {
           e.preventDefault();
-          if (npsso.trim()) {
-            importer.mutate({ npsso: npsso.trim(), include_ps_plus: includePlus });
+          if (npsso.trim() && !running) {
+            start.mutate(
+              { npsso: npsso.trim(), include_ps_plus: includePlus, dedupe_cross_gen: dedupe },
+              { onSuccess: (res) => setJobId(res.job_id) },
+            );
           }
         }}
       >
@@ -174,9 +187,9 @@ function PsnConnection() {
           type="submit"
           className="btn"
           aria-label="Import PlayStation library"
-          disabled={importer.isPending || !npsso.trim()}
+          disabled={running || !npsso.trim()}
         >
-          {importer.isPending ? "Importing…" : "Import"}
+          {running ? "Importing…" : "Import"}
         </button>
       </form>
 
@@ -189,15 +202,58 @@ function PsnConnection() {
         />
         Include PS Plus games (marked, so they stay identifiable if the subscription lapses)
       </label>
+      <label className="-mt-1.5 flex w-fit cursor-pointer items-center gap-2 text-[12.5px] text-muted">
+        <input
+          type="checkbox"
+          checked={dedupe}
+          onChange={(e) => setDedupe(e.target.checked)}
+          aria-label="Skip PS4 versions of games you also own on PS5"
+        />
+        Skip PS4 versions of games you also own on PS5
+      </label>
 
       <p className="m-0 text-xs text-dim">
         Sign in at playstation.com, then open ca.account.sony.com/api/v1/ssocookie and copy the
         npsso value. Tokens expire after a couple of months — just grab a new one per import.
       </p>
 
+      {job?.status === "running" && (
+        <div className="flex flex-col gap-1.5 rounded-xl bg-surface px-4 py-3 text-sm">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-muted">{job.phase}…</span>
+            {job.total > 0 && (
+              <span className="font-mono text-xs text-faint">
+                {job.done}/{job.total}
+              </span>
+            )}
+          </div>
+          {job.total > 0 && (
+            <div className="h-1.5 overflow-hidden rounded-full bg-raised">
+              <div
+                className="h-full rounded-full transition-[width]"
+                style={{
+                  width: `${Math.round((job.done / job.total) * 100)}%`,
+                  background: "var(--accent)",
+                }}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
       <ImportOutcome
-        error={importer.isError ? (importer.error as Error) : null}
-        data={importer.data}
+        error={
+          start.isError
+            ? (start.error as Error)
+            : job?.status === "error"
+              ? new Error(job.detail ?? "Import failed")
+              : null
+        }
+        data={
+          job?.status === "done"
+            ? { imported: job.imported ?? 0, skipped: job.skipped ?? 0, total: job.total }
+            : undefined
+        }
         totalLabel="in your PSN library"
       />
     </div>
