@@ -739,8 +739,10 @@ function RelinkDialog({ item, onClose }: { item: Item; onClose: () => void }) {
       className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4"
       onClick={onClose}
     >
+      {/* Capped to the visual viewport so the result list scrolls inside
+          the dialog instead of pushing the buttons off small screens. */}
       <div
-        className="panel flex w-full max-w-[440px] flex-col gap-3 p-5 shadow-lift"
+        className="panel flex max-h-[85dvh] w-full max-w-[440px] flex-col gap-3 p-5 shadow-lift"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="paneltitle">Re-link metadata</div>
@@ -755,7 +757,7 @@ function RelinkDialog({ item, onClose }: { item: Item; onClose: () => void }) {
           placeholder="Search…"
           className="input w-full"
         />
-        <div className="flex max-h-72 flex-col gap-0.5 overflow-y-auto">
+        <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
           {search.isLoading && <span className="px-2 py-1.5 text-xs text-faint">Searching…</span>}
           {results.map((result) => (
             <button
