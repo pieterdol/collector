@@ -206,3 +206,19 @@ Richer dashboards (reads per year, hours over time, spend) beyond the
 current stats tiles. The append-only event log and timestamps already
 capture everything they'll need, so they remain pure queries — no
 migration or backfill when they land.
+
+## Data sources & attribution
+
+- **TMDB** — movie & TV metadata and images.
+  This product uses the [TMDB](https://www.themoviedb.org) API but is not
+  endorsed or certified by TMDB.
+- **IGDB** — game metadata and artwork, via [IGDB.com](https://www.igdb.com)
+  (a Twitch service).
+- **Open Library** — book metadata and covers, from
+  [Open Library](https://openlibrary.org) (an Internet Archive project).
+- **Steam / PlayStation Network** — library imports use the Steam Web API
+  and PSN. This project is not affiliated with Valve or Sony.
+
+Cover art and posters shown in the app (and in screenshots) remain the
+property of their respective rights holders. The MIT license covers this
+project's code only, not third-party metadata or imagery.
