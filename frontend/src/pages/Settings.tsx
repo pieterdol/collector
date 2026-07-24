@@ -39,7 +39,7 @@ export default function Settings() {
         <h2 className="m-0 font-display text-[15px] font-semibold">Metadata sources</h2>
         <p className="m-0 text-[12.5px] leading-relaxed text-faint">
           Covers and details are enriched from Open Library (books), TMDB (movies &amp; TV) and
-          IGDB (games).
+          IGDB (games). This product uses the TMDB API but is not endorsed or certified by TMDB.
         </p>
       </section>
     </div>
