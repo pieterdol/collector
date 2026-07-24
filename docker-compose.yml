@@ -32,13 +32,21 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      # Slim image has no curl; probe the API with stdlib Python. Generous
+      # retries: migrations (and `uv sync` in the dev overlay) run first.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
 
   frontend:
     build: ./frontend
     ports:
       - "${APP_PORT:-8080}:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
 volumes:
   pgdata:
