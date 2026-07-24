@@ -93,16 +93,35 @@ def mock_psn(purchased=None, ps_plus=None, code_ok=True, played=None):
     respx.post(GRAPHQL_URL).mock(side_effect=graphql)
 
 
-def do_import(client, headers, **body) -> dict:
-    """Start an import job and return its (already final) status."""
+def start_job(client, headers, **body) -> str:
     res = client.post(
         "/api/psn/import", json={"npsso": "npsso-cookie-value", **body}, headers=headers
     )
     assert res.status_code == 202, res.text
-    job_id = res.json()["job_id"]
-    status = client.get(f"/api/psn/import/{job_id}", headers=headers)
-    assert status.status_code == 200, status.text
-    return status.json()
+    return res.json()["job_id"]
+
+
+def job_status(client, headers, job_id) -> dict:
+    res = client.get(f"/api/psn/import/{job_id}", headers=headers)
+    assert res.status_code == 200, res.text
+    return res.json()
+
+
+def confirm(client, headers, job_id, title_ids) -> dict:
+    res = client.post(
+        f"/api/psn/import/{job_id}/confirm", json={"title_ids": title_ids}, headers=headers
+    )
+    assert res.status_code == 202, res.text
+    return job_status(client, headers, job_id)
+
+
+def do_import(client, headers, **body) -> dict:
+    """Start a job, confirm every candidate, return the final status."""
+    job_id = start_job(client, headers, **body)
+    job = job_status(client, headers, job_id)
+    if job["status"] != "review":
+        return job
+    return confirm(client, headers, job_id, [c["title_id"] for c in job["candidates"]])
 
 
 def counts(job: dict) -> dict:
@@ -162,13 +181,121 @@ def test_dedupe_option_keeps_only_the_ps5_version(client):
     job = do_import(client, headers)
     assert job["imported"] == 3
 
-    # On: the PS4 twin is dropped before item creation.
+    # On: the PS4 twin moves to the auto-excluded review list.
     other = auth_headers(client, email="dedupe@example.com")
-    job = do_import(client, other, dedupe_cross_gen=True)
+    job_id = start_job(client, other, dedupe_cross_gen=True)
+    review = job_status(client, other, job_id)
+    twin = next(e for e in review["excluded"] if e["title_id"] == "CUSA11111")
+    assert "PS5" in twin["reason"]
+
+    job = confirm(client, other, job_id, [c["title_id"] for c in review["candidates"]])
     assert counts(job) == {"imported": 2, "skipped": 0, "total": 2}
     items = client.get("/api/items?type=game", headers=other).json()["items"]
     platforms = {i["title"]: i["platform"] for i in items}
     assert platforms == {"Returnal": "PlayStation 5", "Bloodborne": "PlayStation 4"}
+
+
+JUNK = [
+    {
+        "name": "Dragon's Dogma 2 Character Creator & Storage",
+        "titleId": "PPSA09999_00",
+        "platform": "PS5",
+        "subscriptionService": "NONE",
+    },
+    {
+        "name": "Prime Video",
+        "titleId": "CUSA00119_00",
+        "platform": "PS4",
+        "subscriptionService": "NONE",
+    },
+    {
+        "name": "Concord Beta",
+        "titleId": "PPSA08888_00",
+        "platform": "PS5",
+        "subscriptionService": "NONE",
+    },
+    {
+        "name": "FairGame$ Playtest",
+        "titleId": "PPSA07777_00",
+        "platform": "PS5",
+        "subscriptionService": "NONE",
+    },
+    {
+        # Not on any name list — only its played-titles category gives it away.
+        "name": "Some Streaming Thing",
+        "titleId": "CUSA55555_00",
+        "platform": "PS4",
+        "subscriptionService": "NONE",
+    },
+]
+
+
+@respx.mock
+def test_non_games_pause_in_the_excluded_review_list(client):
+    mock_psn(
+        purchased=PURCHASED + JUNK,
+        played=[{"titleId": "CUSA55555_00", "category": "media"}],
+    )
+    headers = auth_headers(client)
+    job_id = start_job(client, headers)
+    job = job_status(client, headers, job_id)
+
+    assert job["status"] == "review"
+    assert {c["name"] for c in job["candidates"]} == {"Returnal", "Bloodborne"}
+    excluded = {e["name"]: e["reason"] for e in job["excluded"]}
+    assert set(excluded) == {
+        "Dragon's Dogma 2 Character Creator & Storage",
+        "Prime Video",
+        "Concord Beta",
+        "FairGame$ Playtest",
+        "Some Streaming Thing",
+    }
+    assert all(excluded.values())  # every exclusion explains itself
+
+    # Nothing is created until the review is confirmed.
+    items = client.get("/api/items?type=game", headers=headers).json()["items"]
+    assert items == []
+
+
+@respx.mock
+def test_confirm_imports_only_the_selected_titles(client):
+    mock_psn(purchased=PURCHASED)
+    headers = auth_headers(client)
+    job_id = start_job(client, headers)
+    job = confirm(client, headers, job_id, ["PPSA01284"])
+
+    assert counts(job) == {"imported": 1, "skipped": 0, "total": 1}
+    items = client.get("/api/items?type=game", headers=headers).json()["items"]
+    assert [i["title"] for i in items] == ["Returnal"]
+
+
+@respx.mock
+def test_excluded_titles_can_be_rescued_at_confirm(client):
+    mock_psn(purchased=PURCHASED + JUNK)
+    headers = auth_headers(client)
+    job_id = start_job(client, headers)
+    job = confirm(client, headers, job_id, ["PPSA08888"])  # the Concord Beta
+
+    assert job["imported"] == 1
+    items = client.get("/api/items?type=game", headers=headers).json()["items"]
+    assert [i["title"] for i in items] == ["Concord Beta"]
+
+
+@respx.mock
+def test_confirm_requires_a_job_in_review(client):
+    mock_psn(purchased=PURCHASED)
+    headers = auth_headers(client)
+    job_id = start_job(client, headers)
+    confirm(client, headers, job_id, ["PPSA01284"])
+
+    res = client.post(
+        f"/api/psn/import/{job_id}/confirm", json={"title_ids": []}, headers=headers
+    )
+    assert res.status_code == 409
+    res = client.post(
+        "/api/psn/import/nope/confirm", json={"title_ids": []}, headers=headers
+    )
+    assert res.status_code == 404
 
 
 @respx.mock

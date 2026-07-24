@@ -97,21 +97,19 @@ def purchased_games(token: str, include_ps_plus: bool = False, on_progress=None)
     return out
 
 
-def play_durations(token: str) -> dict[str, int]:
-    """titleId → minutes played, from the played-games list (the numbers
-    the PS App shows on your profile). Best-effort: an error here should
+def played_titles(token: str) -> dict[str, dict]:
+    """titleId → {"minutes", "category"} from the played-games list (the
+    numbers the PS App shows on your profile). The category matters
+    twice: playtime prefill, and spotting entitlements that are apps
+    rather than games (Prime Video). Best-effort: an error here should
     never block an import, so failures return what was gathered so far."""
-    out: dict[str, int] = {}
+    out: dict[str, dict] = {}
     offset = 0
     try:
         while True:
             res = httpx.get(
                 GAMELIST_URL,
-                params={
-                    "categories": "ps4_game,ps5_native_game",
-                    "limit": 200,
-                    "offset": offset,
-                },
+                params={"limit": 200, "offset": offset},
                 headers={"Authorization": f"Bearer {token}"},
                 timeout=30,
             )
@@ -120,11 +118,16 @@ def play_durations(token: str) -> dict[str, int]:
             payload = res.json()
             titles = payload.get("titles") or []
             for title in titles:
-                # gamelist ids carry a "_00" service suffix; purchased ids don't.
                 title_id = str(title.get("titleId", "")).split("_")[0]
-                minutes = _duration_minutes(title.get("playDuration"))
-                if title_id and minutes:
-                    out[title_id] = max(out.get(title_id, 0), minutes)
+                if not title_id:
+                    continue
+                entry = out.setdefault(title_id, {"minutes": 0, "category": None})
+                entry["minutes"] = max(
+                    entry["minutes"], _duration_minutes(title.get("playDuration"))
+                )
+                category = title.get("category")
+                if entry["category"] is None and isinstance(category, str):
+                    entry["category"] = category
             offset += len(titles)
             if not titles or offset >= payload.get("totalItemCount", 0):
                 return out

@@ -5,11 +5,14 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { SteamIcon } from "../components/icons";
 import {
+  useConfirmPsnImport,
   useEpicImport,
   useGogImport,
   usePsnImportJob,
   useStartPsnImport,
   useSteamImport,
+  type PsnImportJob,
+  type PsnReviewTitle,
 } from "../lib/queries";
 import type { ImportSummary } from "../lib/types";
 
@@ -217,6 +220,8 @@ function PsnConnection() {
         npsso value. Tokens expire after a couple of months — just grab a new one per import.
       </p>
 
+      {job?.status === "review" && jobId && <PsnReview key={jobId} job={job} jobId={jobId} />}
+
       {job?.status === "running" && (
         <div className="flex flex-col gap-1.5 rounded-xl bg-surface px-4 py-3 text-sm">
           <div className="flex items-center justify-between gap-3">
@@ -257,6 +262,97 @@ function PsnConnection() {
         totalLabel="in your PSN library"
       />
     </div>
+  );
+}
+
+/** Review step of a PSN import: pick the titles to create. Auto-excluded
+ * entries (apps, demos, betas…) sit behind a collapsed section where
+ * they can be rescued. */
+function PsnReview({ job, jobId }: { job: PsnImportJob; jobId: string }) {
+  const candidates = job.candidates ?? [];
+  const excluded = job.excluded ?? [];
+  const [selected, setSelected] = useState<Set<string>>(
+    () => new Set(candidates.map((c) => c.title_id)),
+  );
+  const [showExcluded, setShowExcluded] = useState(false);
+  const confirm = useConfirmPsnImport(jobId);
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-2.5 rounded-xl bg-surface px-4 py-3.5 text-sm">
+      <div className="font-semibold">
+        Review import — {selected.size} of {candidates.length + excluded.length} selected
+      </div>
+
+      <div className="flex max-h-72 flex-col gap-0.5 overflow-y-auto">
+        {candidates.map((title) => (
+          <ReviewRow key={title.title_id} title={title} checked={selected.has(title.title_id)} onToggle={toggle} />
+        ))}
+      </div>
+
+      {excluded.length > 0 && (
+        <>
+          <button
+            type="button"
+            onClick={() => setShowExcluded((v) => !v)}
+            aria-expanded={showExcluded}
+            className="w-fit text-[12.5px] font-semibold text-muted hover:text-text"
+          >
+            {showExcluded ? "▾" : "▸"} Auto-excluded ({excluded.length})
+          </button>
+          {showExcluded && (
+            <div className="flex max-h-72 flex-col gap-0.5 overflow-y-auto">
+              {excluded.map((title) => (
+                <ReviewRow key={title.title_id} title={title} checked={selected.has(title.title_id)} onToggle={toggle} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      <button
+        type="button"
+        className="btn w-fit"
+        disabled={selected.size === 0 || confirm.isPending}
+        onClick={() => confirm.mutate([...selected])}
+      >
+        Import {selected.size} game{selected.size === 1 ? "" : "s"}
+      </button>
+    </div>
+  );
+}
+
+function ReviewRow({
+  title,
+  checked,
+  onToggle,
+}: {
+  title: PsnReviewTitle;
+  checked: boolean;
+  onToggle: (id: string) => void;
+}) {
+  return (
+    <label className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-raised">
+      <input type="checkbox" checked={checked} onChange={() => onToggle(title.title_id)} />
+      <span className="min-w-0 flex-1 truncate text-[13px]">{title.name}</span>
+      {title.subscription && (
+        <span className="flex-none rounded-full border border-line-strong px-2 py-0.5 text-[10.5px] font-semibold text-muted">
+          {title.subscription}
+        </span>
+      )}
+      {title.reason && (
+        <span className="flex-none text-[11px] text-faint">{title.reason}</span>
+      )}
+      <span className="flex-none font-mono text-[11px] text-faint">{title.platform}</span>
+    </label>
   );
 }
 

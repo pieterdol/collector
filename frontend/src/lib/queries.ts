@@ -292,15 +292,26 @@ export function useEpicImport() {
 }
 
 /** A PSN import runs as a background job the UI polls (big libraries
- * outlive proxy timeouts). Mirrors backend schemas/psn.py. */
+ * outlive proxy timeouts); it pauses in "review" until the user picks
+ * which titles to create. Mirrors backend schemas/psn.py. */
+export interface PsnReviewTitle {
+  title_id: string;
+  name: string;
+  platform: string | null;
+  subscription: string | null;
+  reason: string | null;
+}
+
 export interface PsnImportJob {
-  status: "running" | "done" | "error";
+  status: "running" | "review" | "done" | "error";
   phase: string;
   done: number;
   total: number;
   imported: number | null;
   skipped: number | null;
   detail: string | null;
+  candidates: PsnReviewTitle[] | null;
+  excluded: PsnReviewTitle[] | null;
 }
 
 /** Start a PSN import job: the pasted NPSSO token is exchanged
@@ -309,6 +320,20 @@ export function useStartPsnImport() {
   return useMutation({
     mutationFn: (body: { npsso: string; include_ps_plus: boolean; dedupe_cross_gen: boolean }) =>
       api<{ job_id: string }>("/api/psn/import", { method: "POST", body }),
+  });
+}
+
+/** Confirm a PSN import in review: create items for the selected ids.
+ * Invalidating the job query resumes the polling loop. */
+export function useConfirmPsnImport(jobId: string | null) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (titleIds: string[]) =>
+      api<{ job_id: string }>(`/api/psn/import/${jobId}/confirm`, {
+        method: "POST",
+        body: { title_ids: titleIds },
+      }),
+    onSuccess: () => void client.invalidateQueries({ queryKey: ["psn-import", jobId] }),
   });
 }
 

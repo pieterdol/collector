@@ -183,6 +183,67 @@ describe("Settings PSN import", () => {
   });
 });
 
+const REVIEW_JOB = {
+  status: "review",
+  phase: "Waiting for review",
+  done: 0,
+  total: 0,
+  candidates: [
+    { title_id: "PPSA01284", name: "Returnal", platform: "PS5", subscription: null, reason: null },
+    { title_id: "CUSA00207", name: "Bloodborne", platform: "PS4", subscription: null, reason: null },
+  ],
+  excluded: [
+    { title_id: "CUSA00119", name: "Prime Video", platform: "PS4", subscription: null, reason: "media app" },
+  ],
+};
+
+describe("Settings PSN review step", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("lists candidates and keeps the excluded section collapsed", async () => {
+    mockPsnFetch(REVIEW_JOB);
+    renderSettings();
+    startPsnImport();
+
+    expect(await screen.findByText("Returnal")).toBeInTheDocument();
+    expect(screen.getByText("Bloodborne")).toBeInTheDocument();
+    expect(screen.queryByText("Prime Video")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Auto-excluded \(1\)/ }));
+    expect(screen.getByText("Prime Video")).toBeInTheDocument();
+    expect(screen.getByText("media app")).toBeInTheDocument();
+  });
+
+  it("confirms only the selected titles", async () => {
+    mockPsnFetch(REVIEW_JOB);
+    renderSettings();
+    startPsnImport();
+
+    fireEvent.click(await screen.findByRole("checkbox", { name: /Bloodborne/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Import 1 game" }));
+
+    await waitFor(() => {
+      const call = (fetch as ReturnType<typeof vi.fn>).mock.calls.find(([url]) =>
+        String(url).includes("/confirm"),
+      );
+      expect(call).toBeDefined();
+      expect(JSON.parse(String((call![1] as RequestInit).body))).toEqual({
+        title_ids: ["PPSA01284"],
+      });
+    });
+  });
+
+  it("can rescue an auto-excluded title", async () => {
+    mockPsnFetch(REVIEW_JOB);
+    renderSettings();
+    startPsnImport();
+
+    fireEvent.click(await screen.findByRole("button", { name: /Auto-excluded \(1\)/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Prime Video/ }));
+    expect(screen.getByRole("button", { name: "Import 3 games" })).toBeInTheDocument();
+  });
+});
+
 describe("Settings GOG import", () => {
   beforeEach(() => mockFetch({ imported: 1, skipped: 0, total: 1 }));
   afterEach(() => vi.unstubAllGlobals());
