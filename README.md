@@ -198,7 +198,6 @@ frontend/
   src/components/        PosterCard, ItemTable, BarcodeScanner, SeasonsPanel, …
   src/pages/             Shelf, Wishlist, Upcoming, Stats, AddItem, ItemDetail,
                          Settings, Login
-PLAN.md                  the running build plan / design decisions
 ```
 
 ## Out of scope (for now)

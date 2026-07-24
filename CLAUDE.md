@@ -1,9 +1,9 @@
 # Collector — agent guide
 
-Self-hosted media collection tracker (books/movies/games). FastAPI +
+Self-hosted media collection tracker (books/movies/TV/games). FastAPI +
 SQLAlchemy + PostgreSQL backend, React 19 + TypeScript + Tailwind v4 PWA
-frontend, docker-compose (works with podman). `PLAN.md` holds the running
-architecture decisions; `README.md` the user-facing docs.
+frontend, docker-compose (works with podman). `README.md` holds the
+user-facing docs; architecture rules live below.
 
 ## TDD — non-negotiable
 
