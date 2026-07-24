@@ -379,8 +379,8 @@ function ReviewRow({
           {title.subscription}
         </span>
       )}
-      {title.reason && (
-        <span className="flex-none text-[11px] text-faint">{title.reason}</span>
+      {(title.reason || title.note) && (
+        <span className="flex-none text-[11px] text-faint">{title.reason ?? title.note}</span>
       )}
       <span className="flex-none font-mono text-[11px] text-faint">{title.platform}</span>
     </label>

@@ -271,3 +271,34 @@ describe("Settings GOG import", () => {
     expect(await screen.findByText("Imported 1 game.")).toBeInTheDocument();
   });
 });
+
+describe("Settings review notes", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("keeps a game owned on another platform selected, with a note", async () => {
+    mockJobFetch({
+      status: "review",
+      phase: "Waiting for review",
+      done: 0,
+      total: 0,
+      candidates: [
+        {
+          title_id: "Bree",
+          name: "Hogwarts Legacy",
+          platform: "PC",
+          subscription: null,
+          reason: null,
+          note: "also owned on PlayStation 5",
+        },
+      ],
+      excluded: [],
+    });
+    renderSettings();
+    chooseEpicFile();
+    fireEvent.click(screen.getByRole("button", { name: "Import Epic library" }));
+
+    expect(await screen.findByText("also owned on PlayStation 5")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: /Hogwarts Legacy/ })).toBeChecked();
+    expect(screen.getByRole("button", { name: "Import 1 game" })).toBeInTheDocument();
+  });
+});

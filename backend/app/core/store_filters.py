@@ -47,6 +47,25 @@ def name_key(name: str) -> str:
     return re.sub(r"[™®]", "", name or "").casefold().strip()
 
 
+def owned_verdict(
+    name: str, platform: str, owned: dict[str, set[str | None]]
+) -> tuple[str | None, str | None]:
+    """(reason, note) for a title the user may already have.
+
+    Same game, same platform → a duplicate worth excluding. Same game on
+    another platform → a candidate with a note: owning a game on PS5
+    shouldn't block importing the PC copy, since they're separate copies.
+    An existing copy with no platform recorded counts as the same one.
+    """
+    platforms = owned.get(name_key(name))
+    if not platforms:
+        return None, None
+    if platform in platforms or None in platforms:
+        return "already in your collection", None
+    others = sorted(p for p in platforms if p)
+    return None, f"also owned on {', '.join(others)}"
+
+
 def classify(name: str, category: str | None = None) -> str | None:
     """Reason this entitlement isn't a game, or None if it looks like one.
 

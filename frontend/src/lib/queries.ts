@@ -305,6 +305,8 @@ export interface ReviewTitle {
   platform: string | null;
   subscription: string | null;
   reason: string | null;
+  /** Informational, e.g. the same game owned on another platform. */
+  note: string | null;
 }
 
 export interface ImportJob {

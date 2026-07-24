@@ -432,3 +432,37 @@ def test_import_records_activity_events(client):
     ]
     assert [e["event_type"] for e in events] == ["item_added"]
     assert events[0]["new_value"]["source"] == "psn_import"
+
+
+@respx.mock
+def test_pc_copies_do_not_block_playstation_imports(client):
+    """The Epic/GOG copy of a game lives on PC; the PS5 entitlement is a
+    different platform, so it stays importable with a note."""
+    mock_psn(purchased=PURCHASED)
+    headers = auth_headers(client)
+    create_item(
+        client, headers, type="game", title="Returnal", format="digital",
+        metadata={"platform": "PC (Microsoft Windows)", "epic_app_name": "x"},
+    )
+
+    job_id = start_job(client, headers)
+    review = job_status(client, headers, job_id)
+    returnal = next(c for c in review["candidates"] if c["name"] == "Returnal")
+    assert returnal["note"] == "also owned on PC (Microsoft Windows)"
+    assert returnal["reason"] is None
+
+
+@respx.mock
+def test_same_console_copy_is_still_excluded(client):
+    mock_psn(purchased=PURCHASED)
+    headers = auth_headers(client)
+    create_item(
+        client, headers, type="game", title="Returnal", format="physical",
+        metadata={"platform": "PlayStation 5"},
+    )
+
+    job_id = start_job(client, headers)
+    review = job_status(client, headers, job_id)
+    assert [c["name"] for c in review["candidates"]] == ["Bloodborne"]
+    flagged = next(e for e in review["excluded"] if e["name"] == "Returnal")
+    assert flagged["reason"] == "already in your collection"

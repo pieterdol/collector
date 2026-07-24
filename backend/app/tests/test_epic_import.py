@@ -256,3 +256,37 @@ def test_import_records_activity_events(client):
     ]
     assert [e["event_type"] for e in events] == ["item_added"]
     assert events[0]["new_value"]["source"] == "epic_import"
+
+
+@respx.mock
+def test_same_title_on_another_platform_stays_importable(client):
+    """Owning Hogwarts Legacy on PS5 must not block the PC copy — the
+    review notes the overlap instead of excluding it."""
+    stub_cdn()
+    headers = auth_headers(client)
+    create_item(
+        client, headers, type="game", title="Celeste", format="digital",
+        metadata={"platform": "PlayStation 5", "psn_title_id": "PPSA00001"},
+    )
+
+    _, review = review_of(client, headers, LEGENDARY_DUMP)
+    names = {c["name"] for c in review["candidates"]}
+    assert names == {"Alba - A Wildlife Adventure", "Celeste"}
+    celeste = next(c for c in review["candidates"] if c["name"] == "Celeste")
+    assert celeste["note"] == "also owned on PlayStation 5"
+    assert celeste["reason"] is None
+
+
+@respx.mock
+def test_same_title_on_the_same_platform_is_excluded(client):
+    stub_cdn()
+    headers = auth_headers(client)
+    create_item(
+        client, headers, type="game", title="Celeste", format="digital",
+        metadata={"platform": "PC (Microsoft Windows)"},
+    )
+
+    _, review = review_of(client, headers, LEGENDARY_DUMP)
+    assert [c["name"] for c in review["candidates"]] == ["Alba - A Wildlife Adventure"]
+    flagged = next(e for e in review["excluded"] if e["name"] == "Celeste")
+    assert flagged["reason"] == "already in your collection"

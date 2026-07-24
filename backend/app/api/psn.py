@@ -20,7 +20,7 @@ from app.core.events import record_event
 from app.core.library_import import fetch_covers
 from app.core.platforms import find_or_create_platform
 from app.core.security import get_current_user
-from app.core.store_filters import classify, name_key
+from app.core.store_filters import classify, name_key, owned_verdict
 from app.db import SessionLocal
 from app.domain.enums import EventType, ItemFormat, ItemStatus, ItemType
 from app.models import Item, User
@@ -119,17 +119,16 @@ def _prepare_review(job_id: str, user_id: uuid.UUID, body: PsnImportIn) -> None:
         import_jobs.fail(job_id, "PSN is unreachable right now")
         return
 
-    # Titles already on the shelf (any format/source) get pre-excluded in
-    # the review — imported earlier, added manually, whatever. Rescuable.
+    # Copies already on the shelf, per platform: the same game on another
+    # platform is a separate copy, not a duplicate.
     with SessionLocal() as db:
-        owned_names = {
-            name_key(title)
-            for title in db.scalars(
-                select(Item.title).where(
-                    Item.user_id == user_id, Item.type == ItemType.GAME.value
-                )
+        owned: dict[str, set[str | None]] = {}
+        for item in db.scalars(
+            select(Item).where(
+                Item.user_id == user_id, Item.type == ItemType.GAME.value
             )
-        }
+        ):
+            owned.setdefault(name_key(item.title), set()).add(item.platform)
 
     candidates: list[dict] = []
     excluded: list[dict] = []
@@ -151,16 +150,18 @@ def _prepare_review(job_id: str, user_id: uuid.UUID, body: PsnImportIn) -> None:
             "platform": game.get("platform"),
             "subscription": game.get("subscription"),
         }
+        platform_name = _PLATFORM_NAMES.get(game.get("platform"), "PlayStation 5")
         reason = classify(name, (played.get(title_id) or {}).get("category"))
-        if reason is None and name_key(name) in owned_names:
-            reason = "already in your collection"
+        note = None
+        if reason is None:
+            reason, note = owned_verdict(name, platform_name, owned)
         if reason is None and body.dedupe_cross_gen and game.get("platform") == "PS4":
             if name_key(name) in ps5_names:
                 reason = "PS4 version of a game you also own on PS5"
         if reason:
             excluded.append({**entry, "reason": reason})
         else:
-            candidates.append(entry)
+            candidates.append({**entry, "note": note})
 
     import_jobs.update(
         job_id,

@@ -14,6 +14,9 @@ class ReviewTitle(BaseModel):
     subscription: str | None = None
     # Why the auto-filter excluded it (excluded list only).
     reason: str | None = None
+    # Informational note on a candidate, e.g. the same game owned on
+    # another platform — worth knowing, not a reason to skip.
+    note: str | None = None
 
 
 class ImportJobOut(BaseModel):

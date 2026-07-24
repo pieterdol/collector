@@ -24,12 +24,15 @@ from app.core import import_jobs
 from app.core.covers import download_cover
 from app.core.events import record_event
 from app.core.platforms import find_or_create_platform
-from app.core.store_filters import classify, name_key
+from app.core.store_filters import classify, name_key, owned_verdict
 from app.db import SessionLocal
 from app.domain.enums import EventType, ItemFormat, ItemStatus, ItemType
 from app.models import Item, User
 
 MAX_BYTES = 40 * 1024 * 1024  # legendary dumps carry full catalog metadata
+
+# Epic and GOG are PC storefronts; every import lands on this platform.
+PC_PLATFORM = "PC (Microsoft Windows)"
 
 # Poster-shaped art first; Heroic's square art beats no art.
 _KEY_IMAGE_PREFERENCE = ["DieselGameBoxTall", "OfferImageTall", "DieselGameBox"]
@@ -58,14 +61,15 @@ def prepare_review(
     import_jobs.update(job_id, phase="Reading library file", total=len(entries))
 
     with SessionLocal() as db:
-        owned_names = {
-            name_key(title)
-            for title in db.scalars(
-                select(Item.title).where(
-                    Item.user_id == user_id, Item.type == ItemType.GAME.value
-                )
+        # Title → the platforms it's already owned on, so a PC copy of a
+        # game owned on a console isn't mistaken for a duplicate.
+        owned: dict[str, set[str | None]] = {}
+        for item in db.scalars(
+            select(Item).where(
+                Item.user_id == user_id, Item.type == ItemType.GAME.value
             )
-        }
+        ):
+            owned.setdefault(name_key(item.title), set()).add(item.platform)
         already_imported = set(
             db.scalars(
                 select(text(f"metadata->>'{spec.id_key}'")).select_from(Item).where(
@@ -86,14 +90,16 @@ def prepare_review(
         games[game["app_name"]] = game
         row = {"title_id": game["app_name"], "name": game["title"], "platform": "PC"}
         reason = classify(game["title"])
-        if reason is None and (
-            game["app_name"] in already_imported or name_key(game["title"]) in owned_names
-        ):
-            reason = "already in your collection"
+        note = None
+        if reason is None:
+            if game["app_name"] in already_imported:
+                reason = "already in your collection"
+            else:
+                reason, note = owned_verdict(game["title"], PC_PLATFORM, owned)
         if reason:
             excluded.append({**row, "reason": reason})
         else:
-            candidates.append(row)
+            candidates.append({**row, "note": note})
 
     import_jobs.update(
         job_id,
@@ -126,7 +132,7 @@ def import_selected(
             )
         )
 
-        pc_platform = find_or_create_platform(db, "PC (Microsoft Windows)")
+        pc_platform = find_or_create_platform(db, PC_PLATFORM)
         imported_ids: list[uuid.UUID] = []
         for index, title_id in enumerate(selected):
             if index % 25 == 0:
@@ -141,7 +147,7 @@ def import_selected(
             meta = {
                 spec.id_key: title_id,
                 "storefront": spec.storefront,
-                "platform": "PC (Microsoft Windows)",
+                "platform": PC_PLATFORM,
             }
             if game["developer"]:
                 meta["developer"] = game["developer"]
