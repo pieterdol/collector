@@ -290,6 +290,17 @@ export function useEpicImport() {
   });
 }
 
+/** PSN import: the pasted NPSSO token is exchanged server-side and
+ * used once — never stored. */
+export function usePsnImport() {
+  const invalidate = useInvalidateItems();
+  return useMutation({
+    mutationFn: (body: { npsso: string; include_ps_plus: boolean }) =>
+      api<ImportSummary>("/api/psn/import", { method: "POST", body }),
+    onSuccess: () => invalidate(),
+  });
+}
+
 /** GOG import: upload Heroic's gog_library.json store cache. */
 export function useGogImport() {
   const invalidate = useInvalidateItems();

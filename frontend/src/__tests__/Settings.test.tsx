@@ -79,6 +79,54 @@ describe("Settings Epic import", () => {
   });
 });
 
+describe("Settings PSN import", () => {
+  beforeEach(() => mockFetch({ imported: 4, skipped: 1, total: 5 }));
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("sends the NPSSO token with PS Plus excluded by default", async () => {
+    renderSettings();
+    fireEvent.change(screen.getByLabelText("NPSSO token"), {
+      target: { value: "npsso-cookie-value" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Import PlayStation library" }));
+
+    await waitFor(() => {
+      const calls = (fetch as ReturnType<typeof vi.fn>).mock.calls;
+      expect(calls.some(([url]) => String(url).includes("/api/psn/import"))).toBe(true);
+    });
+    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls.find(([url]) =>
+      String(url).includes("/api/psn/import"),
+    )!;
+    expect(JSON.parse(String((init as RequestInit).body))).toEqual({
+      npsso: "npsso-cookie-value",
+      include_ps_plus: false,
+    });
+    expect(await screen.findByText("Imported 4 games.")).toBeInTheDocument();
+  });
+
+  it("includes PS Plus games when the toggle is checked", async () => {
+    renderSettings();
+    fireEvent.change(screen.getByLabelText("NPSSO token"), {
+      target: { value: "npsso-cookie-value" },
+    });
+    fireEvent.click(screen.getByLabelText("Include PS Plus games"));
+    fireEvent.click(screen.getByRole("button", { name: "Import PlayStation library" }));
+
+    await waitFor(() => {
+      const call = (fetch as ReturnType<typeof vi.fn>).mock.calls.find(([url]) =>
+        String(url).includes("/api/psn/import"),
+      );
+      expect(call).toBeDefined();
+      expect(JSON.parse(String((call![1] as RequestInit).body)).include_ps_plus).toBe(true);
+    });
+  });
+
+  it("keeps the import button disabled until a token is entered", () => {
+    renderSettings();
+    expect(screen.getByRole("button", { name: "Import PlayStation library" })).toBeDisabled();
+  });
+});
+
 describe("Settings GOG import", () => {
   beforeEach(() => mockFetch({ imported: 1, skipped: 0, total: 1 }));
   afterEach(() => vi.unstubAllGlobals());

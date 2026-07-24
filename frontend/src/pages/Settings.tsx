@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { SteamIcon } from "../components/icons";
-import { useEpicImport, useGogImport, useSteamImport } from "../lib/queries";
+import { useEpicImport, useGogImport, usePsnImport, useSteamImport } from "../lib/queries";
 import type { ImportSummary } from "../lib/types";
 
 export default function Settings() {
@@ -20,7 +20,10 @@ export default function Settings() {
         <SteamConnection />
         <EpicConnection />
         <GogConnection />
-        <p className="m-0 text-xs text-dim">PSN and Xbox are on the roadmap.</p>
+        <PsnConnection />
+        <p className="m-0 text-xs text-dim">
+          Xbox isn't planned — Microsoft's API can't tell owned games apart from Game Pass.
+        </p>
       </section>
 
       <section className="panel flex flex-col gap-2.5 px-5 py-5">
@@ -126,6 +129,78 @@ function GogConnection() {
       store="GOG"
       importer={useGogImport()}
     />
+  );
+}
+
+function PsnConnection() {
+  const [npsso, setNpsso] = useState("");
+  const [includePlus, setIncludePlus] = useState(false);
+  const importer = usePsnImport();
+
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border border-line px-4 py-3.5">
+      <div className="flex items-center gap-3.5">
+        <div className="grid h-9 w-9 flex-none place-items-center rounded-[9px] border border-line-strong bg-raised font-display text-[15px] font-bold">
+          PS
+        </div>
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <span className="text-[13.5px] font-semibold">PlayStation Network</span>
+          <span className="text-xs text-faint">
+            Digitally purchased games with their console (PS5, PS4, …). The token is used once
+            and never stored; already imported games are skipped.
+          </span>
+        </div>
+      </div>
+
+      <form
+        className="flex gap-2.5 max-[560px]:flex-col"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (npsso.trim()) {
+            importer.mutate({ npsso: npsso.trim(), include_ps_plus: includePlus });
+          }
+        }}
+      >
+        <input
+          type="password"
+          value={npsso}
+          onChange={(e) => setNpsso(e.target.value)}
+          placeholder="NPSSO token"
+          aria-label="NPSSO token"
+          autoComplete="off"
+          className="input min-w-0 flex-1"
+        />
+        <button
+          type="submit"
+          className="btn"
+          aria-label="Import PlayStation library"
+          disabled={importer.isPending || !npsso.trim()}
+        >
+          {importer.isPending ? "Importing…" : "Import"}
+        </button>
+      </form>
+
+      <label className="flex w-fit cursor-pointer items-center gap-2 text-[12.5px] text-muted">
+        <input
+          type="checkbox"
+          checked={includePlus}
+          onChange={(e) => setIncludePlus(e.target.checked)}
+          aria-label="Include PS Plus games"
+        />
+        Include PS Plus games (marked, so they stay identifiable if the subscription lapses)
+      </label>
+
+      <p className="m-0 text-xs text-dim">
+        Sign in at playstation.com, then open ca.account.sony.com/api/v1/ssocookie and copy the
+        npsso value. Tokens expire after a couple of months — just grab a new one per import.
+      </p>
+
+      <ImportOutcome
+        error={importer.isError ? (importer.error as Error) : null}
+        data={importer.data}
+        totalLabel="in your PSN library"
+      />
+    </div>
   );
 }
 
