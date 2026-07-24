@@ -44,12 +44,38 @@ GOG_CACHE_LEGACY = {
 }
 
 
-def upload(client, headers, payload) -> httpx.Response:
+def start(client, headers, payload) -> httpx.Response:
     return client.post(
         "/api/gog/import",
         files={"file": ("gog_library.json", json.dumps(payload), "application/json")},
         headers=headers,
     )
+
+
+def review_of(client, headers, payload) -> tuple[str, dict]:
+    res = start(client, headers, payload)
+    assert res.status_code == 202, res.text
+    job_id = res.json()["job_id"]
+    return job_id, client.get(f"/api/gog/import/{job_id}", headers=headers).json()
+
+
+def confirm(client, headers, job_id, title_ids) -> dict:
+    res = client.post(
+        f"/api/gog/import/{job_id}/confirm",
+        json={"title_ids": title_ids},
+        headers=headers,
+    )
+    assert res.status_code == 202, res.text
+    return client.get(f"/api/gog/import/{job_id}", headers=headers).json()
+
+
+def upload(client, headers, payload) -> dict:
+    job_id, review = review_of(client, headers, payload)
+    return confirm(client, headers, job_id, [c["title_id"] for c in review["candidates"]])
+
+
+def counts(job: dict) -> dict:
+    return {k: job[k] for k in ("imported", "skipped", "total")}
 
 
 def stub_cdn():
@@ -60,9 +86,8 @@ def stub_cdn():
 def test_import_creates_gog_games_skipping_dlc_and_other_runners(client):
     stub_cdn()
     headers = auth_headers(client)
-    res = upload(client, headers, GOG_CACHE)
-    assert res.status_code == 200, res.text
-    assert res.json() == {"imported": 1, "skipped": 2, "total": 3}
+    job = upload(client, headers, GOG_CACHE)
+    assert counts(job) == {"imported": 1, "skipped": 0, "total": 1}
 
     items = client.get("/api/items?type=game", headers=headers).json()["items"]
     assert [i["title"] for i in items] == ["The Witcher 3: Wild Hunt"]
@@ -80,18 +105,39 @@ def test_import_creates_gog_games_skipping_dlc_and_other_runners(client):
 def test_import_accepts_older_games_envelope(client):
     stub_cdn()
     headers = auth_headers(client)
-    res = upload(client, headers, GOG_CACHE_LEGACY)
-    assert res.json() == {"imported": 1, "skipped": 0, "total": 1}
+    assert upload(client, headers, GOG_CACHE_LEGACY)["imported"] == 1
 
 
 @respx.mock
-def test_reimport_skips_already_imported_games(client):
+def test_redistributables_are_auto_excluded(client):
+    """Heroic's GOG cache carries a "Galaxy Common Redistributables" row."""
     stub_cdn()
     headers = auth_headers(client)
-    assert upload(client, headers, GOG_CACHE).json()["imported"] == 1
+    payload = {
+        "games": GOG_CACHE["library"]
+        + [
+            {
+                "app_name": "gog-redist",
+                "title": "Galaxy Common Redistributables",
+                "runner": "gog",
+            }
+        ]
+    }
+    _, review = review_of(client, headers, payload)
+    assert [c["name"] for c in review["candidates"]] == ["The Witcher 3: Wild Hunt"]
+    flagged = next(e for e in review["excluded"] if e["name"] == "Galaxy Common Redistributables")
+    assert flagged["reason"]
 
-    res = upload(client, headers, GOG_CACHE)
-    assert res.json() == {"imported": 0, "skipped": 3, "total": 3}
+
+@respx.mock
+def test_reimport_flags_previously_imported_games(client):
+    stub_cdn()
+    headers = auth_headers(client)
+    assert upload(client, headers, GOG_CACHE)["imported"] == 1
+
+    _, review = review_of(client, headers, GOG_CACHE)
+    assert review["candidates"] == []
+    assert {e["reason"] for e in review["excluded"]} == {"already in your collection"}
 
 
 def test_import_requires_auth(client):
@@ -109,13 +155,18 @@ def test_gog_and_epic_imports_do_not_collide(client):
     epic_payload = {
         "library": [{"app_name": "1207658924", "title": "Epic Twin", "runner": "legendary"}]
     }
-    client.post(
+    epic_res = client.post(
         "/api/epic/import",
         files={"file": ("library.json", json.dumps(epic_payload), "application/json")},
         headers=headers,
     )
-    res = upload(client, headers, GOG_CACHE)
-    assert res.json()["imported"] == 1
+    epic_job = epic_res.json()["job_id"]
+    client.post(
+        f"/api/epic/import/{epic_job}/confirm",
+        json={"title_ids": ["1207658924"]},
+        headers=headers,
+    )
 
+    assert upload(client, headers, GOG_CACHE)["imported"] == 1
     items = client.get("/api/items?type=game", headers=headers).json()["items"]
     assert sorted(i["title"] for i in items) == ["Epic Twin", "The Witcher 3: Wild Hunt"]

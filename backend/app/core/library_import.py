@@ -4,8 +4,12 @@ Neither store has a usable public API, so we import the library files the
 user's launcher already maintains: Heroic's store caches
 (store_cache/legendary_library.json, gog_library.json) and legendary's
 `list --json` dumps. Each store's router supplies a StoreSpec; everything
-else — parsing, DLC/runner filtering, dedupe, item + event creation,
-cover fetching — is identical.
+else — parsing, DLC/runner filtering, review classification, dedupe, item
+and event creation, cover fetching — is identical.
+
+Imports pause for review (same contract as PSN): the upload parses the
+file and classifies every entry, then the user confirms which titles to
+create.
 """
 
 import json
@@ -16,9 +20,11 @@ from fastapi import HTTPException
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
+from app.core import import_jobs
 from app.core.covers import download_cover
 from app.core.events import record_event
 from app.core.platforms import find_or_create_platform
+from app.core.store_filters import classify, name_key
 from app.db import SessionLocal
 from app.domain.enums import EventType, ItemFormat, ItemStatus, ItemType
 from app.models import Item, User
@@ -38,66 +44,140 @@ class StoreSpec:
     file_hint: str  # named in the 400 for unrecognized uploads
 
 
-def import_library(
-    db: Session, user: User, raw: bytes, spec: StoreSpec
-) -> tuple[list[uuid.UUID], int]:
-    """Create items for every new game in the file.
-
-    Returns (imported item ids, total entries in the file); everything
-    not imported — DLC, other runners, duplicates — counts as skipped.
-    """
+def parse_upload(raw: bytes, spec: StoreSpec) -> list[dict]:
+    """Validate the uploaded file synchronously, so a bad file 400s."""
     if len(raw) > MAX_BYTES:
         raise HTTPException(status_code=413, detail="File is too large (max 40 MB)")
-    entries = _parse_entries(raw, spec)
+    return _parse_entries(raw, spec)
 
-    existing = set(
-        db.scalars(
-            select(text(f"metadata->>'{spec.id_key}'")).select_from(Item).where(
-                Item.user_id == user.id,
-                Item.type == ItemType.GAME.value,
-                text(f"metadata ? '{spec.id_key}'"),
+
+def prepare_review(
+    job_id: str, user_id: uuid.UUID, entries: list[dict], spec: StoreSpec
+) -> None:
+    """Classify every entry, then park the job until the user confirms."""
+    import_jobs.update(job_id, phase="Reading library file", total=len(entries))
+
+    with SessionLocal() as db:
+        owned_names = {
+            name_key(title)
+            for title in db.scalars(
+                select(Item.title).where(
+                    Item.user_id == user_id, Item.type == ItemType.GAME.value
+                )
+            )
+        }
+        already_imported = set(
+            db.scalars(
+                select(text(f"metadata->>'{spec.id_key}'")).select_from(Item).where(
+                    Item.user_id == user_id,
+                    Item.type == ItemType.GAME.value,
+                    text(f"metadata ? '{spec.id_key}'"),
+                )
             )
         )
-    )
 
-    pc_platform = find_or_create_platform(db, "PC (Microsoft Windows)")
-    imported_ids: list[uuid.UUID] = []
+    candidates: list[dict] = []
+    excluded: list[dict] = []
+    games: dict[str, dict] = {}
     for entry in entries:
         game = _normalize(entry, spec)
-        if game is None or game["app_name"] in existing:
-            continue
-        existing.add(game["app_name"])  # dedupe within the file too
-        meta = {
-            spec.id_key: game["app_name"],
-            "storefront": spec.storefront,
-            "platform": "PC (Microsoft Windows)",
-        }
-        if game["developer"]:
-            meta["developer"] = game["developer"]
-        if game["cover_url"]:
-            meta["cover_source_url"] = game["cover_url"]
-        item = Item(
-            user_id=user.id,
-            type=ItemType.GAME.value,
-            format=ItemFormat.DIGITAL.value,
-            status=ItemStatus.BACKLOG.value,
-            platform_id=pc_platform.id,
-            title=game["title"],
-            meta=meta,
+        if game is None or game["app_name"] in games:
+            continue  # DLC, other runners, malformed rows: not library items
+        games[game["app_name"]] = game
+        row = {"title_id": game["app_name"], "name": game["title"], "platform": "PC"}
+        reason = classify(game["title"])
+        if reason is None and (
+            game["app_name"] in already_imported or name_key(game["title"]) in owned_names
+        ):
+            reason = "already in your collection"
+        if reason:
+            excluded.append({**row, "reason": reason})
+        else:
+            candidates.append(row)
+
+    import_jobs.update(
+        job_id,
+        status="review",
+        phase="Waiting for review",
+        done=0,
+        total=0,
+        candidates=candidates,
+        excluded=excluded,
+        _games=games,
+    )
+
+
+def import_selected(
+    job_id: str, user_id: uuid.UUID, title_ids: list[str], spec: StoreSpec
+) -> None:
+    """Create items for the confirmed selection (own session)."""
+    job = import_jobs.get(job_id) or {}
+    games: dict[str, dict] = job.get("_games") or {}
+    selected = [tid for tid in dict.fromkeys(title_ids) if tid in games]
+
+    with SessionLocal() as db:
+        existing = set(
+            db.scalars(
+                select(text(f"metadata->>'{spec.id_key}'")).select_from(Item).where(
+                    Item.user_id == user_id,
+                    Item.type == ItemType.GAME.value,
+                    text(f"metadata ? '{spec.id_key}'"),
+                )
+            )
         )
-        db.add(item)
-        db.flush()
-        record_event(
-            db,
-            item_id=item.id,
-            user_id=user.id,
-            event_type=EventType.ITEM_ADDED,
-            new_value={"status": item.status, "type": item.type, "title": item.title,
-                       "source": spec.event_source},
-        )
-        imported_ids.append(item.id)
-    db.commit()
-    return imported_ids, len(entries)
+
+        pc_platform = find_or_create_platform(db, "PC (Microsoft Windows)")
+        imported_ids: list[uuid.UUID] = []
+        for index, title_id in enumerate(selected):
+            if index % 25 == 0:
+                import_jobs.update(
+                    job_id, phase="Adding games", done=index, total=len(selected)
+                )
+            if title_id in existing:
+                continue
+            existing.add(title_id)
+            game = games[title_id]
+
+            meta = {
+                spec.id_key: title_id,
+                "storefront": spec.storefront,
+                "platform": "PC (Microsoft Windows)",
+            }
+            if game["developer"]:
+                meta["developer"] = game["developer"]
+            if game["cover_url"]:
+                meta["cover_source_url"] = game["cover_url"]
+            item = Item(
+                user_id=user_id,
+                type=ItemType.GAME.value,
+                format=ItemFormat.DIGITAL.value,
+                status=ItemStatus.BACKLOG.value,
+                platform_id=pc_platform.id,
+                title=game["title"],
+                meta=meta,
+            )
+            db.add(item)
+            db.flush()
+            record_event(
+                db,
+                item_id=item.id,
+                user_id=user_id,
+                event_type=EventType.ITEM_ADDED,
+                new_value={"status": item.status, "type": item.type, "title": item.title,
+                           "source": spec.event_source},
+            )
+            imported_ids.append(item.id)
+        db.commit()
+
+    import_jobs.finish(
+        job_id,
+        imported=len(imported_ids),
+        skipped=len(selected) - len(imported_ids),
+        total=len(selected),
+    )
+    import_jobs.update(job_id, candidates=None, excluded=None, _games=None)
+    if imported_ids:
+        fetch_covers(imported_ids)
 
 
 def _parse_entries(raw: bytes, spec: StoreSpec) -> list[dict]:
@@ -109,7 +189,7 @@ def _parse_entries(raw: bytes, spec: StoreSpec) -> list[dict]:
     if isinstance(data, list):
         entries = data  # legendary list --json
     elif isinstance(data, dict):
-        for key in ("library", "games"):  # Heroic caches, old and new
+        for key in ("library", "games"):  # Heroic caches, new and old
             if isinstance(data.get(key), list):
                 entries = data[key]
                 break

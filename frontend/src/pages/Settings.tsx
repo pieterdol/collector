@@ -5,14 +5,14 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { SteamIcon } from "../components/icons";
 import {
-  useConfirmPsnImport,
-  useEpicImport,
-  useGogImport,
-  usePsnImportJob,
+  useConfirmImport,
+  useImportJob,
+  useStartFileImport,
   useStartPsnImport,
   useSteamImport,
-  type PsnImportJob,
-  type PsnReviewTitle,
+  type ImportJob,
+  type ImportStore,
+  type ReviewTitle,
 } from "../lib/queries";
 import type { ImportSummary } from "../lib/types";
 
@@ -115,8 +115,8 @@ function EpicConnection() {
           <code className="font-mono">legendary list --json &gt; epic.json</code> and upload that.
         </>
       }
-      store="Epic"
-      importer={useEpicImport()}
+      store="epic"
+      shortName="Epic"
     />
   );
 }
@@ -135,8 +135,8 @@ function GogConnection() {
           so the cache exists.
         </>
       }
-      store="GOG"
-      importer={useGogImport()}
+      store="gog"
+      shortName="GOG"
     />
   );
 }
@@ -147,7 +147,7 @@ function PsnConnection() {
   const [dedupe, setDedupe] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const start = useStartPsnImport();
-  const { data: job } = usePsnImportJob(jobId);
+  const { data: job } = useImportJob("psn", jobId);
   const running = start.isPending || job?.status === "running";
 
   return (
@@ -220,62 +220,93 @@ function PsnConnection() {
         npsso value. Tokens expire after a couple of months — just grab a new one per import.
       </p>
 
-      {job?.status === "review" && jobId && <PsnReview key={jobId} job={job} jobId={jobId} />}
-
-      {job?.status === "running" && (
-        <div className="flex flex-col gap-1.5 rounded-xl bg-surface px-4 py-3 text-sm">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-muted">{job.phase}…</span>
-            {job.total > 0 && (
-              <span className="font-mono text-xs text-faint">
-                {job.done}/{job.total}
-              </span>
-            )}
-          </div>
-          {job.total > 0 && (
-            <div className="h-1.5 overflow-hidden rounded-full bg-raised">
-              <div
-                className="h-full rounded-full transition-[width]"
-                style={{
-                  width: `${Math.round((job.done / job.total) * 100)}%`,
-                  background: "var(--accent)",
-                }}
-              />
-            </div>
-          )}
-        </div>
+      {job?.status === "review" && jobId && (
+        <ImportReview key={jobId} store="psn" job={job} jobId={jobId} />
       )}
 
-      <ImportOutcome
-        error={
-          start.isError
-            ? (start.error as Error)
-            : job?.status === "error"
-              ? new Error(job.detail ?? "Import failed")
-              : null
-        }
-        data={
-          job?.status === "done"
-            ? { imported: job.imported ?? 0, skipped: job.skipped ?? 0, total: job.total }
-            : undefined
-        }
+      {job?.status === "running" && <JobProgress job={job} />}
+
+      <JobOutcome
+        startError={start.isError ? (start.error as Error) : null}
+        job={job}
         totalLabel="in your PSN library"
       />
     </div>
   );
 }
 
-/** Review step of a PSN import: pick the titles to create. Auto-excluded
- * entries (apps, demos, betas…) sit behind a collapsed section where
- * they can be rescued. */
-function PsnReview({ job, jobId }: { job: PsnImportJob; jobId: string }) {
+/** Phase + progress bar for a running import job. */
+function JobProgress({ job }: { job: ImportJob }) {
+  return (
+    <div className="flex flex-col gap-1.5 rounded-xl bg-surface px-4 py-3 text-sm">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-muted">{job.phase}…</span>
+        {job.total > 0 && (
+          <span className="font-mono text-xs text-faint">
+            {job.done}/{job.total}
+          </span>
+        )}
+      </div>
+      {job.total > 0 && (
+        <div className="h-1.5 overflow-hidden rounded-full bg-raised">
+          <div
+            className="h-full rounded-full transition-[width]"
+            style={{
+              width: `${Math.round((job.done / job.total) * 100)}%`,
+              background: "var(--accent)",
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Result box for a finished import job (or a failed start). */
+function JobOutcome({
+  startError,
+  job,
+  totalLabel,
+}: {
+  startError: Error | null;
+  job: ImportJob | undefined;
+  totalLabel: string;
+}) {
+  return (
+    <ImportOutcome
+      error={
+        startError ??
+        (job?.status === "error" ? new Error(job.detail ?? "Import failed") : null)
+      }
+      data={
+        job?.status === "done"
+          ? { imported: job.imported ?? 0, skipped: job.skipped ?? 0, total: job.total }
+          : undefined
+      }
+      totalLabel={totalLabel}
+    />
+  );
+}
+
+/** Review step of an import: pick the titles to create. Auto-excluded
+ * entries (apps, demos, betas, things you already own…) sit behind a
+ * collapsed section where they can be rescued. */
+function ImportReview({
+  store,
+  job,
+  jobId,
+}: {
+  store: ImportStore;
+  job: ImportJob;
+  jobId: string;
+}) {
   const candidates = job.candidates ?? [];
   const excluded = job.excluded ?? [];
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set(candidates.map((c) => c.title_id)),
   );
   const [showExcluded, setShowExcluded] = useState(false);
-  const confirm = useConfirmPsnImport(jobId);
+  const confirm = useConfirmImport(store, jobId);
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -335,7 +366,7 @@ function ReviewRow({
   checked,
   onToggle,
 }: {
-  title: PsnReviewTitle;
+  title: ReviewTitle;
   checked: boolean;
   onToggle: (id: string) => void;
 }) {
@@ -356,24 +387,29 @@ function ReviewRow({
   );
 }
 
-/** Upload-a-library-file connection row (Epic, GOG). */
+/** Upload-a-library-file connection row (Epic, GOG): the upload starts a
+ * reviewed job, same as PSN. */
 function FileImportConnection({
   logo,
   name,
   store,
+  shortName,
   description,
   hint,
-  importer,
 }: {
   logo: string;
   name: string;
+  store: "epic" | "gog";
   /** Short store name used in the control labels ("Epic", "GOG"). */
-  store: string;
+  shortName: string;
   description: string;
   hint: React.ReactNode;
-  importer: ReturnType<typeof useEpicImport>;
 }) {
   const [file, setFile] = useState<File | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const start = useStartFileImport(store);
+  const { data: job } = useImportJob(store, jobId);
+  const running = start.isPending || job?.status === "running";
 
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-line px-4 py-3.5">
@@ -391,13 +427,15 @@ function FileImportConnection({
         className="flex gap-2.5 max-[560px]:flex-col"
         onSubmit={(e) => {
           e.preventDefault();
-          if (file) importer.mutate(file);
+          if (file && !running) {
+            start.mutate(file, { onSuccess: (res) => setJobId(res.job_id) });
+          }
         }}
       >
         <input
           type="file"
           accept=".json,application/json"
-          aria-label={`${store} library file`}
+          aria-label={`${shortName} library file`}
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
           className="input min-w-0 flex-1 cursor-pointer file:mr-3 file:cursor-pointer file:rounded-full
             file:border-0 file:bg-raised file:px-3 file:py-1 file:text-xs file:font-semibold file:text-text"
@@ -405,19 +443,23 @@ function FileImportConnection({
         <button
           type="submit"
           className="btn"
-          aria-label={`Import ${store} library`}
-          disabled={importer.isPending || !file}
+          aria-label={`Import ${shortName} library`}
+          disabled={running || !file}
         >
-          {importer.isPending ? "Importing…" : "Import"}
+          {running ? "Importing…" : "Import"}
         </button>
       </form>
 
       <p className="m-0 text-xs text-dim">{hint}</p>
 
-      <ImportOutcome
-        error={importer.isError ? (importer.error as Error) : null}
-        data={importer.data}
-        totalLabel="in the file"
+      {job?.status === "review" && jobId && (
+        <ImportReview key={jobId} store={store} job={job} jobId={jobId} />
+      )}
+      {job?.status === "running" && <JobProgress job={job} />}
+      <JobOutcome
+        startError={start.isError ? (start.error as Error) : null}
+        job={job}
+        totalLabel="selected"
       />
     </div>
   );

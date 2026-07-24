@@ -146,15 +146,21 @@ browser ──:8080──▶ frontend (nginx)
     Steam "Game details" privacy must be public.
   - **Epic & GOG** — upload the library file a launcher already maintains:
     Heroic's store cache (`store_cache/legendary_library.json` /
-    `gog_library.json`) or a `legendary list --json` dump. DLC and other
-    runners are filtered out.
+    `gog_library.json`, also under
+    `~/.var/app/com.heroicgameslauncher.hgl/config/heroic/` for the
+    Flatpak) or a `legendary list --json` dump. DLC and other runners are
+    dropped outright.
   - **PlayStation Network** — paste an NPSSO token (used once, never
-    stored). Runs as a background job with live progress, then pauses for
-    **review**: real games are preselected while PS Plus-gated claims,
-    demos/betas/playtests, media apps and titles already in your library
-    are auto-excluded (each with a reason, all rescuable). Games link to
-    their console platform and import hours played; optional toggles
-    include PS Plus games (marked) or skip PS4 twins of PS5 games.
+    stored). Games link to their console platform (PS5, PS4, …) and import
+    hours played; optional toggles include PS Plus games (marked) or skip
+    PS4 twins of PS5 games.
+
+  Epic, GOG and PSN imports run as background jobs with live progress and
+  pause for **review** before anything is created: real games come
+  preselected, while non-games (companion apps, demos/betas/playtests,
+  media apps, launcher redistributables), PS Plus-gated claims and titles
+  already in your collection are auto-excluded — each with its reason, in
+  a collapsed list, all rescuable with a checkbox.
 - **Metadata enrichment**: storefront imports arrive without a catalog
   link, so the first detail-page visit matches games to IGDB by title and
   pulls description, hero art and screenshots. Wrong or missing match? The
@@ -186,9 +192,9 @@ backend/
   app/models/            SQLAlchemy tables (users, items, item_seasons, platforms,
                          activity_events, provider_cache)
   app/api/               routers: auth, items, seasons, enrich, steam, epic, gog,
-                         psn, stats, platforms
+                         psn, stats, platforms (epic/gog share store_import)
   app/core/              security (argon2+JWT), events, covers, artwork, seasons,
-                         platforms, library_import, import_jobs
+                         platforms, library_import, import_jobs, store_filters
   app/providers/         MetadataProvider ABC + openlibrary/tmdb/igdb/steam/psn + cache
   app/tests/             pytest suite (runs against real Postgres)
   alembic/versions/      migrations

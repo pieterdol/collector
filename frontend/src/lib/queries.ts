@@ -296,19 +296,10 @@ export function useSteamImport() {
   });
 }
 
-/** Epic import: upload a Heroic store cache or `legendary list --json` file. */
-export function useEpicImport() {
-  const invalidate = useInvalidateItems();
-  return useMutation({
-    mutationFn: (file: File) => upload<ImportSummary>("/api/epic/import", file),
-    onSuccess: () => invalidate(),
-  });
-}
-
-/** A PSN import runs as a background job the UI polls (big libraries
- * outlive proxy timeouts); it pauses in "review" until the user picks
- * which titles to create. Mirrors backend schemas/psn.py. */
-export interface PsnReviewTitle {
+/** Storefront imports run as background jobs the UI polls (big libraries
+ * outlive proxy timeouts) and pause in "review" until the user picks
+ * which titles to create. Mirrors backend schemas/library_import.py. */
+export interface ReviewTitle {
   title_id: string;
   name: string;
   platform: string | null;
@@ -316,7 +307,7 @@ export interface PsnReviewTitle {
   reason: string | null;
 }
 
-export interface PsnImportJob {
+export interface ImportJob {
   status: "running" | "review" | "done" | "error";
   phase: string;
   done: number;
@@ -324,8 +315,18 @@ export interface PsnImportJob {
   imported: number | null;
   skipped: number | null;
   detail: string | null;
-  candidates: PsnReviewTitle[] | null;
-  excluded: PsnReviewTitle[] | null;
+  candidates: ReviewTitle[] | null;
+  excluded: ReviewTitle[] | null;
+}
+
+/** Store slugs that back /api/{store}/import. */
+export type ImportStore = "psn" | "epic" | "gog";
+
+/** Upload a launcher library file (Epic, GOG) → job id. */
+export function useStartFileImport(store: "epic" | "gog") {
+  return useMutation({
+    mutationFn: (file: File) => upload<{ job_id: string }>(`/api/${store}/import`, file),
+  });
 }
 
 /** Start a PSN import job: the pasted NPSSO token is exchanged
@@ -337,27 +338,27 @@ export function useStartPsnImport() {
   });
 }
 
-/** Confirm a PSN import in review: create items for the selected ids.
+/** Confirm an import in review: create items for the selected ids.
  * Invalidating the job query resumes the polling loop. */
-export function useConfirmPsnImport(jobId: string | null) {
+export function useConfirmImport(store: ImportStore, jobId: string | null) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (titleIds: string[]) =>
-      api<{ job_id: string }>(`/api/psn/import/${jobId}/confirm`, {
+      api<{ job_id: string }>(`/api/${store}/import/${jobId}/confirm`, {
         method: "POST",
         body: { title_ids: titleIds },
       }),
-    onSuccess: () => void client.invalidateQueries({ queryKey: ["psn-import", jobId] }),
+    onSuccess: () => void client.invalidateQueries({ queryKey: ["import-job", store, jobId] }),
   });
 }
 
-/** Poll a PSN import job every second while it runs; refresh the
- * library once it completes. */
-export function usePsnImportJob(jobId: string | null) {
+/** Poll an import job every second while it runs; refresh the library
+ * once it completes. */
+export function useImportJob(store: ImportStore, jobId: string | null) {
   const client = useQueryClient();
   const query = useQuery({
-    queryKey: ["psn-import", jobId],
-    queryFn: () => api<PsnImportJob>(`/api/psn/import/${jobId}`),
+    queryKey: ["import-job", store, jobId],
+    queryFn: () => api<ImportJob>(`/api/${store}/import/${jobId}`),
     enabled: Boolean(jobId),
     refetchInterval: (q) => (q.state.data?.status === "running" ? 1000 : false),
   });
@@ -370,13 +371,4 @@ export function usePsnImportJob(jobId: string | null) {
   }, [finished]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return query;
-}
-
-/** GOG import: upload Heroic's gog_library.json store cache. */
-export function useGogImport() {
-  const invalidate = useInvalidateItems();
-  return useMutation({
-    mutationFn: (file: File) => upload<ImportSummary>("/api/gog/import", file),
-    onSuccess: () => invalidate(),
-  });
 }

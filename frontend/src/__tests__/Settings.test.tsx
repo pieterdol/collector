@@ -36,35 +36,45 @@ function chooseEpicFile() {
 }
 
 describe("Settings Epic import", () => {
-  beforeEach(() => mockFetch());
   afterEach(() => vi.unstubAllGlobals());
 
-  it("uploads the chosen library file to the epic import endpoint", async () => {
+  it("uploads the chosen library file as a job and reviews the result", async () => {
+    mockJobFetch(REVIEW_JOB);
     renderSettings();
     chooseEpicFile();
     fireEvent.click(screen.getByRole("button", { name: "Import Epic library" }));
 
+    // The upload posts multipart to the epic endpoint…
     await waitFor(() => {
-      const calls = (fetch as ReturnType<typeof vi.fn>).mock.calls;
-      expect(calls.some(([url]) => String(url).includes("/api/epic/import"))).toBe(true);
+      const call = (fetch as ReturnType<typeof vi.fn>).mock.calls.find(
+        ([url, options]) =>
+          String(url).endsWith("/api/epic/import") &&
+          (options as RequestInit | undefined)?.method === "POST",
+      );
+      expect(call).toBeDefined();
+      expect((call![1] as RequestInit).body).toBeInstanceOf(FormData);
     });
-    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls.find(([url]) =>
-      String(url).includes("/api/epic/import"),
-    )!;
-    expect((init as RequestInit).method).toBe("POST");
-    expect((init as RequestInit).body).toBeInstanceOf(FormData);
+    // …and the job's review list appears.
+    expect(await screen.findByText("Returnal")).toBeInTheDocument();
   });
 
-  it("summarizes the import result", async () => {
+  it("confirms the selection against the epic endpoint", async () => {
+    mockJobFetch(REVIEW_JOB);
     renderSettings();
     chooseEpicFile();
     fireEvent.click(screen.getByRole("button", { name: "Import Epic library" }));
 
-    expect(await screen.findByText("Imported 2 games.")).toBeInTheDocument();
-    expect(screen.getByText(/1 already on your shelf/)).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "Import 2 games" }));
+    await waitFor(() => {
+      const call = (fetch as ReturnType<typeof vi.fn>).mock.calls.find(([url]) =>
+        String(url).includes("/api/epic/import/j1/confirm"),
+      );
+      expect(call).toBeDefined();
+    });
   });
 
   it("keeps the import button disabled until a file is chosen", () => {
+    mockJobFetch(REVIEW_JOB);
     renderSettings();
     expect(screen.getByRole("button", { name: "Import Epic library" })).toBeDisabled();
   });
@@ -81,12 +91,12 @@ describe("Settings Epic import", () => {
 
 /** PSN runs as a polled background job: POST returns a job id, GET
  * reports progress until done/error. */
-function mockPsnFetch(job: object) {
+function mockJobFetch(job: object) {
   vi.stubGlobal(
     "fetch",
     vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
-      const polling = url.includes("/api/psn/import/");
+      const polling = /\/api\/(psn|epic|gog)\/import\/[^/]+$/.test(url);
       return Promise.resolve({
         ok: true,
         status: polling ? 200 : 202,
@@ -108,7 +118,7 @@ describe("Settings PSN import", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("starts a job with PS Plus excluded by default and shows the result", async () => {
-    mockPsnFetch({ status: "done", phase: "Done", done: 0, total: 5, imported: 4, skipped: 1 });
+    mockJobFetch({ status: "done", phase: "Done", done: 0, total: 5, imported: 4, skipped: 1 });
     renderSettings();
     startPsnImport();
 
@@ -126,7 +136,7 @@ describe("Settings PSN import", () => {
   });
 
   it("drops PS4 twins when the dedupe toggle is checked", async () => {
-    mockPsnFetch({ status: "done", phase: "Done", done: 0, total: 4, imported: 4, skipped: 0 });
+    mockJobFetch({ status: "done", phase: "Done", done: 0, total: 4, imported: 4, skipped: 0 });
     renderSettings();
     fireEvent.click(screen.getByLabelText("Skip PS4 versions of games you also own on PS5"));
     startPsnImport();
@@ -143,7 +153,7 @@ describe("Settings PSN import", () => {
   });
 
   it("includes PS Plus games when the toggle is checked", async () => {
-    mockPsnFetch({ status: "done", phase: "Done", done: 0, total: 5, imported: 5, skipped: 0 });
+    mockJobFetch({ status: "done", phase: "Done", done: 0, total: 5, imported: 5, skipped: 0 });
     renderSettings();
     fireEvent.click(screen.getByLabelText("Include PS Plus games"));
     startPsnImport();
@@ -160,7 +170,7 @@ describe("Settings PSN import", () => {
   });
 
   it("shows the job's phase and progress while it runs", async () => {
-    mockPsnFetch({ status: "running", phase: "Fetching purchased games", done: 400, total: 1400 });
+    mockJobFetch({ status: "running", phase: "Fetching purchased games", done: 400, total: 1400 });
     renderSettings();
     startPsnImport();
 
@@ -169,7 +179,7 @@ describe("Settings PSN import", () => {
   });
 
   it("shows the job's error when it fails", async () => {
-    mockPsnFetch({ status: "error", phase: "Failed", done: 0, total: 0, detail: "NPSSO token was rejected" });
+    mockJobFetch({ status: "error", phase: "Failed", done: 0, total: 0, detail: "NPSSO token was rejected" });
     renderSettings();
     startPsnImport();
 
@@ -177,7 +187,7 @@ describe("Settings PSN import", () => {
   });
 
   it("keeps the import button disabled until a token is entered", () => {
-    mockPsnFetch({});
+    mockJobFetch({});
     renderSettings();
     expect(screen.getByRole("button", { name: "Import PlayStation library" })).toBeDisabled();
   });
@@ -201,7 +211,7 @@ describe("Settings PSN review step", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("lists candidates and keeps the excluded section collapsed", async () => {
-    mockPsnFetch(REVIEW_JOB);
+    mockJobFetch(REVIEW_JOB);
     renderSettings();
     startPsnImport();
 
@@ -215,7 +225,7 @@ describe("Settings PSN review step", () => {
   });
 
   it("confirms only the selected titles", async () => {
-    mockPsnFetch(REVIEW_JOB);
+    mockJobFetch(REVIEW_JOB);
     renderSettings();
     startPsnImport();
 
@@ -234,7 +244,7 @@ describe("Settings PSN review step", () => {
   });
 
   it("can rescue an auto-excluded title", async () => {
-    mockPsnFetch(REVIEW_JOB);
+    mockJobFetch(REVIEW_JOB);
     renderSettings();
     startPsnImport();
 
@@ -245,10 +255,10 @@ describe("Settings PSN review step", () => {
 });
 
 describe("Settings GOG import", () => {
-  beforeEach(() => mockFetch({ imported: 1, skipped: 0, total: 1 }));
   afterEach(() => vi.unstubAllGlobals());
 
   it("uploads the chosen library file to the gog import endpoint", async () => {
+    mockJobFetch({ status: "done", phase: "Done", done: 0, total: 1, imported: 1, skipped: 0 });
     renderSettings();
     const file = new File(["{}"], "gog_library.json", { type: "application/json" });
     fireEvent.change(screen.getByLabelText("GOG library file"), { target: { files: [file] } });

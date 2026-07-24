@@ -7,7 +7,6 @@ candidate and auto-excluded lists, and POST /confirm creates the items
 the user actually selected.
 """
 
-import re
 import uuid
 from decimal import Decimal
 
@@ -21,11 +20,12 @@ from app.core.events import record_event
 from app.core.library_import import fetch_covers
 from app.core.platforms import find_or_create_platform
 from app.core.security import get_current_user
+from app.core.store_filters import classify, name_key
 from app.db import SessionLocal
 from app.domain.enums import EventType, ItemFormat, ItemStatus, ItemType
 from app.models import Item, User
 from app.providers.psn import PsnError, exchange_npsso, played_titles, purchased_games
-from app.schemas.psn import PsnConfirmIn, PsnJobOut, PsnJobStartOut
+from app.schemas.library_import import ConfirmIn, ImportJobOut, JobStartOut
 
 router = APIRouter(prefix="/api/psn", tags=["psn"])
 
@@ -38,23 +38,6 @@ _PLATFORM_NAMES = {
     "PSP": "PlayStation Portable",
 }
 
-# Sony sells everything as an entitlement; these mark the non-games. The
-# review step shows every exclusion, so false positives are rescuable.
-_EXTRA_PATTERN = re.compile(
-    r"\b(demo|beta|alpha|playtest|trial|network test|technical test|server test|"
-    r"character creator|soundtrack|dynamic theme|avatar|benchmark|companion app|"
-    r"media player)\b",
-    re.IGNORECASE,
-)
-_MEDIA_APPS = {
-    "prime video", "amazon prime video", "netflix", "youtube", "twitch",
-    "spotify", "disney+", "crunchyroll", "hulu", "plex", "apple tv",
-    "wwe network", "hbo max", "paramount+", "pluto tv", "tubi", "funimation",
-    "vlc", "now tv", "videostream",
-    # Dutch storefront names.
-    "mediaspeler", "nlziet",
-}
-
 
 class PsnImportIn(BaseModel):
     # The NPSSO cookie value from ca.account.sony.com/api/v1/ssocookie.
@@ -64,42 +47,42 @@ class PsnImportIn(BaseModel):
     dedupe_cross_gen: bool = False
 
 
-@router.post("/import", response_model=PsnJobStartOut, status_code=202)
+@router.post("/import", response_model=JobStartOut, status_code=202)
 def start_import(
     body: PsnImportIn,
     background: BackgroundTasks,
     user: User = Depends(get_current_user),
-) -> PsnJobStartOut:
+) -> JobStartOut:
     """Kick off a PSN import job; poll GET /import/{job_id} for progress.
     The job pauses in status "review" until /confirm selects the titles."""
     job_id = import_jobs.create(owner_id=user.id)
     background.add_task(_prepare_review, job_id, user.id, body)
-    return PsnJobStartOut(job_id=job_id)
+    return JobStartOut(job_id=job_id)
 
 
-@router.get("/import/{job_id}", response_model=PsnJobOut)
+@router.get("/import/{job_id}", response_model=ImportJobOut)
 def import_status(
     job_id: str,
     user: User = Depends(get_current_user),
-) -> PsnJobOut:
+) -> ImportJobOut:
     job = _owned_job(job_id, user)
-    return PsnJobOut(**{k: v for k, v in job.items() if not k.startswith("_") and k != "owner_id"})
+    return ImportJobOut(**{k: v for k, v in job.items() if not k.startswith("_") and k != "owner_id"})
 
 
-@router.post("/import/{job_id}/confirm", response_model=PsnJobStartOut, status_code=202)
+@router.post("/import/{job_id}/confirm", response_model=JobStartOut, status_code=202)
 def confirm_import(
     job_id: str,
-    body: PsnConfirmIn,
+    body: ConfirmIn,
     background: BackgroundTasks,
     user: User = Depends(get_current_user),
-) -> PsnJobStartOut:
+) -> JobStartOut:
     """Create items for the selected title ids of a job in review."""
     job = _owned_job(job_id, user)
     if job["status"] != "review":
         raise HTTPException(status_code=409, detail="This import is not awaiting review")
     import_jobs.update(job_id, status="running", phase="Adding games")
     background.add_task(_create_items, job_id, user.id, body.title_ids)
-    return PsnJobStartOut(job_id=job_id)
+    return JobStartOut(job_id=job_id)
 
 
 def _owned_job(job_id: str, user: User) -> dict:
@@ -140,7 +123,7 @@ def _prepare_review(job_id: str, user_id: uuid.UUID, body: PsnImportIn) -> None:
     # the review — imported earlier, added manually, whatever. Rescuable.
     with SessionLocal() as db:
         owned_names = {
-            _name_key(title)
+            name_key(title)
             for title in db.scalars(
                 select(Item.title).where(
                     Item.user_id == user_id, Item.type == ItemType.GAME.value
@@ -152,7 +135,7 @@ def _prepare_review(job_id: str, user_id: uuid.UUID, body: PsnImportIn) -> None:
     excluded: list[dict] = []
     raw_by_id: dict[str, dict] = {}
     ps5_names = {
-        _name_key(game["name"])
+        name_key(game["name"])
         for game in games
         if game.get("platform") == "PS5" and game.get("name")
     }
@@ -168,11 +151,11 @@ def _prepare_review(job_id: str, user_id: uuid.UUID, body: PsnImportIn) -> None:
             "platform": game.get("platform"),
             "subscription": game.get("subscription"),
         }
-        reason = _classify(game, played.get(title_id, {}))
-        if reason is None and _name_key(name) in owned_names:
+        reason = classify(name, (played.get(title_id) or {}).get("category"))
+        if reason is None and name_key(name) in owned_names:
             reason = "already in your collection"
         if reason is None and body.dedupe_cross_gen and game.get("platform") == "PS4":
-            if _name_key(name) in ps5_names:
+            if name_key(name) in ps5_names:
                 reason = "PS4 version of a game you also own on PS5"
         if reason:
             excluded.append({**entry, "reason": reason})
@@ -190,24 +173,6 @@ def _prepare_review(job_id: str, user_id: uuid.UUID, body: PsnImportIn) -> None:
         _games=raw_by_id,
         _played=played,
     )
-
-
-def _classify(game: dict, played: dict) -> str | None:
-    """Reason to auto-exclude this entitlement, or None for a real game."""
-    name = str(game.get("name") or "")
-    if _name_key(name) in _MEDIA_APPS:
-        return "media app"
-    category = played.get("category")
-    if isinstance(category, str) and "game" not in category:
-        return "app, not a game (PSN category)"
-    match = _EXTRA_PATTERN.search(name)
-    if match:
-        return f'name contains "{match.group(1)}"'
-    return None
-
-
-def _name_key(name: str) -> str:
-    return re.sub(r"[™®]", "", name).casefold().strip()
 
 
 def _create_items(job_id: str, user_id: uuid.UUID, title_ids: list[str]) -> None:
