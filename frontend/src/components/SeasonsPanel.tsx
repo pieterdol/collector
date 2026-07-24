@@ -78,7 +78,7 @@ function SeasonCard({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="poster" style={{ "--mc": "var(--tv)" } as React.CSSProperties}>
+      <div className="poster">
         {season.poster_path ? (
           <img src={season.poster_path} alt="" loading="lazy" />
         ) : (

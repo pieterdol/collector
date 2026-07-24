@@ -55,10 +55,7 @@ function WishCard({ item, onAcquire }: { item: Item; onAcquire: () => void }) {
       <Link to={`/items/${item.id}`} className="cardlink">
         <div
           className="poster opacity-85 saturate-[0.8]"
-          style={{
-            "--mc": `var(--${item.type})`,
-            border: "1.5px dashed color-mix(in oklch, var(--accent) 50%, transparent)",
-          } as React.CSSProperties}
+          style={{ border: "1.5px dashed color-mix(in oklch, var(--accent) 50%, transparent)" }}
         >
           {item.cover_path ? (
             <img src={coverSrc(item)!} alt="" loading="lazy" />

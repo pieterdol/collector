@@ -114,10 +114,7 @@ function Detail({ item }: { item: Item }) {
           }
         >
           <div className="flex w-[148px] flex-none flex-col gap-1.5 max-[820px]:w-[104px]">
-            <div
-              className="poster shadow-lift"
-              style={{ "--mc": `var(--${item.type})` } as React.CSSProperties}
-            >
+            <div className="poster shadow-lift">
               {item.cover_path ? (
                 <img src={coverSrc(item)!} alt={`Cover of ${item.title}`} />
               ) : (

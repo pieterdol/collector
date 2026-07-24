@@ -22,6 +22,9 @@
   --faint: #84848f;
   --dim: #6b6b76;
   --nav-dot: #3a3a44;
+  /* Cover-less poster placeholder: neutral, quieter than the card it sits on */
+  --poster-bg: #24242b;
+  --poster-stripe: rgba(255, 255, 255, 0.022);
 
   --accent: oklch(76% 0.14 290);
   --accent-ink: #111114;
@@ -58,6 +61,8 @@
     --faint: #84848f;
     --dim: #9a9aa6;
     --nav-dot: #d4d4dc;
+    --poster-bg: #e9e9ef;
+    --poster-stripe: rgba(20, 20, 30, 0.03);
 
     --accent: oklch(56% 0.17 290);
     --accent-ink: #ffffff;
@@ -94,6 +99,9 @@
   --faint: #84848f;
   --dim: #6b6b76;
   --nav-dot: #3a3a44;
+  /* Cover-less poster placeholder: neutral, quieter than the card it sits on */
+  --poster-bg: #24242b;
+  --poster-stripe: rgba(255, 255, 255, 0.022);
 
   --accent: oklch(76% 0.14 290);
   --accent-ink: #111114;
@@ -129,6 +137,8 @@
   --faint: #84848f;
   --dim: #9a9aa6;
   --nav-dot: #d4d4dc;
+  --poster-bg: #e9e9ef;
+  --poster-stripe: rgba(20, 20, 30, 0.03);
 
   --accent: oklch(56% 0.17 290);
   --accent-ink: #ffffff;

@@ -98,7 +98,7 @@ function UpcomingRow({ item, info }: { item: Item; info: ReleaseInfo }) {
     >
       <div
         className="grid h-12 w-[34px] flex-none place-items-center overflow-hidden rounded-md border border-line-strong"
-        style={{ background: `color-mix(in oklch, var(--${item.type}) 16%, var(--surface))` }}
+        style={{ background: "var(--poster-bg)" }}
       >
         {item.cover_path && (
           <img src={coverSrc(item)!} alt="" loading="lazy" className="h-full w-full object-cover" />

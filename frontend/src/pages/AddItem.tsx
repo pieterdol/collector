@@ -269,7 +269,7 @@ function ResultRow({
         className="h-14 w-[38px] flex-none overflow-hidden rounded-md border border-line-strong"
         style={{
           background:
-            "repeating-linear-gradient(135deg, rgba(255,255,255,0.05) 0 5px, transparent 5px 10px), var(--raised)",
+            "repeating-linear-gradient(135deg, var(--poster-stripe) 0 5px, transparent 5px 10px), var(--poster-bg)",
         }}
       >
         {result.cover_url && (

@@ -44,7 +44,7 @@ export function PosterCard({ item }: { item: Item }) {
 
   return (
     <Link to={`/items/${item.id}`} className="cardlink">
-      <div className="poster" style={{ "--mc": `var(--${item.type})` } as React.CSSProperties}>
+      <div className="poster">
         {item.cover_path ? (
           <img src={coverSrc(item)!} alt="" loading="lazy" />
         ) : (

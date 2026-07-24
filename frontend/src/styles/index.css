@@ -81,9 +81,12 @@ body {
   position: relative;
   overflow: hidden;
   border: 1px solid var(--line-strong);
+  /* Cover-less placeholder: neutral grey with a barely-there weave, so a
+     wall of art-less imports stays calm. Media type is signalled by the
+     badges, not by tinting the whole tile. */
   background:
-    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0 7px, transparent 7px 14px),
-    linear-gradient(180deg, color-mix(in oklch, var(--mc, var(--raised)) 16%, transparent), var(--surface));
+    repeating-linear-gradient(135deg, var(--poster-stripe) 0 8px, transparent 8px 16px),
+    var(--poster-bg);
   display: flex;
   align-items: center;
   justify-content: center;
