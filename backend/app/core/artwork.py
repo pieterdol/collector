@@ -13,6 +13,7 @@ Files live in media/artwork/{item_id}/. On provider failure the flag is NOT
 set, so opening the item again retries.
 """
 
+import re
 import uuid
 from pathlib import Path
 
@@ -37,6 +38,15 @@ def fetch_artwork(db, item: Item) -> bool:
     """Populate hero/screenshots/description once. Returns True if updated."""
     if item.meta.get("artwork_fetched"):
         return False
+
+    # Storefront imports (PSN/Epic/GOG) arrive without a catalog link;
+    # match them to IGDB by title so the pipeline below has a source.
+    if (
+        item.type == "game"
+        and not item.meta.get("steam_appid")
+        and not item.meta.get("igdb_id")
+    ):
+        _match_igdb_by_title(db, item)
 
     if item.type == "game" and item.meta.get("steam_appid"):
         found = _from_steam(db, item)
@@ -69,6 +79,36 @@ def fetch_artwork(db, item: Item) -> bool:
     item.meta = meta
     db.commit()
     return True
+
+
+def _match_igdb_by_title(db, item: Item) -> None:
+    """Store the IGDB id whose name matches the item's title.
+
+    An exact (normalized) name match wins; otherwise IGDB's top
+    relevance hit is used. A wrong pick is correctable through the
+    relink endpoint, which is also the answer when there's no match.
+    """
+    provider = IgdbProvider(db)
+    if not provider.available or not item.title:
+        return
+    query = re.sub(r"[™®]", "", item.title).strip()
+    if not query:
+        return
+    results = provider.search(query)
+    if not results:
+        return
+    key = query.casefold()
+    best = next(
+        (r for r in results if r.title and r.title.casefold().strip() == key),
+        results[0],
+    )
+    if not best.external_id or not best.external_id.isdigit():
+        return
+    meta = {**item.meta, "igdb_id": int(best.external_id)}
+    for field in ("developer", "year", "release_date"):
+        if not meta.get(field) and best.metadata.get(field):
+            meta[field] = best.metadata[field]
+    item.meta = meta  # persisted by fetch_artwork's own commit
 
 
 def _from_steam(db, item: Item) -> dict | None:

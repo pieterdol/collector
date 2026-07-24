@@ -16,8 +16,10 @@ import {
   useActivity,
   useDeleteActivity,
   useDeleteItem,
+  useEnrichSearch,
   useFetchArtwork,
   useItem,
+  useRelinkItem,
   useUpdateItem,
   useUploadCover,
 } from "../lib/queries";
@@ -603,6 +605,7 @@ const STOREFRONTS = [
 
 function DetailsPanel({ item }: { item: Item }) {
   const update = useUpdateItem(item.id);
+  const [relinking, setRelinking] = useState(false);
   const meta = item.metadata;
   const rows: Array<[string, React.ReactNode]> = [];
   if (Array.isArray(meta.authors) && meta.authors.length) rows.push(["Author", meta.authors.join(", ")]);
@@ -706,6 +709,91 @@ function DetailsPanel({ item }: { item: Item }) {
           <span className="text-right font-medium capitalize text-text">{value}</span>
         </div>
       ))}
+      {item.type !== "book" && (
+        <div className="flex items-center justify-between gap-3 pt-1 text-[12.5px]">
+          <span className="text-faint">Metadata</span>
+          <button
+            type="button"
+            onClick={() => setRelinking(true)}
+            className="font-semibold text-accent hover:underline"
+          >
+            Re-link…
+          </button>
+        </div>
+      )}
+      {relinking && <RelinkDialog item={item} onClose={() => setRelinking(false)} />}
+    </div>
+  );
+}
+
+/** Search the catalog and point this item at a different record — the
+ * fix for a wrong or missing automatic metadata match. */
+function RelinkDialog({ item, onClose }: { item: Item; onClose: () => void }) {
+  const [q, setQ] = useState(item.title);
+  const search = useEnrichSearch(item.type, q);
+  const relink = useRelinkItem(item.id);
+  const results = search.data?.results ?? [];
+
+  return (
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="panel flex w-full max-w-[440px] flex-col gap-3 p-5 shadow-lift"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="paneltitle">Re-link metadata</div>
+        <p className="m-0 text-xs text-faint">
+          Pick the matching {SOURCE_LABEL[item.type]} entry. Import info, playtime and your
+          title are kept; description, cover and artwork come from the new match.
+        </p>
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          aria-label="Search catalog"
+          placeholder="Search…"
+          className="input w-full"
+        />
+        <div className="flex max-h-72 flex-col gap-0.5 overflow-y-auto">
+          {search.isLoading && <span className="px-2 py-1.5 text-xs text-faint">Searching…</span>}
+          {results.map((result) => (
+            <button
+              key={result.external_id ?? result.title}
+              type="button"
+              disabled={relink.isPending || !result.external_id}
+              onClick={() =>
+                result.external_id &&
+                relink.mutate(result.external_id, { onSuccess: onClose })
+              }
+              className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-left hover:bg-raised disabled:opacity-50"
+            >
+              <span className="grid h-12 w-[34px] flex-none place-items-center overflow-hidden rounded-md border border-line-strong bg-surface">
+                {result.cover_url && (
+                  <img src={result.cover_url} alt="" className="h-full w-full object-cover" />
+                )}
+              </span>
+              <span className="flex min-w-0 flex-col">
+                <span className="truncate text-[13px] font-semibold">{result.title}</span>
+                <span className="truncate text-xs text-faint">
+                  {[result.metadata.developer, result.metadata.year]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
+              </span>
+            </button>
+          ))}
+          {!search.isLoading && results.length === 0 && q.trim().length >= 2 && (
+            <span className="px-2 py-1.5 text-xs text-faint">No matches.</span>
+          )}
+        </div>
+        {relink.isError && (
+          <p className="m-0 text-xs text-danger">{(relink.error as Error).message}</p>
+        )}
+        <button type="button" className="btn btn-ghost btn-sm w-fit" onClick={onClose}>
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }

@@ -141,6 +141,20 @@ export function useAcquireItem(id: string) {
   });
 }
 
+/** Point an item at a different catalog record; provenance survives
+ * server-side, cover and artwork refetch for the new match. */
+export function useRelinkItem(id: string) {
+  const invalidate = useInvalidateItems();
+  return useMutation({
+    mutationFn: (externalId: string) =>
+      api<Item>(`/api/items/${id}/relink`, {
+        method: "POST",
+        body: { external_id: externalId },
+      }),
+    onSuccess: () => invalidate(id),
+  });
+}
+
 export function useUploadCover(itemId: string) {
   const client = useQueryClient();
   return useMutation({

@@ -73,7 +73,7 @@ def start_import(
     """Kick off a PSN import job; poll GET /import/{job_id} for progress.
     The job pauses in status "review" until /confirm selects the titles."""
     job_id = import_jobs.create(owner_id=user.id)
-    background.add_task(_prepare_review, job_id, body)
+    background.add_task(_prepare_review, job_id, user.id, body)
     return PsnJobStartOut(job_id=job_id)
 
 
@@ -109,7 +109,7 @@ def _owned_job(job_id: str, user: User) -> dict:
     return job
 
 
-def _prepare_review(job_id: str, body: PsnImportIn) -> None:
+def _prepare_review(job_id: str, user_id: uuid.UUID, body: PsnImportIn) -> None:
     """Fetch and classify everything, then wait for the user's selection.
 
     PS Plus-gated claims are excluded up front unless include_ps_plus is
@@ -136,6 +136,18 @@ def _prepare_review(job_id: str, body: PsnImportIn) -> None:
         import_jobs.fail(job_id, "PSN is unreachable right now")
         return
 
+    # Titles already on the shelf (any format/source) get pre-excluded in
+    # the review — imported earlier, added manually, whatever. Rescuable.
+    with SessionLocal() as db:
+        owned_names = {
+            _name_key(title)
+            for title in db.scalars(
+                select(Item.title).where(
+                    Item.user_id == user_id, Item.type == ItemType.GAME.value
+                )
+            )
+        }
+
     candidates: list[dict] = []
     excluded: list[dict] = []
     raw_by_id: dict[str, dict] = {}
@@ -157,6 +169,8 @@ def _prepare_review(job_id: str, body: PsnImportIn) -> None:
             "subscription": game.get("subscription"),
         }
         reason = _classify(game, played.get(title_id, {}))
+        if reason is None and _name_key(name) in owned_names:
+            reason = "already in your collection"
         if reason is None and body.dedupe_cross_gen and game.get("platform") == "PS4":
             if _name_key(name) in ps5_names:
                 reason = "PS4 version of a game you also own on PS5"

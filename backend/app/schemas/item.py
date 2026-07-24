@@ -62,6 +62,11 @@ class ItemUpdate(BaseModel):
     _half_steps = field_validator("rating")(_validate_half_steps)
 
 
+class RelinkIn(BaseModel):
+    # Provider-specific catalog id (IGDB id, TMDB id, OpenLibrary key).
+    external_id: str = Field(min_length=1, max_length=50)
+
+
 class AcquireIn(BaseModel):
     format: ItemFormat
     purchase_price: Decimal | None = None

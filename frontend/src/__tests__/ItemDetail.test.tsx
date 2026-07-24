@@ -342,3 +342,61 @@ describe("ItemDetail back link", () => {
     expect(screen.queryByRole("link", { name: /library/i })).not.toBeInTheDocument();
   });
 });
+
+describe("ItemDetail relink", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  function mockRelinkFetch() {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+        const body = url.includes("/api/enrich/search")
+          ? {
+              provider: "igdb",
+              available: true,
+              results: [
+                {
+                  title: "Sekiro: Shadows Die Twice",
+                  type: "game",
+                  metadata: { year: 2019, developer: "FromSoftware" },
+                  cover_url: null,
+                  external_id: "9630",
+                },
+              ],
+            }
+          : url.includes("/activity")
+            ? { events: [] }
+            : GAME;
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          statusText: "OK",
+          json: () => Promise.resolve(body),
+        } as Response);
+      }),
+    );
+  }
+
+  it("searches the catalog and relinks the picked record", async () => {
+    mockRelinkFetch();
+    renderDetail();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Re-link…" }));
+    expect(screen.getByLabelText("Search catalog")).toHaveValue("Sekiro: Shadows Die Twice");
+
+    const option = await screen.findByRole("button", { name: /FromSoftware/ });
+    fireEvent.click(option);
+
+    await waitFor(() => {
+      const call = (fetch as ReturnType<typeof vi.fn>).mock.calls.find(([u]) =>
+        String(u).includes("/relink"),
+      );
+      expect(call).toBeDefined();
+      expect((call![1] as RequestInit).method).toBe("POST");
+      expect(JSON.parse(String((call![1] as RequestInit).body))).toEqual({
+        external_id: "9630",
+      });
+    });
+  });
+});

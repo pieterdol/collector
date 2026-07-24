@@ -143,6 +143,42 @@ class IgdbProvider(MetadataProvider):
             return []
         return [self._map_game(g) for g in data.get("games", [])]
 
+    def details(self, external_id: str) -> MetadataResult | None:
+        """One game by IGDB id, with the summary the search omits."""
+        if not self.available or not external_id.isdigit():
+            return None
+
+        def fetch() -> dict:
+            body = (
+                "fields name,first_release_date,platforms.name,"
+                "involved_companies.company.name,involved_companies.developer,"
+                "cover.image_id,summary; "
+                f"where id = {int(external_id)}; limit 1;"
+            )
+            res = httpx.post(
+                GAMES_URL,
+                content=body,
+                headers={
+                    "Client-ID": get_settings().twitch_client_id,
+                    "Authorization": f"Bearer {self._token()}",
+                },
+                timeout=10,
+            )
+            res.raise_for_status()
+            return {"games": res.json()}
+
+        try:
+            data = cached_fetch(self.db, self.name, f"details:{external_id}", fetch)
+        except httpx.HTTPError:
+            return None
+        games = data.get("games", [])
+        if not games:
+            return None
+        result = self._map_game(games[0])
+        if games[0].get("summary"):
+            result.metadata["description"] = games[0]["summary"]
+        return result
+
     def _token(self) -> str:
         if _token["value"] and _token["expires"] > time.time() + 60:
             return _token["value"]

@@ -12,7 +12,7 @@ import httpx
 import respx
 
 from app.providers.psn import AUTH_BASE, GAMELIST_URL, GRAPHQL_URL
-from app.tests.helpers import auth_headers
+from app.tests.helpers import auth_headers, create_item
 
 REDIRECT = "com.scee.psxandroid.scecompcall://redirect?code=v3.AbCdEf"
 
@@ -327,13 +327,38 @@ def test_purchased_list_is_paginated(client):
 
 
 @respx.mock
-def test_reimport_skips_existing_titles(client):
+def test_reimport_flags_previously_imported_titles(client):
     mock_psn(purchased=PURCHASED)
     headers = auth_headers(client)
     assert do_import(client, headers)["imported"] == 2
 
-    job = do_import(client, headers)
-    assert counts(job) == {"imported": 0, "skipped": 2, "total": 2}
+    # Second run: both titles now exist in the library, so the review
+    # pre-excludes them and nothing is imported.
+    job_id = start_job(client, headers)
+    review = job_status(client, headers, job_id)
+    assert review["candidates"] == []
+    assert {e["reason"] for e in review["excluded"]} == {"already in your collection"}
+
+    job = confirm(client, headers, job_id, [])
+    assert counts(job) == {"imported": 0, "skipped": 0, "total": 0}
+
+
+@respx.mock
+def test_manually_added_titles_are_flagged_as_already_owned(client):
+    mock_psn(purchased=PURCHASED)
+    headers = auth_headers(client)
+    # A manual physical copy, trademark glyph and all.
+    create_item(client, headers, type="game", title="Returnal™", format="physical")
+
+    job_id = start_job(client, headers)
+    review = job_status(client, headers, job_id)
+    assert [c["name"] for c in review["candidates"]] == ["Bloodborne"]
+    flagged = next(e for e in review["excluded"] if e["name"] == "Returnal")
+    assert flagged["reason"] == "already in your collection"
+
+    # Rescuable: confirming it anyway imports the digital copy.
+    job = confirm(client, headers, job_id, ["PPSA01284", "CUSA00207"])
+    assert job["imported"] == 2
 
 
 @respx.mock

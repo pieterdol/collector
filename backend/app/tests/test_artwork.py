@@ -214,3 +214,84 @@ def test_provider_failure_leaves_item_retryable(client):
     assert res.status_code == 200
     # not marked fetched, so a later attempt can retry
     assert "artwork_fetched" not in res.json()["metadata"]
+
+
+def igdb_games_router(search_results, artwork_game):
+    """Route IGDB /v4/games by request body: search vs artwork lookup."""
+
+    def route(request):
+        body = request.content.decode()
+        if body.startswith("search"):
+            return httpx.Response(200, json=search_results)
+        return httpx.Response(200, json=[artwork_game] if artwork_game else [])
+
+    return route
+
+
+RAGNAROK_SEARCH = [
+    {"id": 112875, "name": "God of War"},
+    {
+        "id": 119171,
+        "name": "God of War Ragnarök",
+        "first_release_date": 1667952000,
+        "cover": {"image_id": "gowr"},
+        "involved_companies": [
+            {"developer": True, "company": {"name": "Santa Monica Studio"}}
+        ],
+    },
+]
+
+RAGNAROK_ARTWORK = {
+    "id": 119171,
+    "summary": "Fimbulwinter is well underway.",
+    "artworks": [{"image_id": "art1"}],
+    "screenshots": [{"image_id": "sc1"}],
+}
+
+
+@respx.mock
+def test_unlinked_game_is_matched_to_igdb_by_title(client, keys):
+    """PSN/Epic/GOG imports carry no IGDB id — match by title, exactly
+    when possible (the ™ in the stored title must not break it)."""
+    keys(TWITCH_CLIENT_ID="cid", TWITCH_CLIENT_SECRET="sec")
+    respx.post("https://id.twitch.tv/oauth2/token").mock(
+        return_value=httpx.Response(200, json={"access_token": "t", "expires_in": 9999})
+    )
+    respx.post("https://api.igdb.com/v4/games").mock(
+        side_effect=igdb_games_router(RAGNAROK_SEARCH, RAGNAROK_ARTWORK)
+    )
+    respx.get(url__regex=r"https://images\.igdb\.com/.*").mock(side_effect=png_response)
+
+    headers = auth_headers(client)
+    item = create_item(
+        client, headers, type="game", title="God of War Ragnarök™", format="digital",
+        metadata={"psn_title_id": "PPSA01284", "storefront": "PlayStation Store"},
+    )
+    meta = client.post(f"/api/items/{item['id']}/artwork", headers=headers).json()["metadata"]
+
+    assert meta["igdb_id"] == 119171  # the exact-name match, not the first hit
+    assert meta["description"] == "Fimbulwinter is well underway."
+    assert meta["hero_path"].endswith("hero.png")
+    assert meta["developer"] == "Santa Monica Studio"
+    assert meta["psn_title_id"] == "PPSA01284"  # provenance untouched
+
+
+@respx.mock
+def test_unlinked_game_without_a_match_marks_fetched(client, keys):
+    keys(TWITCH_CLIENT_ID="cid", TWITCH_CLIENT_SECRET="sec")
+    respx.post("https://id.twitch.tv/oauth2/token").mock(
+        return_value=httpx.Response(200, json={"access_token": "t", "expires_in": 9999})
+    )
+    respx.post("https://api.igdb.com/v4/games").mock(
+        return_value=httpx.Response(200, json=[])
+    )
+
+    headers = auth_headers(client)
+    item = create_item(
+        client, headers, type="game", title="Obscure PSN Thing", format="digital",
+        metadata={"psn_title_id": "CUSA99999"},
+    )
+    meta = client.post(f"/api/items/{item['id']}/artwork", headers=headers).json()["metadata"]
+
+    assert "igdb_id" not in meta
+    assert meta["artwork_fetched"] is True  # no endless retries

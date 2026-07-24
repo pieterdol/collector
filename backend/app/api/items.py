@@ -22,6 +22,7 @@ from app.schemas.item import (
     ItemListOut,
     ItemOut,
     ItemUpdate,
+    RelinkIn,
 )
 
 router = APIRouter(prefix="/api/items", tags=["items"])
@@ -399,6 +400,51 @@ async def upload_cover(
     (covers_dir / name).write_bytes(content)
     item.cover_path = f"/media/covers/{name}"
     db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.post("/{item_id}/relink", response_model=ItemOut)
+def relink_item(
+    item_id: uuid.UUID,
+    body: RelinkIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> Item:
+    """Point an item at a different catalog record — the fix for wrong
+    or missing automatic matches. Provider metadata is replaced; import
+    provenance, playtime and the user's title survive; cover and artwork
+    refetch for the new record."""
+    from app.providers import get_provider
+
+    item = _get_owned_item(db, user, item_id)
+    provider = get_provider(ItemType(item.type), db)
+    if not provider.available:
+        raise HTTPException(status_code=503, detail=f"{provider.name} is not configured")
+    result = provider.details(body.external_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="No catalog entry found for that id")
+
+    preserved = (
+        "psn_title_id", "epic_app_name", "gog_product_id", "steam_appid",
+        "storefront", "platform", "playtime_minutes", "subscription",
+    )
+    meta = dict(result.metadata)
+    if "platform" not in item.meta:
+        # Search results join every platform into one display string;
+        # never let that become a platform record.
+        meta.pop("platform", None)
+    for key in preserved:
+        if key in item.meta:
+            meta[key] = item.meta[key]
+    if result.cover_url:
+        item.cover_path = download_cover(result.cover_url, item.id)
+        meta["cover_source_url"] = result.cover_url
+    item.meta = meta  # stale artwork/description fields drop with the swap
+    _link_platform(db, item)
+    db.commit()
+
+    fetch_artwork(db, item)  # hero/screenshots for the new record (commits)
     db.refresh(item)
     return item
 
