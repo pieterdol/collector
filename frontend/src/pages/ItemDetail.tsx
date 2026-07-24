@@ -3,7 +3,7 @@
  * loan + danger zone (right). Artwork is fetched once, lazily. */
 
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { AcquireDialog } from "../components/AcquireDialog";
 import { Lightbox } from "../components/Lightbox";
 import { BackIcon } from "../components/icons";
@@ -47,14 +47,22 @@ export default function ItemDetail() {
   return <Detail item={item} />;
 }
 
-/** Wishlist items return to the wishlist; everything else to the library. */
+/** Items opened from the Upcoming page return there; wishlist items to
+ * the wishlist; everything else to the library. */
 function BackLink({ wishlist = false }: { wishlist?: boolean }) {
+  const location = useLocation();
+  const fromUpcoming = (location.state as { from?: string } | null)?.from === "upcoming";
+  const [to, label] = fromUpcoming
+    ? ["/upcoming", "Upcoming"]
+    : wishlist
+      ? ["/wishlist", "Wishlist"]
+      : ["/", "Library"];
   return (
     <Link
-      to={wishlist ? "/wishlist" : "/"}
+      to={to}
       className="inline-flex w-fit items-center gap-2 rounded-[9px] border border-line bg-surface px-3 py-1.5 text-[12.5px] font-semibold text-muted no-underline hover:bg-raised hover:text-text"
     >
-      <BackIcon size={12} /> {wishlist ? "Wishlist" : "Library"}
+      <BackIcon size={12} /> {label}
     </Link>
   );
 }

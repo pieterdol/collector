@@ -104,7 +104,8 @@ export interface ProviderStatus {
   available: boolean;
 }
 
-export interface SteamImportResult {
+/** Shared shape of the bulk importers (Steam, Epic). */
+export interface ImportSummary {
   imported: number;
   skipped: number;
   total: number;

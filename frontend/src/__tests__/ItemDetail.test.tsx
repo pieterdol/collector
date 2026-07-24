@@ -47,11 +47,11 @@ function mockFetch(item: object = GAME) {
   );
 }
 
-function renderDetail() {
+function renderDetail(state?: Record<string, unknown>) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[`/items/${ID}`]}>
+      <MemoryRouter initialEntries={[{ pathname: `/items/${ID}`, state }]}>
         <Routes>
           <Route path="/items/:id" element={<ItemDetail />} />
         </Routes>
@@ -322,5 +322,23 @@ describe("ItemDetail details panel", () => {
     renderDetail();
 
     expect(await screen.findByText("Metadata via TMDB")).toBeInTheDocument();
+  });
+});
+
+describe("ItemDetail back link", () => {
+  beforeEach(() => mockFetch());
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("returns to the library by default", async () => {
+    renderDetail();
+    const link = await screen.findByRole("link", { name: /library/i });
+    expect(link).toHaveAttribute("href", "/");
+  });
+
+  it("returns to Upcoming when the item was opened from the upcoming page", async () => {
+    renderDetail({ from: "upcoming" });
+    const link = await screen.findByRole("link", { name: /upcoming/i });
+    expect(link).toHaveAttribute("href", "/upcoming");
+    expect(screen.queryByRole("link", { name: /library/i })).not.toBeInTheDocument();
   });
 });

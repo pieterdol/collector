@@ -6,9 +6,10 @@ import { AuthProvider, useAuth } from "./lib/auth";
 import AddItem from "./pages/AddItem";
 import ItemDetail from "./pages/ItemDetail";
 import Login from "./pages/Login";
+import Settings from "./pages/Settings";
 import Shelf from "./pages/Shelf";
 import StatsPage from "./pages/Stats";
-import SteamImport from "./pages/SteamImport";
+import Upcoming from "./pages/Upcoming";
 import Wishlist from "./pages/Wishlist";
 import { applyStoredTheme } from "./theme/useTheme";
 
@@ -49,8 +50,11 @@ export default function App() {
               <Route path="/" element={<Shelf />} />
               <Route path="/stats" element={<StatsPage />} />
               <Route path="/wishlist" element={<Wishlist />} />
+              <Route path="/upcoming" element={<Upcoming />} />
               <Route path="/add" element={<AddItem />} />
-              <Route path="/steam" element={<SteamImport />} />
+              <Route path="/settings" element={<Settings />} />
+              {/* Steam import moved into settings; keep old links working. */}
+              <Route path="/steam" element={<Navigate to="/settings" replace />} />
               <Route path="/items/:id" element={<ItemDetail />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

@@ -127,7 +127,8 @@ def list_items(
     platform: Annotated[str | None, Query(max_length=100)] = None,
     media: Annotated[str | None, Query(max_length=40)] = None,
     q: Annotated[str | None, Query(max_length=200)] = None,
-    sort: Annotated[str, Query(pattern="^(added|title|rating|updated)$")] = "added",
+    upcoming: Annotated[bool, Query()] = False,
+    sort: Annotated[str, Query(pattern="^(added|title|rating|updated|release)$")] = "added",
     limit: Annotated[int, Query(ge=1, le=200)] = 100,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> ItemListOut:
@@ -161,6 +162,14 @@ def list_items(
                 text("title_tsv @@ plainto_tsquery('simple', :q)").bindparams(q=q),
             )
         )
+    release = Item.meta["release_date"].astext
+    if upcoming:
+        # Release dates are ISO strings, full ("2026-12-18") or partial
+        # ("2026-09", "2027"). An item is upcoming while its release period
+        # hasn't fully passed: compare against today truncated to the same
+        # precision, so a year-only date stays upcoming all year.
+        today = datetime.now(UTC).date().isoformat()
+        query = query.where(release >= func.substr(today, 1, func.length(release)))
 
     total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
 
@@ -169,6 +178,9 @@ def list_items(
         "title": func.lower(Item.title).asc(),
         "rating": Item.rating.desc().nullslast(),
         "updated": Item.updated_at.desc(),
+        # Lexicographic asc puts partial dates at the start of their period
+        # ("2027" < "2027-01-01"), matching how the Upcoming page groups.
+        "release": release.asc().nullslast(),
     }[sort]
     # id tiebreaker: batch imports share created_at, and without a total
     # order Postgres pages tied rows arbitrarily (duplicates/gaps in the UI).

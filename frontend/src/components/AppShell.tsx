@@ -6,7 +6,9 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../lib/auth";
 import { useTheme } from "../theme/useTheme";
 import {
+  CalendarIcon,
   ChartIcon,
+  GearIcon,
   GridIcon,
   HeartIcon,
   LogoIcon,
@@ -14,7 +16,6 @@ import {
   PlusIcon,
   RowsIcon,
   SearchIcon,
-  SteamIcon,
   SunIcon,
 } from "./icons";
 
@@ -22,15 +23,16 @@ const NAV = [
   { to: "/", label: "Library", icon: GridIcon },
   { to: "/stats", label: "Stats", icon: ChartIcon },
   { to: "/wishlist", label: "Wishlist", icon: HeartIcon },
-  { to: "/steam", label: "Import", icon: SteamIcon },
+  { to: "/upcoming", label: "Upcoming", icon: CalendarIcon },
 ];
 
 const TITLES: Record<string, string> = {
   "/": "Library",
   "/stats": "Stats",
   "/wishlist": "Wishlist",
+  "/upcoming": "Upcoming",
   "/add": "Add item",
-  "/steam": "Import from Steam",
+  "/settings": "Import & settings",
 };
 
 export function AppShell() {
@@ -96,6 +98,16 @@ function Sidebar() {
       </nav>
 
       <div className="mt-auto flex flex-col gap-1 max-[820px]:hidden">
+        <NavLink
+          to="/settings"
+          className={({ isActive }) =>
+            `flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm no-underline transition-colors ${
+              isActive ? "bg-raised/60 font-semibold text-text" : "text-muted hover:bg-surface"
+            }`
+          }
+        >
+          <GearIcon size={14} /> Import &amp; settings
+        </NavLink>
         <button
           type="button"
           onClick={toggle}
@@ -306,6 +318,13 @@ function MobileUser({ name, onLogout }: { name: string; onLogout: () => void }) 
       {open && (
         <div className="panel absolute right-0 top-11 z-50 w-44 p-1.5 shadow-lift">
           <div className="px-3 py-2 text-[13px] font-semibold">{name}</div>
+          <NavLink
+            to="/settings"
+            onClick={() => setOpen(false)}
+            className="block rounded-lg px-3 py-2 text-[13px] text-muted no-underline hover:bg-raised hover:text-text"
+          >
+            Import &amp; settings
+          </NavLink>
           <button
             type="button"
             onClick={onLogout}

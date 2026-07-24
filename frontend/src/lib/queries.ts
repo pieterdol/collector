@@ -11,6 +11,7 @@ import type {
   ActivityEvent,
   BarcodeResult,
   EnrichSearch,
+  ImportSummary,
   Item,
   ItemList,
   ItemType,
@@ -18,7 +19,6 @@ import type {
   Season,
   SeasonList,
   Stats,
-  SteamImportResult,
 } from "./types";
 
 export interface ItemFilters {
@@ -29,6 +29,8 @@ export interface ItemFilters {
   media?: string;
   q?: string;
   sort?: string;
+  /** "true" limits to items whose release date hasn't passed. */
+  upcoming?: string;
 }
 
 export function useItems(filters: ItemFilters) {
@@ -271,10 +273,28 @@ export function useSteamImport() {
   const invalidate = useInvalidateItems();
   return useMutation({
     mutationFn: (steamId: string) =>
-      api<SteamImportResult>("/api/steam/import", {
+      api<ImportSummary>("/api/steam/import", {
         method: "POST",
         body: { steam_id: steamId },
       }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+/** Epic import: upload a Heroic store cache or `legendary list --json` file. */
+export function useEpicImport() {
+  const invalidate = useInvalidateItems();
+  return useMutation({
+    mutationFn: (file: File) => upload<ImportSummary>("/api/epic/import", file),
+    onSuccess: () => invalidate(),
+  });
+}
+
+/** GOG import: upload Heroic's gog_library.json store cache. */
+export function useGogImport() {
+  const invalidate = useInvalidateItems();
+  return useMutation({
+    mutationFn: (file: File) => upload<ImportSummary>("/api/gog/import", file),
     onSuccess: () => invalidate(),
   });
 }
