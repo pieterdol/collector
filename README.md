@@ -218,6 +218,11 @@ migration or backfill when they land.
   [Open Library](https://openlibrary.org) (an Internet Archive project).
 - **Steam / PlayStation Network** — library imports use the Steam Web API
   and PSN. This project is not affiliated with Valve or Sony.
+- **Heroic & Legendary** — Epic and GOG imports read the library files
+  maintained by the open-source
+  [Heroic Games Launcher](https://heroicgameslauncher.com) and
+  [Legendary](https://github.com/derrod/legendary). This project is not
+  affiliated with them, Epic Games or GOG.
 
 Cover art and posters shown in the app (and in screenshots) remain the
 property of their respective rights holders. The MIT license covers this
