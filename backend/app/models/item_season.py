@@ -1,5 +1,6 @@
 import uuid
 from datetime import date, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Boolean,
@@ -15,11 +16,14 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
 from app.domain.enums import DiscMedia, ItemFormat, SeasonOwnership, values
 from app.models.item import _check_in
+
+if TYPE_CHECKING:
+    from app.models.item_episode import ItemEpisode
 
 
 class ItemSeason(Base):
@@ -28,8 +32,8 @@ class ItemSeason(Base):
     Rows are created from TMDB season metadata at item creation, or lazily
     by the season PATCH endpoint (manual entries). The show-level
     format/metadata.media remain the whole-show fallback (box sets) when
-    no season is tracked. tmdb_season_id/season_number are kept so a
-    future episodes table can hang off this one.
+    no season is tracked. Episodes hang off this row (item_episodes),
+    filled in lazily the first time the season is opened.
     """
 
     __tablename__ = "item_seasons"
@@ -58,6 +62,22 @@ class ItemSeason(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+    # Eager-loaded: every season read reports its episode progress, and the
+    # counts are a handful of rows per season.
+    episodes: Mapped[list["ItemEpisode"]] = relationship(
+        cascade="all, delete-orphan",
+        order_by="ItemEpisode.episode_number",
+        lazy="selectin",
+    )
+
+    @property
+    def episodes_tracked(self) -> int:
+        return len(self.episodes)
+
+    @property
+    def episodes_watched(self) -> int:
+        return sum(1 for e in self.episodes if e.watched)
 
     __table_args__ = (
         UniqueConstraint("item_id", "season_number", name="uq_item_seasons_item_season"),

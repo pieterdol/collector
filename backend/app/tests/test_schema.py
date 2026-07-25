@@ -176,7 +176,8 @@ def test_migration_produces_schema(tmp_path):
                 )
             ).scalar_one()
         scratch_engine.dispose()
-        for t in ["users", "items", "activity_events", "provider_cache", "platforms", "alembic_version"]:
+        for t in ["users", "items", "activity_events", "provider_cache", "platforms",
+                  "item_seasons", "item_episodes", "alembic_version"]:
             assert t in tables, f"missing table {t}"
         # Every ItemType must survive a real migration chain, not just
         # create_all — the CHECK is what the live DB enforces.

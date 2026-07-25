@@ -85,6 +85,15 @@ export function BackIcon({ size = 14, className }: IconProps) {
   );
 }
 
+/** Disclosure chevron; rotates to point down when its section is open. */
+export function ChevronIcon({ size = 12, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" className={className} aria-hidden>
+      <path d="M9 5l7 7-7 7" />
+    </svg>
+  );
+}
+
 export function ChartIcon({ size = 19, className }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>

@@ -147,6 +147,13 @@ body {
   letter-spacing: 0.08em;
   color: var(--muted);
 }
+/* Same disc badge, flowing inline instead of pinned to a poster corner
+   (season rows, where the thumbnail is too small to carry it) */
+.badge-chip {
+  position: static;
+  inset: auto;
+  background: var(--raised);
+}
 .badge-uhd {
   display: flex;
   flex-direction: column;

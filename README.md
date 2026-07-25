@@ -174,8 +174,14 @@ browser ──:8080──▶ frontend (nginx)
   wishlist with a future release date, grouped by month, with countdown
   chips; partial dates ("2027", "09-2026") stay listed until their period
   ends.
-- **TV seasons**: per-season ownership (with disc format) and
-  watched-tracking on show pages; season data comes from TMDB.
+- **TV seasons & episodes**: show pages list their seasons as a compact
+  accordion — poster thumbnail, air year, episode count, watch progress.
+  Open one for its ownership (with disc format), the whole-season watched
+  control and a per-episode checklist. Episode lists come from TMDB the
+  first time a season is opened (never at add time), and watch state syncs
+  both ways: ticking the last episode marks the season watched, marking the
+  season ticks every episode. **Refresh** re-checks TMDB for a running
+  show's new episodes.
 - **Stats**: per-type tiles, continue-playing/reading, loans and recent
   activity — all read from the event log.
 - **Wishlist** is first-class: no price/format until you hit **Acquire**,
@@ -195,12 +201,14 @@ browser ──:8080──▶ frontend (nginx)
 ```
 backend/
   app/domain/enums.py    the enum single-source-of-truth
-  app/models/            SQLAlchemy tables (users, items, item_seasons, platforms,
-                         activity_events, provider_cache)
-  app/api/               routers: auth, items, seasons, enrich, steam, epic, gog,
-                         psn, stats, platforms (epic/gog share store_import)
+  app/models/            SQLAlchemy tables (users, items, item_seasons,
+                         item_episodes, platforms, activity_events, provider_cache)
+  app/api/               routers: auth, items, seasons, episodes, enrich, steam,
+                         epic, gog, psn, stats, platforms (epic/gog share
+                         store_import)
   app/core/              security (argon2+JWT), events, covers, artwork, seasons,
-                         platforms, library_import, import_jobs, store_filters
+                         episodes, platforms, library_import, import_jobs,
+                         store_filters
   app/providers/         MetadataProvider ABC + openlibrary/tmdb/igdb/steam/psn + cache
   app/tests/             pytest suite (runs against real Postgres)
   alembic/versions/      migrations

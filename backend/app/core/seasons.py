@@ -37,7 +37,7 @@ def create_seasons_from_metadata(db, item: Item) -> None:
                 tmdb_season_id=entry.get("tmdb_season_id"),
                 name=entry.get("name"),
                 episode_count=entry.get("episode_count"),
-                air_date=_parse_date(entry.get("air_date")),
+                air_date=parse_date(entry.get("air_date")),
                 poster_path=(
                     download_image(
                         SEASON_POSTER_URL.format(path=poster), poster_dir, f"s{number}"
@@ -50,7 +50,7 @@ def create_seasons_from_metadata(db, item: Item) -> None:
     item.meta = {k: v for k, v in item.meta.items() if k != "seasons"}
 
 
-def _parse_date(raw) -> date | None:
+def parse_date(raw) -> date | None:
     if not isinstance(raw, str):
         return None
     try:

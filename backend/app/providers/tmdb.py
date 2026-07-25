@@ -108,6 +108,45 @@ class TmdbProvider(MetadataProvider):
         result.metadata["director"] = director
         return result
 
+    def season_episodes(
+        self, external_id: str, season_number: int, force: bool = False
+    ) -> list[dict]:
+        """Episode list for one season — the extra call per season TMDB needs.
+
+        Fetched lazily (core/episodes.py) the first time a season is opened;
+        `force` re-asks TMDB for a running show that has gained episodes.
+        """
+        if not self.available:
+            return []
+
+        def fetch() -> dict:
+            res = httpx.get(
+                f"{BASE}/tv/{external_id}/season/{season_number}",
+                params={"api_key": get_settings().tmdb_api_key},
+                timeout=10,
+            )
+            res.raise_for_status()
+            return res.json()
+
+        try:
+            data = cached_fetch(
+                self.db, self.name, f"season:{external_id}:{season_number}", fetch, force=force
+            )
+        except httpx.HTTPError:
+            return []
+        return [
+            {
+                "tmdb_episode_id": e.get("id"),
+                "episode_number": e["episode_number"],
+                "name": e.get("name") or None,
+                "overview": e.get("overview") or None,
+                "air_date": e.get("air_date") or None,
+                "runtime": e.get("runtime"),
+            }
+            for e in data.get("episodes", [])
+            if isinstance(e.get("episode_number"), int)
+        ]
+
     def _map_result(self, data: dict) -> MetadataResult:
         is_tv = self.item_type == ItemType.TV
         title = data.get("name" if is_tv else "title", "Unknown")

@@ -57,6 +57,9 @@ export interface Season {
   format: ItemFormat | null;
   media: string | null;
   watched: boolean;
+  /** 0 until the season's episodes have been fetched (on first open). */
+  episodes_tracked: number;
+  episodes_watched: number;
   created_at: string;
   updated_at: string;
 }
@@ -67,6 +70,27 @@ export interface SeasonList {
   total_seasons: number;
   owned_seasons: number;
   watched_seasons: number;
+}
+
+/** One tracked episode of a season — mirrors backend EpisodeOut. */
+export interface Episode {
+  id: string;
+  season_id: string;
+  episode_number: number;
+  tmdb_episode_id: number | null;
+  name: string | null;
+  overview: string | null;
+  air_date: string | null;
+  runtime: number | null;
+  watched: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EpisodeList {
+  episodes: Episode[];
+  total: number;
+  watched: number;
 }
 
 export interface ActivityEvent {

@@ -9,7 +9,19 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.api import auth, enrich, epic, gog, items, platforms, psn, seasons, stats, steam
+from app.api import (
+    auth,
+    enrich,
+    epic,
+    episodes,
+    gog,
+    items,
+    platforms,
+    psn,
+    seasons,
+    stats,
+    steam,
+)
 from app.config import get_settings
 
 app = FastAPI(title="Collector API", docs_url="/api/docs", openapi_url="/api/openapi.json")
@@ -17,6 +29,7 @@ app = FastAPI(title="Collector API", docs_url="/api/docs", openapi_url="/api/ope
 app.include_router(auth.router)
 app.include_router(items.router)
 app.include_router(seasons.router)
+app.include_router(episodes.router)
 app.include_router(enrich.router)
 app.include_router(steam.router)
 app.include_router(epic.router)

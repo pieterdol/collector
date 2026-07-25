@@ -277,6 +277,20 @@ describe("ItemDetail details panel", () => {
                   new_value: null,
                   created_at: "2026-07-19T10:00:00Z",
                 },
+                {
+                  id: "e4",
+                  event_type: "episode_watched",
+                  old_value: { season_number: 2, episode_number: 4, watched: false },
+                  new_value: { season_number: 2, episode_number: 4, watched: true },
+                  created_at: "2026-07-18T10:00:00Z",
+                },
+                {
+                  id: "e5",
+                  event_type: "episode_watched",
+                  old_value: { season_number: 2, episode_number: 5, watched: true },
+                  new_value: { season_number: 2, episode_number: 5, watched: false },
+                  created_at: "2026-07-17T10:00:00Z",
+                },
               ],
             }
           : url.includes("/seasons")
@@ -295,6 +309,8 @@ describe("ItemDetail details panel", () => {
     expect(await screen.findByText("Season 3 watched")).toBeInTheDocument();
     expect(screen.getByText("Season 1 acquired (Blu-ray)")).toBeInTheDocument();
     expect(screen.getByText("Season 7 removed")).toBeInTheDocument();
+    expect(screen.getByText("S2E4 watched")).toBeInTheDocument();
+    expect(screen.getByText("S2E5 unwatched")).toBeInTheDocument();
   });
 
   it("shows the TMDB rating for movies and TV", async () => {

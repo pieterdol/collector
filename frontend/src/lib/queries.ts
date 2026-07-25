@@ -12,6 +12,8 @@ import type {
   ActivityEvent,
   BarcodeResult,
   EnrichSearch,
+  Episode,
+  EpisodeList,
   ImportSummary,
   Item,
   ItemList,
@@ -193,6 +195,8 @@ export function useUpdateSeason(itemId: string) {
       api<Season>(`/api/items/${itemId}/seasons/${seasonNumber}`, { method: "PATCH", body }),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ["seasons", itemId] });
+      // Marking a season watched ticks its episodes server-side.
+      void client.invalidateQueries({ queryKey: ["episodes", itemId] });
       void client.invalidateQueries({ queryKey: ["activity", itemId] });
       void client.invalidateQueries({ queryKey: ["items"] }); // media filter uses seasons
     },
@@ -208,6 +212,51 @@ export function useDeleteSeason(itemId: string) {
       void client.invalidateQueries({ queryKey: ["seasons", itemId] });
       void client.invalidateQueries({ queryKey: ["activity", itemId] });
       void client.invalidateQueries({ queryKey: ["items"] }); // media filter uses seasons
+    },
+  });
+}
+
+/** Episodes of one season. Rows only exist after a refresh has run, so an
+ * empty list is the signal to fetch from TMDB (see SeasonsPanel). */
+export function useEpisodes(itemId: string, seasonNumber: number) {
+  return useQuery({
+    queryKey: ["episodes", itemId, seasonNumber],
+    queryFn: () =>
+      api<EpisodeList>(`/api/items/${itemId}/seasons/${seasonNumber}/episodes`),
+  });
+}
+
+export function useRefreshEpisodes(itemId: string, seasonNumber: number) {
+  const client = useQueryClient();
+  return useMutation({
+    // force=true re-asks TMDB inside the cache TTL — for a running show
+    // that has aired new episodes.
+    mutationFn: (force: boolean) =>
+      api<EpisodeList>(`/api/items/${itemId}/seasons/${seasonNumber}/episodes/refresh`, {
+        method: "POST",
+        params: force ? { force: "true" } : {},
+      }),
+    onSuccess: (data) => {
+      client.setQueryData(["episodes", itemId, seasonNumber], data);
+      void client.invalidateQueries({ queryKey: ["seasons", itemId] });
+      void client.invalidateQueries({ queryKey: ["activity", itemId] });
+    },
+  });
+}
+
+export function useUpdateEpisode(itemId: string, seasonNumber: number) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ episodeNumber, watched }: { episodeNumber: number; watched: boolean }) =>
+      api<Episode>(
+        `/api/items/${itemId}/seasons/${seasonNumber}/episodes/${episodeNumber}`,
+        { method: "PATCH", body: { watched } },
+      ),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["episodes", itemId, seasonNumber] });
+      // The season flag follows its episodes, so the season list moves too.
+      void client.invalidateQueries({ queryKey: ["seasons", itemId] });
+      void client.invalidateQueries({ queryKey: ["activity", itemId] });
     },
   });
 }

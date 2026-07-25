@@ -88,11 +88,21 @@ function FilterBadge({
 }
 
 /** Disc-format badge for a media string; shared by item posters and the
- * per-season cards. Clicking deep-links into the media-filtered library. */
-export function DiscBadge({ media, to }: { media: string; to: string }) {
+ * season rows. `inline` un-pins it from the poster corner so it can sit in
+ * a text row. Clicking deep-links into the media-filtered library. */
+export function DiscBadge({
+  media,
+  to,
+  inline = false,
+}: {
+  media: string;
+  to: string;
+  inline?: boolean;
+}) {
+  const chip = inline ? "badge-chip " : "";
   if (media === "Ultra HD Blu-ray") {
     return (
-      <FilterBadge to={to} title="Ultra HD Blu-ray" className="badge-uhd">
+      <FilterBadge to={to} title="Ultra HD Blu-ray" className={`${chip}badge-uhd`}>
         <b>4K</b>
         <small>ULTRA HD</small>
       </FilterBadge>
@@ -100,14 +110,14 @@ export function DiscBadge({ media, to }: { media: string; to: string }) {
   }
   if (media === "Blu-ray") {
     return (
-      <FilterBadge to={to} title="Blu-ray" className="badge-bd">
+      <FilterBadge to={to} title="Blu-ray" className={`${chip}badge-bd`}>
         Blu-ray
       </FilterBadge>
     );
   }
   if (media === "DVD" || media === "VHS") {
     return (
-      <FilterBadge to={to} title={media} className={media === "DVD" ? "badge-dvd" : ""}>
+      <FilterBadge to={to} title={media} className={chip + (media === "DVD" ? "badge-dvd" : "")}>
         {media}
       </FilterBadge>
     );

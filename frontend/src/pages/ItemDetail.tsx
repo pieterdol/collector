@@ -526,6 +526,10 @@ function describeEvent(
       return `Season ${newValue?.season_number} ${newValue?.watched ? "watched" : "unwatched"}`;
     case "season_acquired":
       return `Season ${newValue?.season_number} acquired${newValue?.media ? ` (${newValue.media})` : ""}`;
+    case "episode_watched":
+      return `S${newValue?.season_number}E${newValue?.episode_number} ${
+        newValue?.watched ? "watched" : "unwatched"
+      }`;
     case "season_updated":
       return `Season ${newValue?.season_number} updated`;
     case "season_removed":

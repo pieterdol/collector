@@ -365,6 +365,68 @@ def test_tmdb_tv_details_handles_empty_episode_runtime_list(db, keys):
     assert result.metadata["episode_runtime"] is None
 
 
+SEASON_ONE = {
+    "id": 3627,
+    "name": "Season 1",
+    "season_number": 1,
+    "episodes": [
+        {"id": 63056, "episode_number": 1, "name": "Winter Is Coming",
+         "overview": "Jon Arryn is dead.", "air_date": "2011-04-17", "runtime": 62},
+        {"id": 63057, "episode_number": 2, "name": "The Kingsroad",
+         "overview": "", "air_date": None, "runtime": None},
+    ],
+}
+
+
+@respx.mock
+def test_tmdb_season_episodes_maps_episodes(db, keys):
+    keys(TMDB_API_KEY="k")
+    respx.get("https://api.themoviedb.org/3/tv/1399/season/1").mock(
+        return_value=httpx.Response(200, json=SEASON_ONE)
+    )
+    provider = get_provider(ItemType.TV, db)
+    episodes = provider.season_episodes("1399", 1)
+    assert episodes[0] == {
+        "tmdb_episode_id": 63056,
+        "episode_number": 1,
+        "name": "Winter Is Coming",
+        "overview": "Jon Arryn is dead.",
+        "air_date": "2011-04-17",
+        "runtime": 62,
+    }
+    # Empty strings from TMDB read as missing, not as blank text.
+    assert episodes[1]["overview"] is None
+    assert episodes[1]["air_date"] is None
+    assert episodes[1]["runtime"] is None
+
+
+@respx.mock
+def test_tmdb_season_episodes_are_cached(db, keys):
+    keys(TMDB_API_KEY="k")
+    route = respx.get("https://api.themoviedb.org/3/tv/1399/season/1").mock(
+        return_value=httpx.Response(200, json=SEASON_ONE)
+    )
+    provider = get_provider(ItemType.TV, db)
+    provider.season_episodes("1399", 1)
+    provider.season_episodes("1399", 1)
+    assert route.call_count == 1  # second hit served from provider_cache
+
+
+@respx.mock
+def test_tmdb_season_episodes_empty_without_key(db, keys):
+    keys(TMDB_API_KEY="")
+    assert get_provider(ItemType.TV, db).season_episodes("1399", 1) == []
+
+
+@respx.mock
+def test_tmdb_season_episodes_empty_on_http_error(db, keys):
+    keys(TMDB_API_KEY="k")
+    respx.get("https://api.themoviedb.org/3/tv/1399/season/9").mock(
+        return_value=httpx.Response(404, json={"status_message": "Not found"})
+    )
+    assert get_provider(ItemType.TV, db).season_episodes("1399", 9) == []
+
+
 @respx.mock
 def test_igdb_fetches_token_then_searches(db, keys):
     keys(TWITCH_CLIENT_ID="cid", TWITCH_CLIENT_SECRET="secret")

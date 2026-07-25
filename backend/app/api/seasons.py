@@ -3,6 +3,10 @@
 Season rows are auto-created from TMDB metadata at item creation
 (core/seasons.py); PATCH upserts, so manual entries grow rows on first
 touch. Every mutation records an activity event in the same transaction.
+
+Marking a season watched here is the bulk control: it ticks every tracked
+episode too (api/episodes.py owns the per-episode path) and stays a single
+season_watched event rather than one per episode.
 """
 
 import uuid
@@ -13,6 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.items import _get_owned_item
+from app.core.episodes import set_all_episodes_watched
 from app.core.events import record_event
 from app.core.security import get_current_user
 from app.db import get_db
@@ -68,6 +73,8 @@ def update_season(
             changed[name] = value
             setattr(season, name, value)
 
+    if "watched" in changed:
+        set_all_episodes_watched(season, changed["watched"])
     _record_season_events(db, item, user, season, old, changed)
     db.commit()
     db.refresh(season)
@@ -120,6 +127,18 @@ def _get_or_create_season(db: Session, item: Item, season_number: int) -> ItemSe
     return season
 
 
+def record_season_watched_event(db, item, user, season: ItemSeason, was_watched: bool) -> None:
+    """Season watch flip — set here, or derived from its episodes."""
+    record_event(
+        db,
+        item_id=item.id,
+        user_id=user.id,
+        event_type=EventType.SEASON_WATCHED,
+        old_value={"season_number": season.season_number, "watched": was_watched},
+        new_value={"season_number": season.season_number, "watched": season.watched},
+    )
+
+
 def _record_season_events(db, item, user, season, old, changed) -> None:
     """One event per meaningful change, in the caller's transaction."""
     n = season.season_number
@@ -139,14 +158,7 @@ def _record_season_events(db, item, user, season, old, changed) -> None:
             },
         )
     if "watched" in changed:
-        record_event(
-            db,
-            item_id=item.id,
-            user_id=user.id,
-            event_type=EventType.SEASON_WATCHED,
-            old_value={"season_number": n, "watched": old["watched"]},
-            new_value={"season_number": n, "watched": changed["watched"]},
-        )
+        record_season_watched_event(db, item, user, season, old["watched"])
     # Everything not already carried by the events above.
     covered = {"watched"} | ({"ownership", "format", "media"} if acquired else set())
     other = {k: v for k, v in changed.items() if k not in covered}

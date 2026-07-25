@@ -32,6 +32,9 @@ class SeasonOut(BaseModel):
     format: str | None
     media: str | None
     watched: bool
+    # 0 until the season's episodes have been fetched (lazily, on first open).
+    episodes_tracked: int
+    episodes_watched: int
     created_at: datetime
     updated_at: datetime
 

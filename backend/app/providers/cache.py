@@ -15,16 +15,20 @@ from app.models import ProviderCache
 
 
 def cached_fetch(
-    db: Session, provider: str, query_key: str, fetch: Callable[[], dict]
+    db: Session, provider: str, query_key: str, fetch: Callable[[], dict], force: bool = False
 ) -> dict:
-    """Return the cached response for (provider, query_key), fetching on miss."""
+    """Return the cached response for (provider, query_key), fetching on miss.
+
+    `force` re-fetches even on a hit — only for user-initiated refreshes of
+    data that legitimately grows (a running show's episode list).
+    """
     now = datetime.now(UTC)
     row = db.scalar(
         select(ProviderCache).where(
             ProviderCache.provider == provider, ProviderCache.query_key == query_key
         )
     )
-    if row is not None and (row.expires_at is None or row.expires_at > now):
+    if not force and row is not None and (row.expires_at is None or row.expires_at > now):
         return row.response
 
     response = fetch()
