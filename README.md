@@ -179,7 +179,9 @@ browser ──:8080──▶ frontend (nginx)
 - **Stats**: per-type tiles, continue-playing/reading, loans and recent
   activity — all read from the event log.
 - **Wishlist** is first-class: no price/format until you hit **Acquire**,
-  which records the acquisition and moves it to your backlog.
+  which records the acquisition and moves it to your backlog. On desktop that
+  button appears over the poster on hover; on narrow screens the poster stays
+  uncovered and you acquire from the item page ("Mark as owned").
 - **Loans**: lend to a name, mark returned — both logged.
 - **Theming**: dark ("graphite", the designed theme) and a derived light variant,
   OS-aware with a persisted toggle. All colors are CSS custom properties in

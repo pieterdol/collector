@@ -63,3 +63,13 @@ def test_sort_release_orders_soonest_first_with_partials_at_period_start(client)
 
     res = client.get("/api/items?upcoming=true&sort=release", headers=headers)
     assert titles(res) == ["Soon", "Sometime next year", "June next year", "Mid next year"]
+
+
+def test_upcoming_accepts_the_frontends_query_string(client):
+    """The Upcoming page requests this exact URL; it must not 422."""
+    headers = auth_headers(client)
+    with_release(client, headers, "Soon", iso(2))
+
+    res = client.get("/api/items?upcoming=true&sort=release&limit=200", headers=headers)
+    assert res.status_code == 200, res.text
+    assert titles(res) == ["Soon"]

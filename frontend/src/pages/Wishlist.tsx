@@ -75,7 +75,7 @@ function WishCard({ item, onAcquire }: { item: Item; onAcquire: () => void }) {
         type="button"
         onClick={onAcquire}
         className="btn absolute inset-x-2.5 z-10 py-2 text-[12.5px] opacity-0 transition-opacity
-          group-hover:opacity-100 group-focus-within:opacity-100 max-[820px]:opacity-100"
+          group-hover:opacity-100 group-focus-within:opacity-100 max-[820px]:hidden"
         style={{ bottom: 56 }}
       >
         Acquire
