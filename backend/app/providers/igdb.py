@@ -23,6 +23,14 @@ EXTERNAL_GAMES_URL = "https://api.igdb.com/v4/external_games"
 COVER_URL = "https://images.igdb.com/igdb/image/upload/t_cover_big/{image_id}.jpg"
 STEAM_SOURCE = 1  # external_games.external_game_source for Steam
 
+# Everything _map_game reads. Shared by both search passes so a fallback
+# result carries the same developer/platform/cover detail as a direct hit.
+GAME_FIELDS = (
+    "fields name,first_release_date,platforms.name,"
+    "involved_companies.company.name,involved_companies.developer,"
+    "cover.image_id; "
+)
+
 _token: dict = {"value": None, "expires": 0.0}
 
 
@@ -133,26 +141,21 @@ class IgdbProvider(MetadataProvider):
 
         def fetch() -> dict:
             safe_query = query.replace('"', "")
-            body = (
-                f'search "{safe_query}"; '
-                "fields name,first_release_date,platforms.name,"
-                "involved_companies.company.name,involved_companies.developer,"
-                "cover.image_id; "
-            )
+            platform_clause = "" if platform_id is None else f" & platforms = ({platform_id})"
+            body = f'search "{safe_query}"; {GAME_FIELDS}'
             if platform_id is not None:
                 body += f"where platforms = ({platform_id}); "
-            body += "limit 10;"
-            res = httpx.post(
-                GAMES_URL,
-                content=body,
-                headers={
-                    "Client-ID": get_settings().twitch_client_id,
-                    "Authorization": f"Bearer {self._token()}",
-                },
-                timeout=10,
-            )
-            res.raise_for_status()
-            return {"games": res.json()}
+            games = self._games(body + "limit 10;")
+            if not games:
+                # IGDB's search index matches whole words, so a half-typed
+                # title ("sekir") finds nothing at all. Fall back to a
+                # name-contains lookup, most-rated first so the well-known
+                # game leads instead of an obscure namesake or an edition.
+                games = self._games(
+                    f'{GAME_FIELDS}where name ~ *"{safe_query}"*{platform_clause}; '
+                    "sort total_rating_count desc; limit 10;"
+                )
+            return {"games": games}
 
         try:
             data = cached_fetch(self.db, self.name, cache_key, fetch)
@@ -165,29 +168,29 @@ class IgdbProvider(MetadataProvider):
             select(Platform.igdb_id).where(func.lower(Platform.name) == name.strip().lower())
         )
 
+    def _games(self, body: str) -> list[dict]:
+        """One apicalypse query against /games."""
+        res = httpx.post(
+            GAMES_URL,
+            content=body,
+            headers={
+                "Client-ID": get_settings().twitch_client_id,
+                "Authorization": f"Bearer {self._token()}",
+            },
+            timeout=10,
+        )
+        res.raise_for_status()
+        return res.json()
+
     def details(self, external_id: str) -> MetadataResult | None:
         """One game by IGDB id, with the summary the search omits."""
         if not self.available or not external_id.isdigit():
             return None
 
         def fetch() -> dict:
-            body = (
-                "fields name,first_release_date,platforms.name,"
-                "involved_companies.company.name,involved_companies.developer,"
-                "cover.image_id,summary; "
-                f"where id = {int(external_id)}; limit 1;"
-            )
-            res = httpx.post(
-                GAMES_URL,
-                content=body,
-                headers={
-                    "Client-ID": get_settings().twitch_client_id,
-                    "Authorization": f"Bearer {self._token()}",
-                },
-                timeout=10,
-            )
-            res.raise_for_status()
-            return {"games": res.json()}
+            # Same fields as search, plus the summary it omits.
+            body = GAME_FIELDS.replace("cover.image_id;", "cover.image_id,summary;")
+            return {"games": self._games(f"{body}where id = {int(external_id)}; limit 1;")}
 
         try:
             data = cached_fetch(self.db, self.name, f"details:{external_id}", fetch)

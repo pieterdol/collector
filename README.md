@@ -123,7 +123,9 @@ browser ──:8080──▶ frontend (nginx)
   search takes a **platform filter** (only games released on it come back,
   and it's preselected as the platform you file the copy under), and the
   search term and filter survive stepping into the confirm form and back
-  via *← results*.
+  via *← results*. Half-typed titles work: IGDB's search index only
+  matches whole words, so "sekir" would find nothing — a query that comes
+  back empty is retried as a name-contains lookup, most-rated first.
 - **Library search** covers titles (Postgres full-text plus substring) and
   synopses, so "batman" finds *Batman Begins* and *The Dark Knight*.
   Title matches always rank above description-only ones, whatever sort is

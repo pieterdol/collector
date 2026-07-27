@@ -482,6 +482,64 @@ BLOODBORNE = [
 ]
 
 
+def _igdb_two_step(db, keys, fallback: list[dict]) -> list[str]:
+    """Mock IGDB so `search` finds nothing and the name lookup does.
+
+    Returns the list the request bodies are appended to, in call order.
+    """
+    keys(TWITCH_CLIENT_ID="cid", TWITCH_CLIENT_SECRET="secret")
+    respx.post("https://id.twitch.tv/oauth2/token").mock(
+        return_value=httpx.Response(200, json={"access_token": "tok", "expires_in": 5000})
+    )
+    bodies: list[str] = []
+
+    def handler(request):
+        body = request.content.decode()
+        bodies.append(body)
+        if body.startswith("search"):
+            return httpx.Response(200, json=[])
+        return httpx.Response(200, json=fallback)
+
+    respx.post("https://api.igdb.com/v4/games").mock(side_effect=handler)
+    return bodies
+
+
+@respx.mock
+def test_igdb_prefix_falls_back_to_a_name_match(db, keys):
+    """IGDB's search index matches whole words only — "sekir" needs more."""
+    bodies = _igdb_two_step(db, keys, BLOODBORNE)
+
+    results = get_provider(ItemType.GAME, db).search("bloodbor")
+
+    assert [r.title for r in results] == ["Bloodborne"]
+    assert 'where name ~ *"bloodbor"*' in bodies[1]
+    assert "sort total_rating_count desc" in bodies[1]
+    # Same fields as the search path, so the mapper still gets developer/cover.
+    assert "involved_companies.developer" in bodies[1]
+
+
+@respx.mock
+def test_igdb_whole_word_hit_costs_one_call(db, keys):
+    route = _igdb_ready(db, keys, BLOODBORNE)
+
+    assert get_provider(ItemType.GAME, db).search("bloodborne")
+    assert route.call_count == 1  # no pointless fallback when search worked
+
+
+@respx.mock
+def test_igdb_prefix_fallback_keeps_the_platform_filter(db, keys):
+    from app.models import Platform
+
+    db.add(Platform(igdb_id=48, name="PlayStation 4"))
+    db.commit()
+    bodies = _igdb_two_step(db, keys, BLOODBORNE)
+
+    get_provider(ItemType.GAME, db).search("bloodbor", platform="PlayStation 4")
+
+    assert 'name ~ *"bloodbor"*' in bodies[1]
+    assert "platforms = (48)" in bodies[1]
+
+
 @respx.mock
 def test_igdb_search_narrows_to_one_platform(db, keys):
     from app.models import Platform
