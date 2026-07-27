@@ -119,7 +119,11 @@ browser ──:8080──▶ frontend (nginx)
 ## Features & flows
 
 - **Add items** by catalog search (Open Library / TMDB / IGDB), by barcode,
-  or manually. Missing keys degrade to manual entry with a hint.
+  or manually. Missing keys degrade to manual entry with a hint. Game
+  search takes a **platform filter** (only games released on it come back,
+  and it's preselected as the platform you file the copy under), and the
+  search term and filter survive stepping into the confirm form and back
+  via *← results*.
 - **Library search** covers titles (Postgres full-text plus substring) and
   synopses, so "batman" finds *Batman Begins* and *The Dark Knight*.
   Title matches always rank above description-only ones, whatever sort is

@@ -38,7 +38,12 @@ function mockFetch() {
               ],
             }
           : url.includes("type=game")
-            ? { provider: "igdb", available: true, results: [SEKIRO] }
+            ? {
+                provider: "igdb",
+                available: true,
+                // Sekiro never came out on Switch: the filter empties the list.
+                results: url.includes("platform=Nintendo+Switch") ? [] : [SEKIRO],
+              }
             : { provider: "openlibrary", available: true, results: [] };
       return Promise.resolve({
         ok: true,
@@ -141,6 +146,85 @@ describe("game platform options", () => {
     const options = [...select.options].map((o) => o.text);
     expect(options).toContain("Nintendo Switch");
     expect(options).toContain("Xbox Series X|S");
+  });
+});
+
+describe("game platform filter", () => {
+  beforeEach(() => mockFetch());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it("narrows the catalog search to the chosen platform", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: /game/i }));
+    fireEvent.change(await screen.findByLabelText("Filter by platform"), {
+      target: { value: "PlayStation 4" },
+    });
+    fireEvent.change(await screen.findByPlaceholderText(/Search IGDB/), {
+      target: { value: "Sekiro" },
+    });
+    await screen.findByText("Sekiro: Shadows Die Twice");
+
+    expect(searchCalls().some((url) => url.includes("platform=PlayStation+4"))).toBe(true);
+  });
+
+  it("preselects that platform on the confirm step", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: /game/i }));
+    fireEvent.change(await screen.findByLabelText("Filter by platform"), {
+      target: { value: "PlayStation 4" },
+    });
+    fireEvent.change(await screen.findByPlaceholderText(/Search IGDB/), {
+      target: { value: "Sekiro" },
+    });
+    fireEvent.click(await screen.findByText("Sekiro: Shadows Die Twice"));
+
+    const select = await screen.findByLabelText<HTMLSelectElement>("Platform");
+    expect(select.value).toBe("PlayStation 4");
+  });
+
+  it("blames the filter when it empties the results", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: /game/i }));
+    fireEvent.change(await screen.findByLabelText("Filter by platform"), {
+      target: { value: "Nintendo Switch" },
+    });
+    fireEvent.change(await screen.findByPlaceholderText(/Search IGDB/), {
+      target: { value: "Sekiro" },
+    });
+
+    expect(
+      await screen.findByText(/on Nintendo Switch/, { selector: "p" }),
+    ).toBeInTheDocument();
+  });
+
+  it("is not offered for books", async () => {
+    renderPage();
+    await screen.findByPlaceholderText(/Search Open Library/);
+    expect(screen.queryByLabelText("Filter by platform")).toBeNull();
+  });
+});
+
+describe("going back to the results", () => {
+  beforeEach(() => mockFetch());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it("keeps the search term and its results", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: /game/i }));
+    fireEvent.change(await screen.findByPlaceholderText(/Search IGDB/), {
+      target: { value: "Sekiro" },
+    });
+    fireEvent.click(await screen.findByText("Sekiro: Shadows Die Twice"));
+    fireEvent.click(await screen.findByRole("button", { name: /results/ }));
+
+    expect(await screen.findByPlaceholderText(/Search IGDB/)).toHaveValue("Sekiro");
+    expect(await screen.findByText("Sekiro: Shadows Die Twice")).toBeInTheDocument();
   });
 });
 

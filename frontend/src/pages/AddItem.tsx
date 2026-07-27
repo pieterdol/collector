@@ -56,6 +56,10 @@ export default function AddItem() {
   const [mode, setMode] = useState<Mode>(initialMode);
   const [draft, setDraft] = useState<EnrichResult | null>(null);
   const [scannedUpc, setScannedUpc] = useState<string | null>(null);
+  // Search term and game platform filter live here, not in SearchMode:
+  // stepping into the confirm form and back must not lose them.
+  const [query, setQuery] = useState("");
+  const [platform, setPlatform] = useState("");
   const providers = useProviders();
 
   const available = useMemo(() => {
@@ -106,6 +110,7 @@ export default function AddItem() {
           type={type}
           draft={draft}
           scannedUpc={scannedUpc}
+          preferredPlatform={type === "game" ? platform : ""}
           onBack={() => setDraft(null)}
         />
       ) : (
@@ -131,6 +136,10 @@ export default function AddItem() {
             <SearchMode
               type={type}
               available={available[type] ?? false}
+              query={query}
+              onQuery={setQuery}
+              platform={platform}
+              onPlatform={setPlatform}
               onPick={(result) => {
                 setScannedUpc(null);
                 setDraft(result);
@@ -149,7 +158,14 @@ export default function AddItem() {
               }}
             />
           )}
-          {mode === "manual" && <ConfirmForm type={type} draft={null} scannedUpc={scannedUpc} />}
+          {mode === "manual" && (
+            <ConfirmForm
+              type={type}
+              draft={null}
+              scannedUpc={scannedUpc}
+              preferredPlatform={type === "game" ? platform : ""}
+            />
+          )}
 
           {scannedUpc && mode === "search" && (
             <p className="mt-4 rounded-lg bg-surface px-4 py-3 text-[13px] text-muted">
@@ -166,21 +182,37 @@ export default function AddItem() {
 function SearchMode({
   type,
   available,
+  query,
+  onQuery,
+  platform,
+  onPlatform,
   onPick,
 }: {
   type: ItemType;
   available: boolean;
+  query: string;
+  onQuery: (q: string) => void;
+  platform: string;
+  onPlatform: (p: string) => void;
   onPick: (r: EnrichResult) => void;
 }) {
-  const [q, setQ] = useState("");
-  const [debounced, setDebounced] = useState("");
+  // Seeded from the lifted query so returning from the confirm form shows
+  // the cached results straight away instead of an empty list.
+  const [debounced, setDebounced] = useState(query);
   // useEffect, not useMemo: only effects run their cleanup, and the cleanup
   // is what cancels the previous keystroke's timer (the actual debounce).
   useEffect(() => {
-    const t = setTimeout(() => setDebounced(q), 300);
+    const t = setTimeout(() => setDebounced(query), 300);
     return () => clearTimeout(t);
-  }, [q]);
-  const search = useEnrichSearch(type, debounced);
+  }, [query]);
+  const isGame = type === "game";
+  const narrowed = isGame && Boolean(platform);
+  const catalog = usePlatformCatalog(isGame);
+  const platformOptions = useMemo(
+    () => [...new Set([...COMMON_PLATFORMS, ...(catalog.data?.platforms.map((p) => p.name) ?? [])])],
+    [catalog.data],
+  );
+  const search = useEnrichSearch(type, debounced, narrowed ? platform : "");
   const details = useEnrichDetails();
 
   function pick(result: EnrichResult) {
@@ -209,17 +241,36 @@ function SearchMode({
 
   return (
     <div>
-      <div className="relative">
-        <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 opacity-45" />
-        <input
-          type="search"
-          autoFocus
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder={`Search ${PROVIDER_LABEL[type]} by title${type === "book" ? " or ISBN" : ""}…`}
-          className="input w-full"
-          style={{ paddingLeft: 38 }}
-        />
+      <div className="flex gap-2 max-[520px]:flex-col">
+        <div className="relative flex-1">
+          <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 opacity-45" />
+          <input
+            type="search"
+            autoFocus
+            value={query}
+            onChange={(e) => onQuery(e.target.value)}
+            placeholder={`Search ${PROVIDER_LABEL[type]} by title${type === "book" ? " or ISBN" : ""}…`}
+            className="input w-full"
+            style={{ paddingLeft: 38 }}
+          />
+        </div>
+        {/* Games only: narrow the catalog to one platform — it also becomes
+            the platform the copy is filed under on the next step. */}
+        {isGame && (
+          <select
+            aria-label="Filter by platform"
+            value={platform}
+            onChange={(e) => onPlatform(e.target.value)}
+            className="input cursor-pointer appearance-none text-[13px] font-semibold text-body max-[520px]:w-full"
+          >
+            <option value="">All platforms</option>
+            {platformOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
       <div className="mt-3.5 flex flex-col gap-2">
         {search.isLoading && debounced.length >= 2 && (
@@ -230,7 +281,9 @@ function SearchMode({
         ))}
         {search.data && search.data.results.length === 0 && debounced.length >= 2 && (
           <p className="px-1 py-2 text-sm text-muted">
-            Nothing found for “{debounced}” — try another spelling or add it manually.
+            {narrowed
+              ? `Nothing found for “${debounced}” on ${platform} — try another spelling, widen to All platforms, or add it manually.`
+              : `Nothing found for “${debounced}” — try another spelling or add it manually.`}
           </p>
         )}
       </div>
@@ -349,11 +402,14 @@ function ConfirmForm({
   type,
   draft,
   scannedUpc,
+  preferredPlatform = "",
   onBack,
 }: {
   type: ItemType;
   draft: EnrichResult | null;
   scannedUpc: string | null;
+  /** The platform picked in the search filter — preselected here. */
+  preferredPlatform?: string;
   onBack?: () => void;
 }) {
   const navigate = useNavigate();
@@ -413,12 +469,12 @@ function ConfirmForm({
     typeof meta.platform === "string" ? meta.platform.split(",").map((p) => p.trim()) : [];
   const catalog = usePlatformCatalog(type === "game" && detectedPlatforms.length === 0);
   const platformOptions = detectedPlatforms.length
-    ? detectedPlatforms
+    ? [...new Set([preferredPlatform, ...detectedPlatforms].filter(Boolean))]
     : [
         ...new Set([...COMMON_PLATFORMS, ...(catalog.data?.platforms.map((p) => p.name) ?? [])]),
       ];
   const [platform, setPlatform] = useState(
-    detectedPlatforms.length === 1 ? detectedPlatforms[0] : "",
+    preferredPlatform || (detectedPlatforms.length === 1 ? detectedPlatforms[0] : ""),
   );
   const [customPlatform, setCustomPlatform] = useState(false);
 

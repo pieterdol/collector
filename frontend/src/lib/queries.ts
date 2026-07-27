@@ -261,10 +261,11 @@ export function useUpdateEpisode(itemId: string, seasonNumber: number) {
   });
 }
 
-export function useEnrichSearch(type: ItemType, q: string) {
+/** Catalog search. `platform` narrows game results (IGDB only). */
+export function useEnrichSearch(type: ItemType, q: string, platform = "") {
   return useQuery({
-    queryKey: ["enrich", type, q],
-    queryFn: () => api<EnrichSearch>("/api/enrich/search", { params: { type, q } }),
+    queryKey: ["enrich", type, q, platform],
+    queryFn: () => api<EnrichSearch>("/api/enrich/search", { params: { type, q, platform } }),
     enabled: q.trim().length >= 2,
     staleTime: 5 * 60 * 1000,
   });

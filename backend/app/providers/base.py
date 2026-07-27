@@ -35,6 +35,9 @@ class MetadataResult:
 class MetadataProvider(ABC):
     name: str
     item_type: ItemType
+    #: True when `search` accepts a `platform=` name to narrow the results
+    #: (IGDB only) — the API layer passes the filter through just for those.
+    supports_platform_filter: bool = False
 
     def __init__(self, db: Session):
         self.db = db

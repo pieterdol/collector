@@ -466,6 +466,67 @@ def test_igdb_fetches_token_then_searches(db, keys):
     assert "co1rgi" in r.cover_url
 
 
+def _igdb_ready(db, keys, games: list[dict]):
+    """Credentials + a mocked token route + a mocked games route."""
+    keys(TWITCH_CLIENT_ID="cid", TWITCH_CLIENT_SECRET="secret")
+    respx.post("https://id.twitch.tv/oauth2/token").mock(
+        return_value=httpx.Response(200, json={"access_token": "tok", "expires_in": 5000})
+    )
+    return respx.post("https://api.igdb.com/v4/games").mock(
+        return_value=httpx.Response(200, json=games)
+    )
+
+
+BLOODBORNE = [
+    {"id": 7334, "name": "Bloodborne", "platforms": [{"name": "PlayStation 4"}]}
+]
+
+
+@respx.mock
+def test_igdb_search_narrows_to_one_platform(db, keys):
+    from app.models import Platform
+
+    db.add(Platform(igdb_id=48, name="PlayStation 4", abbreviation="PS4"))
+    db.commit()
+    route = _igdb_ready(db, keys, BLOODBORNE)
+
+    results = get_provider(ItemType.GAME, db).search("bloodborne", platform="PlayStation 4")
+
+    assert [r.title for r in results] == ["Bloodborne"]
+    assert "where platforms = (48)" in route.calls[0].request.content.decode()
+
+
+@respx.mock
+def test_igdb_platform_filtered_search_is_cached_apart(db, keys):
+    from app.models import Platform
+
+    db.add(Platform(igdb_id=48, name="PlayStation 4"))
+    db.commit()
+    route = _igdb_ready(db, keys, BLOODBORNE)
+
+    provider = get_provider(ItemType.GAME, db)
+    provider.search("bloodborne", platform="PlayStation 4")
+    provider.search("bloodborne", platform="PlayStation 4")  # cache hit
+    provider.search("bloodborne")  # different query — its own cache entry
+
+    assert route.call_count == 2
+
+
+@respx.mock
+def test_igdb_ignores_a_platform_it_has_no_id_for(db, keys):
+    """Custom rows ("PC (Steam)") aren't IGDB platforms — search unfiltered."""
+    from app.models import Platform
+
+    db.add(Platform(name="PC (Steam)"))
+    db.commit()
+    route = _igdb_ready(db, keys, BLOODBORNE)
+
+    results = get_provider(ItemType.GAME, db).search("bloodborne", platform="PC (Steam)")
+
+    assert [r.title for r in results] == ["Bloodborne"]
+    assert "where platforms" not in route.calls[0].request.content.decode()
+
+
 @respx.mock
 def test_search_results_are_cached(db):
     route = respx.get("https://openlibrary.org/search.json").mock(

@@ -9,9 +9,11 @@ import time
 from datetime import UTC, datetime
 
 import httpx
+from sqlalchemy import func, select
 
 from app.config import get_settings
 from app.domain.enums import ItemType
+from app.models import Platform
 from app.providers.base import MetadataProvider, MetadataResult
 from app.providers.cache import cached_fetch
 
@@ -107,15 +109,27 @@ def release_dates_for_igdb_ids(db, igdb_ids: list[int]) -> dict[int, str]:
 class IgdbProvider(MetadataProvider):
     name = "igdb"
     item_type = ItemType.GAME
+    supports_platform_filter = True
 
     @property
     def available(self) -> bool:
         settings = get_settings()
         return bool(settings.twitch_client_id and settings.twitch_client_secret)
 
-    def search(self, query: str) -> list[MetadataResult]:
+    def search(self, query: str, platform: str | None = None) -> list[MetadataResult]:
+        """Title search, optionally narrowed to one platform.
+
+        A platform we have no IGDB id for (custom rows like "PC (Steam)")
+        can't be expressed as a filter — those searches stay unfiltered.
+        """
         if not self.available:
             return []
+        platform_id = self._platform_igdb_id(platform) if platform else None
+        cache_key = (
+            f"search:{query.lower()}"
+            if platform_id is None
+            else f"search:{query.lower()}:platform:{platform_id}"
+        )
 
         def fetch() -> dict:
             safe_query = query.replace('"', "")
@@ -123,8 +137,11 @@ class IgdbProvider(MetadataProvider):
                 f'search "{safe_query}"; '
                 "fields name,first_release_date,platforms.name,"
                 "involved_companies.company.name,involved_companies.developer,"
-                "cover.image_id; limit 10;"
+                "cover.image_id; "
             )
+            if platform_id is not None:
+                body += f"where platforms = ({platform_id}); "
+            body += "limit 10;"
             res = httpx.post(
                 GAMES_URL,
                 content=body,
@@ -138,10 +155,15 @@ class IgdbProvider(MetadataProvider):
             return {"games": res.json()}
 
         try:
-            data = cached_fetch(self.db, self.name, f"search:{query.lower()}", fetch)
+            data = cached_fetch(self.db, self.name, cache_key, fetch)
         except httpx.HTTPError:
             return []
         return [self._map_game(g) for g in data.get("games", [])]
+
+    def _platform_igdb_id(self, name: str) -> int | None:
+        return self.db.scalar(
+            select(Platform.igdb_id).where(func.lower(Platform.name) == name.strip().lower())
+        )
 
     def details(self, external_id: str) -> MetadataResult | None:
         """One game by IGDB id, with the summary the search omits."""

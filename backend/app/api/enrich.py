@@ -24,11 +24,19 @@ def _is_isbn(code: str) -> bool:
 def search(
     type: ItemType,
     q: Annotated[str, Query(min_length=1, max_length=200)],
+    platform: Annotated[str | None, Query(max_length=100)] = None,
     db: Session = Depends(get_db),
     _user: User = Depends(get_current_user),
 ) -> EnrichSearchOut:
+    """Catalog search. `platform` narrows game results (IGDB); other
+    providers have nothing to narrow, so they ignore it."""
     provider = get_provider(type, db)
-    results = provider.search(q) if provider.available else []
+    if not provider.available:
+        results = []
+    elif platform and provider.supports_platform_filter:
+        results = provider.search(q, platform=platform)
+    else:
+        results = provider.search(q)
     return EnrichSearchOut(
         provider=provider.name,
         available=provider.available,
