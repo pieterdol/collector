@@ -127,10 +127,13 @@ browser ──:8080──▶ frontend (nginx)
   via *← results*. Half-typed titles work: IGDB's search index only
   matches whole words, so "sekir" would find nothing — a query that comes
   back empty is retried as a name-contains lookup, most-rated first.
-- **Library search** covers titles (Postgres full-text plus substring) and
-  synopses, so "batman" finds *Batman Begins* and *The Dark Knight*.
-  Title matches always rank above description-only ones, whatever sort is
-  active.
+- **Library search** covers titles (Postgres full-text plus substring), the
+  people behind an item — authors, artists, directors, studios — and
+  synopses. So "batman" finds *Batman Begins* and *The Dark Knight*, and
+  "radiohead" or "herbert" finds everything by them. Results are tiered:
+  title matches, then creator matches, then description-only ones,
+  whatever sort is active. The box clears with the **×** at its right edge
+  (or Esc), which drops `?q=` and keeps every other filter.
 - **Barcode scanning** uses the camera (native `BarcodeDetector`, falls
   back to `@zxing/browser`). ISBNs auto-fill books, and sleeve barcodes
   (UPC/EAN) auto-fill records — the music catalogs index them, and a match
@@ -236,7 +239,8 @@ backend/
 frontend/
   src/lib/               api client, TanStack Query hooks, types, dates, upcoming, music
   src/theme/             design tokens + theme store
-  src/components/        PosterCard, ItemTable, BarcodeScanner, SeasonsPanel, …
+  src/components/        PosterCard, ItemTable, BarcodeScanner, SeasonsPanel,
+                         SearchBox, …
   src/pages/             Shelf, Wishlist, Upcoming, Stats, AddItem, ItemDetail,
                          Settings, Login
 ```

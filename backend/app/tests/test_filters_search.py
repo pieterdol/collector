@@ -46,6 +46,73 @@ def test_full_text_search_matches_partial_words(client):
     assert titles(client.get("/api/items?q=holl", headers=headers)) == ["Hollow Knight"]
 
 
+def test_search_matches_a_book_author(client):
+    headers = auth_headers(client)
+    create_item(client, headers, type="book", title="Dune",
+                metadata={"authors": ["Frank Herbert"]})
+    create_item(client, headers, type="book", title="Neuromancer",
+                metadata={"authors": ["William Gibson"]})
+    assert titles(client.get("/api/items?q=herbert", headers=headers)) == ["Dune"]
+    assert titles(client.get("/api/items?q=gibson", headers=headers)) == ["Neuromancer"]
+
+
+def test_search_matches_any_of_several_authors(client):
+    """Co-authored books store a list; every name in it has to be searchable."""
+    headers = auth_headers(client)
+    create_item(client, headers, type="book", title="Good Omens",
+                metadata={"authors": ["Terry Pratchett", "Neil Gaiman"]})
+    assert titles(client.get("/api/items?q=gaiman", headers=headers)) == ["Good Omens"]
+
+
+def test_search_matches_a_music_artist(client):
+    headers = auth_headers(client)
+    create_item(client, headers, type="music", title="Kid A",
+                metadata={"artist": "Radiohead", "media": "Vinyl LP"})
+    create_item(client, headers, type="music", title="Blue",
+                metadata={"artist": "Joni Mitchell"})
+    assert titles(client.get("/api/items?q=radiohead", headers=headers)) == ["Kid A"]
+    assert titles(client.get("/api/items?q=joni", headers=headers)) == ["Blue"]
+
+
+def test_search_matches_a_director_or_developer(client):
+    """The same creator field for every other type, so the search box can
+    honestly claim to cover the people behind an item."""
+    headers = auth_headers(client)
+    create_item(client, headers, type="movie", title="Arrival",
+                metadata={"director": "Denis Villeneuve"})
+    create_item(client, headers, type="game", title="Hollow Knight",
+                metadata={"developer": "Team Cherry"})
+    assert titles(client.get("/api/items?q=villeneuve", headers=headers)) == ["Arrival"]
+    assert titles(client.get("/api/items?q=team cherry", headers=headers)) == ["Hollow Knight"]
+
+
+def test_creator_matches_rank_between_titles_and_descriptions(client):
+    """A search for a name wants that person's work first, then passing
+    mentions — and never below them just because it was added earlier."""
+    headers = auth_headers(client)
+    # Created oldest-first, so the default "recently added" sort would
+    # return this list reversed if the tiers weren't applied.
+    create_item(client, headers, type="book", title="Gibson: A Life", metadata={})
+    create_item(client, headers, type="book", title="Neuromancer",
+                metadata={"authors": ["William Gibson"]})
+    create_item(client, headers, type="book", title="Cyberpunk Reader",
+                metadata={"description": "Essays on Gibson and his imitators."})
+    assert titles(client.get("/api/items?q=gibson", headers=headers)) == [
+        "Gibson: A Life",
+        "Neuromancer",
+        "Cyberpunk Reader",
+    ]
+
+
+def test_creator_search_is_not_confused_by_other_metadata(client):
+    """Only creator fields — a label or publisher named like the query must
+    not be dragged in by a blanket metadata match."""
+    headers = auth_headers(client)
+    create_item(client, headers, type="music", title="Kid A",
+                metadata={"artist": "Radiohead", "label": "Parlophone"})
+    assert titles(client.get("/api/items?q=parlophone", headers=headers)) == []
+
+
 def test_sort_title_asc(client):
     headers = auth_headers(client)
     seed_collection(client, headers)

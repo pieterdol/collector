@@ -118,6 +118,19 @@ def list_platforms(
     return {"platforms": list(rows)}
 
 
+#: Metadata fields naming whoever made the thing — one per type, all
+#: searched together (see list_items). `authors` is a JSONB list; `->>` on
+#: it yields the array's JSON text, which a substring match reads fine.
+CREATOR_FIELDS = ("authors", "artist", "director", "developer")
+#: Synopsis fields: matched too, but ranked below title and creator hits.
+DESCRIPTION_FIELDS = ("description", "overview")
+
+
+def _meta_match(fields: tuple[str, ...], q: str):
+    """OR of substring matches across the given metadata fields."""
+    return or_(*[Item.meta[field].astext.ilike(f"%{q}%") for field in fields])
+
+
 @router.get("", response_model=ItemListOut)
 def list_items(
     db: Session = Depends(get_db),
@@ -156,20 +169,19 @@ def list_items(
                 Item.id.in_(select(ItemSeason.item_id).where(ItemSeason.media == media)),
             )
         )
-    # Searching also reaches the synopsis ("Batman" should find The Dark
-    # Knight), but title matches always outrank description-only ones.
+    # Searching reaches three layers, in this order of interest: the title,
+    # the people behind the item, then the synopsis ("Batman" should find
+    # The Dark Knight). Creator fields are named per type but searched
+    # together, so one box covers authors, artists, directors and studios.
     title_match = or_(
         Item.title.ilike(f"%{q}%"),
         text("title_tsv @@ plainto_tsquery('simple', :q)").bindparams(q=q),
     ) if q else None
+    creator_match = _meta_match(CREATOR_FIELDS, q) if q else None
     if q:
-        description_match = or_(
-            *[
-                Item.meta[field].astext.ilike(f"%{q}%")
-                for field in ("description", "overview")
-            ]
+        query = query.where(
+            or_(title_match, creator_match, _meta_match(DESCRIPTION_FIELDS, q))
         )
-        query = query.where(or_(title_match, description_match))
     release = Item.meta["release_date"].astext
     if upcoming:
         # Release dates are ISO strings, full ("2026-12-18") or partial
@@ -196,7 +208,7 @@ def list_items(
     if q:
         # Tier before the chosen sort, so "sort by title" still lists the
         # title matches first.
-        ordering.insert(0, case((title_match, 0), else_=1))
+        ordering.insert(0, case((title_match, 0), (creator_match, 1), else_=2))
     items = db.scalars(query.order_by(*ordering).limit(limit).offset(offset)).all()
     return ItemListOut(items=[ItemOut.model_validate(i) for i in items], total=total)
 

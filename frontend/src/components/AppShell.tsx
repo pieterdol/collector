@@ -5,6 +5,7 @@ import { NavLink, Outlet, useLocation, useNavigate, useSearchParams } from "reac
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../lib/auth";
 import { useTheme } from "../theme/useTheme";
+import { SearchBox } from "./SearchBox";
 import {
   CalendarIcon,
   ChartIcon,
@@ -15,7 +16,6 @@ import {
   MoonIcon,
   PlusIcon,
   RowsIcon,
-  SearchIcon,
   SunIcon,
 } from "./icons";
 
@@ -255,40 +255,6 @@ function PageHeader() {
         </button>
       </div>
     </header>
-  );
-}
-
-/** Search box bound to the ?q= URL param (library + wishlist). */
-function SearchBox() {
-  const [params, setParams] = useSearchParams();
-  const [value, setValue] = useState(params.get("q") ?? "");
-
-  useEffect(() => setValue(params.get("q") ?? ""), [params]);
-
-  useEffect(() => {
-    const handle = setTimeout(() => {
-      const current = params.get("q") ?? "";
-      if (value === current) return;
-      const next = new URLSearchParams(params);
-      if (value) next.set("q", value);
-      else next.delete("q");
-      setParams(next, { replace: true });
-    }, 250);
-    return () => clearTimeout(handle);
-  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  return (
-    <div className="relative min-w-[220px] flex-1 max-w-[420px] max-[820px]:order-last max-[820px]:max-w-none max-[820px]:basis-full">
-      <SearchIcon size={13} className="absolute left-3.5 top-1/2 -translate-y-1/2 opacity-50" />
-      <input
-        type="search"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder="Search titles, authors, directors…"
-        className="input w-full"
-        style={{ paddingLeft: 36 }}
-      />
-    </div>
   );
 }
 

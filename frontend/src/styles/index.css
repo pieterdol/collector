@@ -318,6 +318,11 @@ body {
 .input:focus {
   border-color: var(--accent);
 }
+/* Inputs that render their own clear button (see SearchBox): hide WebKit's,
+   or the field shows two crosses. */
+.input-clearable::-webkit-search-cancel-button {
+  display: none;
+}
 
 /* Section heading inside panels */
 .paneltitle {
