@@ -1,6 +1,7 @@
 /** TanStack Query hooks — every server interaction goes through here. */
 
 import {
+  keepPreviousData,
   useInfiniteQuery,
   useMutation,
   useQuery,
@@ -268,6 +269,10 @@ export function useEnrichSearch(type: ItemType, q: string, platform = "") {
     queryFn: () => api<EnrichSearch>("/api/enrich/search", { params: { type, q, platform } }),
     enabled: q.trim().length >= 2,
     staleTime: 5 * 60 * 1000,
+    // Hold the previous term's results while the next one loads. Blanking
+    // the list on every fired search reads as a broken debounce, and IGDB
+    // is slow enough (token + search) for the gap to be very visible.
+    placeholderData: keepPreviousData,
   });
 }
 

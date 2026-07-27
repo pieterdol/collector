@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import AddItem from "../pages/AddItem";
@@ -99,6 +99,41 @@ describe("AddItem search debounce", () => {
     expect(searchCalls()[0]).toContain("q=dune");
   });
 
+  it("debounces the game search too", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: /game/i }));
+    const input = await screen.findByPlaceholderText(/Search IGDB/);
+
+    vi.useFakeTimers();
+    for (const q of ["se", "sek", "seki", "sekiro"]) {
+      fireEvent.change(input, { target: { value: q } });
+      await act(() => vi.advanceTimersByTimeAsync(100));
+    }
+    await act(() => vi.advanceTimersByTimeAsync(1000));
+    vi.useRealTimers();
+
+    expect(searchCalls()).toHaveLength(1);
+    expect(searchCalls()[0]).toContain("q=sekiro");
+  });
+
+  it("does not fire on the pauses of an ordinary typing speed", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: /game/i }));
+    const input = await screen.findByPlaceholderText(/Search IGDB/);
+
+    vi.useFakeTimers();
+    for (const q of ["se", "sek", "seki", "sekiro"]) {
+      fireEvent.change(input, { target: { value: q } });
+      // A hunt-and-peck 350ms between keys — that's still one search, not four.
+      await act(() => vi.advanceTimersByTimeAsync(350));
+    }
+    await act(() => vi.advanceTimersByTimeAsync(1000));
+    vi.useRealTimers();
+
+    expect(searchCalls()).toHaveLength(1);
+    expect(searchCalls()[0]).toContain("q=sekiro");
+  });
+
   it("does not search queries shorter than two characters", async () => {
     renderPage();
     const input = await screen.findByPlaceholderText(/Search Open Library/);
@@ -109,6 +144,67 @@ describe("AddItem search debounce", () => {
     vi.useRealTimers();
 
     expect(searchCalls()).toHaveLength(0);
+  });
+});
+
+describe("retyping a search", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  /** Like mockFetch, but the follow-up term's request never resolves. */
+  function mockSlowSecondSearch() {
+    const json = (body: unknown) =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        json: () => Promise.resolve(body),
+      } as Response);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("/api/enrich/providers")) {
+          return json({ providers: [{ name: "igdb", type: "game", available: true }] });
+        }
+        if (url.includes("/api/platforms")) return json({ platforms: [] });
+        if (url.includes("q=Sekiro+2")) return new Promise<Response>(() => {}); // in flight
+        return json({ provider: "igdb", available: true, results: [SEKIRO] });
+      }),
+    );
+  }
+
+  it("keeps the results on screen while the next term is still loading", async () => {
+    mockSlowSecondSearch();
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: /game/i }));
+    const input = await screen.findByPlaceholderText(/Search IGDB/);
+    fireEvent.change(input, { target: { value: "Sekiro" } });
+    await screen.findByText("Sekiro: Shadows Die Twice");
+
+    fireEvent.change(input, { target: { value: "Sekiro 2" } });
+    await waitFor(() =>
+      expect(searchCalls().some((url) => url.includes("q=Sekiro+2"))).toBe(true),
+    );
+
+    // The list must not blank out between terms — that reads as a broken search.
+    expect(screen.getByText("Sekiro: Shadows Die Twice")).toBeInTheDocument();
+  });
+
+  it("drops the results when the box is cleared", async () => {
+    mockSlowSecondSearch();
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: /game/i }));
+    const input = await screen.findByPlaceholderText(/Search IGDB/);
+    fireEvent.change(input, { target: { value: "Sekiro" } });
+    await screen.findByText("Sekiro: Shadows Die Twice");
+
+    fireEvent.change(input, { target: { value: "" } });
+    await waitFor(() =>
+      expect(screen.queryByText("Sekiro: Shadows Die Twice")).toBeNull(),
+    );
   });
 });
 

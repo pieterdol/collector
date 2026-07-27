@@ -24,6 +24,10 @@ const PROVIDER_LABEL: Record<ItemType, string> = {
 
 type Mode = "search" | "scan" | "manual";
 
+// Long enough that the pauses in ordinary typing don't each fire a search
+// (300ms did, which made the search feel like it ran on every keystroke).
+const SEARCH_DEBOUNCE_MS = 450;
+
 const STOREFRONTS = [
   "Steam",
   "Epic Games Store",
@@ -202,7 +206,7 @@ function SearchMode({
   // useEffect, not useMemo: only effects run their cleanup, and the cleanup
   // is what cancels the previous keystroke's timer (the actual debounce).
   useEffect(() => {
-    const t = setTimeout(() => setDebounced(query), 300);
+    const t = setTimeout(() => setDebounced(query), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(t);
   }, [query]);
   const isGame = type === "game";
@@ -214,6 +218,13 @@ function SearchMode({
   );
   const search = useEnrichSearch(type, debounced, narrowed ? platform : "");
   const details = useEnrichDetails();
+  // A cleared box keeps no results: the query is disabled then, and the
+  // held-over placeholder data would otherwise linger on screen.
+  const ready = debounced.trim().length >= 2;
+  const results = ready ? (search.data?.results ?? []) : [];
+  // True while the newly typed term loads and `results` still belongs to
+  // the previous one — dim the list, don't tear it down.
+  const stale = search.isPlaceholderData || search.isFetching;
 
   function pick(result: EnrichResult) {
     // Movies and TV get a richer record (director/creator, runtime) on selection.
@@ -272,14 +283,16 @@ function SearchMode({
           </select>
         )}
       </div>
-      <div className="mt-3.5 flex flex-col gap-2">
-        {search.isLoading && debounced.length >= 2 && (
-          <div className="skeleton h-[74px] rounded-xl" />
-        )}
-        {(search.data?.results ?? []).map((result, index) => (
+      <div
+        className={`mt-3.5 flex flex-col gap-2 transition-opacity ${
+          stale && results.length > 0 ? "opacity-55" : ""
+        }`}
+      >
+        {ready && stale && results.length === 0 && <div className="skeleton h-[74px] rounded-xl" />}
+        {results.map((result, index) => (
           <ResultRow key={index} result={result} onPick={() => pick(result)} busy={details.isPending} />
         ))}
-        {search.data && search.data.results.length === 0 && debounced.length >= 2 && (
+        {ready && !stale && results.length === 0 && (
           <p className="px-1 py-2 text-sm text-muted">
             {narrowed
               ? `Nothing found for “${debounced}” on ${platform} — try another spelling, widen to All platforms, or add it manually.`
