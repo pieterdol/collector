@@ -24,8 +24,9 @@ import {
   useUpdateItem,
   useUploadCover,
 } from "../lib/queries";
+import { musicTracks } from "../lib/music";
 import type { Item, ItemStatus } from "../lib/types";
-import { MOVIE_MEDIA } from "../lib/types";
+import { mediaOptions } from "../lib/types";
 import { STATUS_LABEL, progressUnit } from "../lib/types";
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -33,7 +34,18 @@ const SOURCE_LABEL: Record<string, string> = {
   movie: "TMDB",
   tv: "TMDB",
   game: "Steam Store / IGDB",
+  music: "MusicBrainz / Discogs",
 };
+
+/** Which catalog this item's metadata actually came from. Music can come
+ * from either of two, and the stored ids say which. */
+function sourceLabel(item: Item): string {
+  if (item.type === "music") {
+    if (item.metadata.discogs_release_id) return "Discogs";
+    if (item.metadata.mb_release_id) return "MusicBrainz";
+  }
+  return SOURCE_LABEL[item.type];
+}
 
 export default function ItemDetail() {
   const { id } = useParams();
@@ -79,7 +91,10 @@ function Detail({ item }: { item: Item }) {
   const artwork = useFetchArtwork(item.id);
   const attempted = useRef(false);
   useEffect(() => {
-    if (attempted.current || meta.artwork_fetched || item.type === "book") return;
+    // Books and records are cover-only: neither catalog carries key art or
+    // screenshots, so there is nothing to go and fetch.
+    if (attempted.current || meta.artwork_fetched || item.type === "book" || item.type === "music")
+      return;
     attempted.current = true;
     artwork.mutate();
   }, [item.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -162,7 +177,7 @@ function Detail({ item }: { item: Item }) {
               <div className="paneltitle">About</div>
               <p className="m-0 text-[13.5px] leading-[1.65] text-body">{description}</p>
               <div className="font-mono text-[11.5px] text-dim">
-                Metadata via {SOURCE_LABEL[item.type]}
+                Metadata via {sourceLabel(item)}
               </div>
             </div>
           )}
@@ -187,6 +202,7 @@ function Detail({ item }: { item: Item }) {
           )}
 
           {item.type === "tv" && <SeasonsPanel itemId={item.id} />}
+          {item.type === "music" && <TracklistPanel item={item} />}
           <ReviewPanel item={item} />
           <ActivityPanel itemId={item.id} unit={progressUnit(item.type)} />
         </div>
@@ -448,6 +464,37 @@ function ProgressPanel({ item }: { item: Item }) {
   );
 }
 
+/** Read-only tracklist, as the catalog recorded it. Vinyl positions keep
+ * their side labels ("A1"), which is how the sleeve reads. */
+function TracklistPanel({ item }: { item: Item }) {
+  const tracks = musicTracks(item.metadata);
+  if (tracks.length === 0) return null;
+  return (
+    <div className="panel flex flex-col gap-2 p-5">
+      <div className="flex items-baseline gap-2">
+        <span className="paneltitle">Tracklist</span>
+        <span className="text-xs text-faint">
+          {tracks.length} track{tracks.length === 1 ? "" : "s"}
+        </span>
+      </div>
+      <ol className="m-0 flex list-none flex-col gap-0 p-0">
+        {tracks.map((track, index) => (
+          <li
+            key={`${track.position}-${index}`}
+            className="grid grid-cols-[34px_1fr_auto] items-baseline gap-3 border-b border-line/60 py-1.5 text-[13px] last:border-b-0"
+          >
+            <span className="font-mono text-[11.5px] text-faint">{track.position}</span>
+            <span className="min-w-0 text-body">{track.title}</span>
+            <span className="font-mono text-[11.5px] tabular-nums text-dim">
+              {track.length ?? ""}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 function ReviewPanel({ item }: { item: Item }) {
   const update = useUpdateItem(item.id);
   const [review, setReview] = useState(item.review ?? "");
@@ -611,6 +658,7 @@ function DetailsPanel({ item }: { item: Item }) {
   const meta = item.metadata;
   const rows: Array<[string, React.ReactNode]> = [];
   if (Array.isArray(meta.authors) && meta.authors.length) rows.push(["Author", meta.authors.join(", ")]);
+  if (typeof meta.artist === "string") rows.push(["Artist", meta.artist]);
   if (typeof meta.director === "string")
     rows.push([item.type === "tv" ? "Creator" : "Director", meta.director]);
   if (typeof meta.developer === "string") rows.push(["Developer", meta.developer]);
@@ -625,6 +673,14 @@ function DetailsPanel({ item }: { item: Item }) {
       </Link>,
     ]);
   if (typeof meta.publisher === "string") rows.push(["Publisher", meta.publisher]);
+  // A record is identified by its pressing, not just its title.
+  if (typeof meta.label === "string") rows.push(["Label", meta.label]);
+  if (typeof meta.catalog_number === "string")
+    rows.push(["Catalogue number", <span className="font-mono">{meta.catalog_number}</span>]);
+  if (typeof meta.release_type === "string") rows.push(["Release", meta.release_type]);
+  if (item.type === "music" && typeof meta.country === "string")
+    rows.push(["Pressed in", meta.country]);
+  if (item.type === "music" && meta.track_count) rows.push(["Tracks", String(meta.track_count)]);
   const releaseDate = typeof meta.release_date === "string" ? meta.release_date : "";
   if (meta.year && !releaseDate) rows.push(["Year", String(meta.year)]);
   if (meta.page_count) rows.push(["Pages", String(meta.page_count)]);
@@ -638,7 +694,8 @@ function DetailsPanel({ item }: { item: Item }) {
   if ((item.type === "movie" || item.type === "tv") && typeof meta.tmdb_rating === "number")
     rows.push(["TMDB rating", `${meta.tmdb_rating.toFixed(1)} / 10`]);
   if (typeof meta.isbn === "string") rows.push(["ISBN", meta.isbn]);
-  if (typeof meta.upc === "string") rows.push(["Barcode", meta.upc]);
+  const barcode = typeof meta.upc === "string" ? meta.upc : meta.barcode;
+  if (typeof barcode === "string") rows.push(["Barcode", <span className="font-mono">{barcode}</span>]);
   if (item.format) rows.push(["Format", item.format]);
   if (item.purchase_price)
     rows.push(["Paid", `${currencySymbol(item.currency)} ${Number(item.purchase_price).toFixed(2)}`]);
@@ -647,11 +704,14 @@ function DetailsPanel({ item }: { item: Item }) {
     formatDate(item.created_at),
   ]);
 
-  // Game/movie release dates come from the provider and are facts — only
-  // editable while still unknown. Books/TV vary by edition, so they stay open.
+  // Game/movie/record release dates come from the provider and are facts —
+  // only editable while still unknown (a music release date belongs to the
+  // pressing, so re-linking is the way to change it). Books/TV vary by
+  // edition, so they stay open.
   const lockedRelease =
-    (item.type === "game" || item.type === "movie") && Boolean(releaseDate);
-  const showMedia = (item.type === "movie" || item.type === "tv") && item.format === "physical";
+    (item.type === "game" || item.type === "movie" || item.type === "music") &&
+    Boolean(releaseDate);
+  const showMedia = mediaOptions(item.type).length > 0 && item.format === "physical";
   const showStorefront = item.type === "game" && item.format === "digital";
   const media = typeof meta.media === "string" ? meta.media : "";
   const storefront = typeof meta.storefront === "string" ? meta.storefront : "";
@@ -663,7 +723,7 @@ function DetailsPanel({ item }: { item: Item }) {
         <MetaSelectRow
           label="Media"
           value={media}
-          options={MOVIE_MEDIA}
+          options={mediaOptions(item.type)}
           onChange={(value) => update.mutate({ metadata: { ...meta, media: value || undefined } })}
         />
       )}
@@ -751,7 +811,7 @@ function RelinkDialog({ item, onClose }: { item: Item; onClose: () => void }) {
       >
         <div className="paneltitle">Re-link metadata</div>
         <p className="m-0 text-xs text-faint">
-          Pick the matching {SOURCE_LABEL[item.type]} entry. Import info, playtime and your
+          Pick the matching {sourceLabel(item)} entry. Import info, playtime and your
           title are kept; description, cover and artwork come from the new match.
         </p>
         <input
@@ -782,7 +842,13 @@ function RelinkDialog({ item, onClose }: { item: Item; onClose: () => void }) {
               <span className="flex min-w-0 flex-col">
                 <span className="truncate text-[13px] font-semibold">{result.title}</span>
                 <span className="truncate text-xs text-faint">
-                  {[result.metadata.developer, result.metadata.year]
+                  {[
+                    result.metadata.developer,
+                    result.metadata.artist,
+                    result.metadata.year,
+                    result.metadata.media,
+                    result.metadata.label,
+                  ]
                     .filter(Boolean)
                     .join(" · ")}
                 </span>

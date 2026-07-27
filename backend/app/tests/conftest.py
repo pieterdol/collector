@@ -21,7 +21,13 @@ os.environ.setdefault("MEDIA_DIR", "/tmp/collector-test-media")
 # The suite assumes a credential-free baseline (so `docker compose exec
 # backend pytest` works even when the container has real keys); tests that
 # need credentials set them via monkeypatch + get_settings.cache_clear().
-for _key in ("TMDB_API_KEY", "TWITCH_CLIENT_ID", "TWITCH_CLIENT_SECRET", "STEAM_API_KEY"):
+for _key in (
+    "TMDB_API_KEY",
+    "TWITCH_CLIENT_ID",
+    "TWITCH_CLIENT_SECRET",
+    "STEAM_API_KEY",
+    "DISCOGS_TOKEN",
+):
     os.environ.pop(_key, None)
 
 
@@ -64,6 +70,16 @@ def _reset_igdb_token():
 
     igdb._token["value"] = None
     igdb._token["expires"] = 0.0
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _reset_musicbrainz_throttle():
+    """Forget the last MusicBrainz call, so its 1 req/s throttle never makes
+    the suite sleep between tests."""
+    from app.providers import musicbrainz
+
+    musicbrainz._last_call["at"] = 0.0
     yield
 
 

@@ -29,6 +29,7 @@ def stats(db: Session = Depends(get_db), user: User = Depends(get_current_user))
             "movie": _movie_tile(db, user),
             "tv": _tv_tile(db, user),
             "game": _game_tile(db, user),
+            "music": _music_tile(db, user),
             "value": _value_tile(db, user),
         },
         "continue": _continue_list(db, user),
@@ -97,6 +98,20 @@ def _game_tile(db, user) -> dict:
         ).where(Item.user_id == user.id, Item.type == ItemType.GAME.value),
     )
     return {"total": row[0], "via_steam": row[1], "hours_played": float(row[2])}
+
+
+def _music_tile(db, user) -> dict:
+    """Carrier split, not format split: a record collection is read by what
+    it sits on (vinyl vs CD), and every vinyl size shares the "Vinyl" prefix."""
+    row = _one(
+        db,
+        select(
+            func.count(),
+            func.count().filter(text("metadata->>'media' LIKE 'Vinyl%'")),
+            func.count().filter(text("metadata->>'media' = 'CD'")),
+        ).where(Item.user_id == user.id, Item.type == ItemType.MUSIC.value),
+    )
+    return {"total": row[0], "vinyl": row[1], "cd": row[2]}
 
 
 def _value_tile(db, user) -> dict:
@@ -194,7 +209,13 @@ def _subtitle(item: Item) -> str:
     meta = item.meta
     if item.type == ItemType.BOOK.value and meta.get("authors"):
         return str(meta["authors"][0])
-    return str(item.platform or meta.get("director") or meta.get("developer") or "")
+    return str(
+        item.platform
+        or meta.get("director")
+        or meta.get("developer")
+        or meta.get("artist")
+        or ""
+    )
 
 
 def _num(value) -> float | None:

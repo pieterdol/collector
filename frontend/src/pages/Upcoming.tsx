@@ -15,6 +15,7 @@ const TYPE_CHIPS = [
   { value: "movie", label: "Movies" },
   { value: "tv", label: "TV" },
   { value: "game", label: "Games" },
+  { value: "music", label: "Music" },
 ];
 
 export default function Upcoming() {

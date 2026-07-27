@@ -27,6 +27,7 @@ services:
       TWITCH_CLIENT_ID: ${TWITCH_CLIENT_ID:-}
       TWITCH_CLIENT_SECRET: ${TWITCH_CLIENT_SECRET:-}
       STEAM_API_KEY: ${STEAM_API_KEY:-}
+      DISCOGS_TOKEN: ${DISCOGS_TOKEN:-}
     volumes:
       - media:/data/media
     depends_on:

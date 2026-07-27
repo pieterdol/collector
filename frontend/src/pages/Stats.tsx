@@ -19,7 +19,7 @@ export default function StatsPage() {
     );
   }
 
-  const { book, movie, tv, game, value } = data.tiles;
+  const { book, movie, tv, game, music, value } = data.tiles;
   const symbol = value.currency === "EUR" ? "€" : value.currency === "USD" ? "$" : value.currency;
 
   return (
@@ -48,6 +48,12 @@ export default function StatsPage() {
           label="Games"
           number={game.total}
           sub={`${game.via_steam} via Steam · ${formatHours(game.hours_played)} played`}
+        />
+        <Tile
+          dot="var(--music)"
+          label="Music"
+          number={music.total}
+          sub={`${music.vinyl} vinyl · ${music.cd} CD`}
         />
         <Tile
           dot="var(--nav-dot)"

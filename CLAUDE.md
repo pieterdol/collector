@@ -52,7 +52,12 @@ docker compose exec backend alembic revision --autogenerate -m "..."
   (`app/providers/cache.py`); images are downloaded once into the media
   volume (`core/covers.py`, `core/artwork.py`) — never hotlink.
 - **Metadata providers** implement `app/providers/base.py` and are
-  registered in `app/providers/__init__.py`.
+  registered in `app/providers/__init__.py`. One type may be served by two
+  catalogs: `providers/music.py` fronts MusicBrainz (keyless default) and
+  Discogs (`DISCOGS_TOKEN`), which is why music `external_id`s are
+  namespaced (`mb:<uuid>` / `discogs:<id>`) — `details`/relink route on that
+  prefix, never on what happens to be configured. Both mappers must emit
+  the same metadata keys.
 - **Platforms are records** (`platforms` table, synced once from IGDB);
   games link via `items.platform_id`. Link by name through
   `core/platforms.find_or_create_platform` — never write bare strings only.

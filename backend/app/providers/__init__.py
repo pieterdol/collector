@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.domain.enums import ItemType
 from app.providers.base import MetadataProvider, MetadataResult
 from app.providers.igdb import IgdbProvider
+from app.providers.music import MusicProvider
 from app.providers.openlibrary import OpenLibraryProvider
 from app.providers.tmdb import TmdbProvider
 
@@ -13,6 +14,8 @@ _REGISTRY: dict[ItemType, type[MetadataProvider]] = {
     ItemType.MOVIE: TmdbProvider,
     ItemType.TV: TmdbProvider,
     ItemType.GAME: IgdbProvider,
+    # Discogs or MusicBrainz, depending on what's configured.
+    ItemType.MUSIC: MusicProvider,
 }
 
 

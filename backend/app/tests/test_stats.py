@@ -64,6 +64,21 @@ def test_tv_tile_counts_formats(client):
     assert body["tiles"]["tv"] == {"total": 2, "physical": 1, "digital": 1}
 
 
+def test_music_tile_counts_carriers(client):
+    """Vinyl vs CD is the split a record collection is actually read by."""
+    headers = auth_headers(client)
+    create_item(client, headers, type="music", title="Kid A", format="physical",
+                metadata={"artist": "Radiohead", "media": 'Vinyl 12"'})
+    create_item(client, headers, type="music", title="OK Computer", format="physical",
+                metadata={"artist": "Radiohead", "media": "Vinyl LP"})
+    create_item(client, headers, type="music", title="Amnesiac", format="physical",
+                metadata={"artist": "Radiohead", "media": "CD"})
+    create_item(client, headers, type="music", title="In Rainbows", format="digital",
+                metadata={"artist": "Radiohead"})
+    body = client.get("/api/stats", headers=headers).json()
+    assert body["tiles"]["music"] == {"total": 4, "vinyl": 2, "cd": 1}
+
+
 def test_stats_continue_lists_in_progress_items(client):
     headers = auth_headers(client)
     seed_stats_data(client, headers)

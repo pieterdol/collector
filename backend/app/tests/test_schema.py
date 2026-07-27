@@ -61,6 +61,18 @@ def test_type_check_constraint_rejects_unknown_type(db):
         make_item(db, user, type="vinyl")
 
 
+def test_music_items_pass_the_type_check(db):
+    user = make_user(db)
+    item = make_item(
+        db,
+        user,
+        type="music",
+        title="Kid A",
+        meta={"artist": "Radiohead", "media": 'Vinyl 12"'},
+    )
+    assert db.get(Item, item.id).meta["artist"] == "Radiohead"
+
+
 def test_status_check_constraint_rejects_unknown_status(db):
     user = make_user(db)
     with pytest.raises(IntegrityError):
@@ -181,7 +193,7 @@ def test_migration_produces_schema(tmp_path):
             assert t in tables, f"missing table {t}"
         # Every ItemType must survive a real migration chain, not just
         # create_all — the CHECK is what the live DB enforces.
-        for value in ["book", "movie", "tv", "game"]:
+        for value in ["book", "movie", "tv", "game", "music"]:
             assert f"'{value}'" in type_check, f"{value} missing from {type_check}"
     finally:
         with admin.connect() as conn:

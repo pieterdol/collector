@@ -14,6 +14,7 @@ class ItemType(StrEnum):
     MOVIE = "movie"
     TV = "tv"
     GAME = "game"
+    MUSIC = "music"
 
 
 class ItemFormat(StrEnum):
@@ -43,6 +44,23 @@ class DiscMedia(StrEnum):
     BLU_RAY = "Blu-ray"
     UHD_BLU_RAY = "Ultra HD Blu-ray"
     VHS = "VHS"
+
+
+class MusicMedia(StrEnum):
+    """Carrier a physical release came on; mirrors MUSIC_MEDIA in types.ts.
+
+    Vinyl sizes stay separate because that is the distinction a record
+    collector actually files by (an LP and a 7" single are not the same
+    shelf). Providers report free-form format strings — normalize with
+    `providers/formats.py` before storing.
+    """
+
+    VINYL_LP = "Vinyl LP"
+    VINYL_12 = 'Vinyl 12"'
+    VINYL_10 = 'Vinyl 10"'
+    VINYL_7 = 'Vinyl 7"'
+    CD = "CD"
+    CASSETTE = "Cassette"
 
 
 class EventType(StrEnum):

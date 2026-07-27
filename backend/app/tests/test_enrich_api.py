@@ -6,6 +6,7 @@ from app.config import get_settings
 from app.db import SessionLocal
 from app.models import Platform
 from app.tests.helpers import auth_headers
+from app.tests.test_music_providers import KID_A_SEARCH
 from app.tests.test_providers import OPENLIB_SEARCH
 
 
@@ -104,13 +105,41 @@ def test_barcode_isbn_returns_book_match(client):
     assert body["result"]["title"] == "Dune"
 
 
-def test_barcode_upc_is_captured_but_unmatched(client):
-    headers = auth_headers(client)
-    res = client.get("/api/enrich/barcode?code=883929247318", headers=headers)
+@respx.mock
+def test_barcode_upc_matches_a_music_release(client):
+    """Sleeve barcodes are the one UPC family with a public catalog."""
+    respx.get("https://musicbrainz.org/ws/2/release").mock(
+        return_value=httpx.Response(200, json=KID_A_SEARCH)
+    )
+    res = client.get("/api/enrich/barcode?code=724352773824", headers=auth_headers(client))
+    body = res.json()
+    assert body["matched"] is True
+    assert body["kind"] == "upc"
+    assert body["result"]["title"] == "Kid A"
+    assert body["result"]["type"] == "music"
+
+
+@respx.mock
+def test_barcode_upc_without_a_music_match_is_captured_unmatched(client):
+    """Discs and game boxes have no public barcode catalog — store the code."""
+    respx.get("https://musicbrainz.org/ws/2/release").mock(
+        return_value=httpx.Response(200, json={"count": 0, "releases": []})
+    )
+    res = client.get("/api/enrich/barcode?code=883929247318", headers=auth_headers(client))
     body = res.json()
     assert body["matched"] is False
     assert body["kind"] == "upc"
     assert body["code"] == "883929247318"
+
+
+@respx.mock
+def test_barcode_upc_survives_a_provider_outage(client):
+    respx.get("https://musicbrainz.org/ws/2/release").mock(
+        return_value=httpx.Response(503)
+    )
+    res = client.get("/api/enrich/barcode?code=883929247318", headers=auth_headers(client))
+    assert res.status_code == 200
+    assert res.json()["matched"] is False
 
 
 def test_providers_status_lists_all(client):
@@ -121,3 +150,6 @@ def test_providers_status_lists_all(client):
     assert body["movie"]["available"] is False
     assert body["tv"]["available"] is False  # TMDB, reported distinctly from movies
     assert body["game"]["available"] is False
+    # MusicBrainz needs no key either, so music search works out of the box.
+    assert body["music"]["available"] is True
+    assert body["music"]["name"] == "musicbrainz"

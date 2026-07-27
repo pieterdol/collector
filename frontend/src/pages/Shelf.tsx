@@ -15,7 +15,7 @@ import {
   useStats,
   useUpdateItem,
 } from "../lib/queries";
-import { MOVIE_MEDIA } from "../lib/types";
+import { mediaOptions } from "../lib/types";
 
 const TYPE_CHIPS = [
   { value: "", label: "All" },
@@ -23,6 +23,7 @@ const TYPE_CHIPS = [
   { value: "movie", label: "Movies" },
   { value: "tv", label: "TV" },
   { value: "game", label: "Games" },
+  { value: "music", label: "Music" },
 ];
 
 export default function Shelf() {
@@ -51,7 +52,9 @@ export default function Shelf() {
     if (value) next.set(key, value);
     else next.delete(key);
     if (key === "type" && value !== "game") next.delete("platform");
-    if (key === "type" && value !== "movie" && value !== "tv") next.delete("media");
+    // Carriers and disc formats don't overlap: a media filter only survives
+    // a type change if the new type actually offers it.
+    if (key === "type" && !mediaOptions(value).includes(media)) next.delete("media");
     setParams(next, { replace: true });
   }
 
@@ -104,7 +107,7 @@ export default function Shelf() {
               status={status}
               sort={sort}
               platformOptions={type === "game" ? (platforms.data?.platforms ?? []) : []}
-              showMedia={type === "movie" || type === "tv"}
+              mediaChoices={mediaOptions(type)}
               setParam={setParam}
             />
           </div>
@@ -151,7 +154,7 @@ export default function Shelf() {
             status={status}
             sort={sort}
             platformOptions={type === "game" ? (platforms.data?.platforms ?? []) : []}
-            showMedia={type === "movie" || type === "tv"}
+            mediaChoices={mediaOptions(type)}
             setParam={setParam}
             stacked
           />
@@ -166,7 +169,7 @@ export default function Shelf() {
           message={
             filtersActive
               ? "No items match these filters. Clear them, or add something new."
-              : "Add your first book, movie or game to get started."
+              : "Add your first book, record, movie or game to get started."
           }
           action={
             filtersActive ? (
@@ -207,7 +210,7 @@ function FilterSelects({
   status,
   sort,
   platformOptions,
-  showMedia,
+  mediaChoices,
   setParam,
   stacked = false,
 }: {
@@ -216,7 +219,8 @@ function FilterSelects({
   status: string;
   sort: string;
   platformOptions: string[];
-  showMedia: boolean;
+  /** Disc formats for films, carriers for records, nothing for the rest. */
+  mediaChoices: string[];
   setParam: (key: string, value: string) => void;
   stacked?: boolean;
 }) {
@@ -240,7 +244,7 @@ function FilterSelects({
           ))}
         </select>
       )}
-      {showMedia && (
+      {mediaChoices.length > 0 && (
         <select
           aria-label="Media"
           value={media}
@@ -248,7 +252,7 @@ function FilterSelects({
           className={cls}
         >
           <option value="">All media</option>
-          {MOVIE_MEDIA.map((m) => (
+          {mediaChoices.map((m) => (
             <option key={m} value={m}>
               {m}
             </option>

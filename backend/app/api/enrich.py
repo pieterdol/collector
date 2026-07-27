@@ -69,8 +69,10 @@ def barcode(
     db: Session = Depends(get_db),
     _user: User = Depends(get_current_user),
 ) -> BarcodeOut:
-    """ISBN → Open Library match. UPC/EAN (discs, game boxes) have no public
-    catalog: the code is returned for storage and the UI offers title search."""
+    """ISBN → Open Library; other UPC/EAN codes → the music catalogs, which
+    index sleeve barcodes. Discs and game boxes have no public barcode
+    catalog: their code is returned for storage and the UI offers title
+    search instead."""
     clean = code.replace("-", "").replace(" ", "")
     if _is_isbn(clean):
         result = get_provider(ItemType.BOOK, db).lookup_barcode(clean)
@@ -80,7 +82,13 @@ def barcode(
             matched=result is not None,
             result=result.as_dict() if result else None,
         )
-    return BarcodeOut(code=clean, kind="upc", matched=False)
+    music = get_provider(ItemType.MUSIC, db).lookup_barcode(clean)
+    return BarcodeOut(
+        code=clean,
+        kind="upc",
+        matched=music is not None,
+        result=music.as_dict() if music else None,
+    )
 
 
 @router.get("/providers", response_model=ProvidersOut)

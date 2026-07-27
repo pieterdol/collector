@@ -1,5 +1,5 @@
 /** Mirrors backend/app/domain/enums.py — keep in sync when adding values. */
-export type ItemType = "book" | "movie" | "tv" | "game";
+export type ItemType = "book" | "movie" | "tv" | "game" | "music";
 export type ItemFormat = "physical" | "digital";
 export type ItemStatus = "wishlist" | "backlog" | "in_progress" | "completed" | "abandoned";
 
@@ -141,6 +141,7 @@ export interface Stats {
     tv: { total: number; physical: number; digital: number };
     movie: { total: number; physical: number; digital: number };
     game: { total: number; via_steam: number; hours_played: number };
+    music: { total: number; vinyl: number; cd: number };
     value: { total: string; this_month: string; currency: string };
   };
   continue: Array<{
@@ -169,6 +170,7 @@ export const TYPE_LABEL: Record<ItemType, string> = {
   tv: "TV",
   movie: "Movie",
   game: "Game",
+  music: "Music",
 };
 
 export const STATUS_LABEL: Record<ItemStatus, string> = {
@@ -182,6 +184,23 @@ export const STATUS_LABEL: Record<ItemStatus, string> = {
 /** Disc formats a physical movie or TV season can be stored on
  * (metadata.media / item_seasons.media — mirrors DiscMedia in enums.py). */
 export const MOVIE_MEDIA = ["DVD", "Blu-ray", "Ultra HD Blu-ray", "VHS"];
+
+/** Carriers a physical record can be stored on (metadata.media — mirrors
+ * MusicMedia in enums.py). Vinyl sizes stay separate: that's the
+ * distinction a collector files by. */
+export const MUSIC_MEDIA = [
+  "Vinyl LP",
+  'Vinyl 12"',
+  'Vinyl 10"',
+  'Vinyl 7"',
+  "CD",
+  "Cassette",
+];
+
+/** The media options for a type — records and discs don't mix. */
+export function mediaOptions(type: string): string[] {
+  return type === "music" ? MUSIC_MEDIA : type === "movie" || type === "tv" ? MOVIE_MEDIA : [];
+}
 
 /** Unit shown for progress, per medium. Movies don't track progress. */
 export function progressUnit(type: ItemType): string | null {

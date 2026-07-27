@@ -22,6 +22,7 @@
   --color-movie: var(--movie);
   --color-tv: var(--tv);
   --color-game: var(--game);
+  --color-music: var(--music);
 
   --font-sans: "IBM Plex Sans Variable", system-ui, sans-serif;
   --font-display: "Space Grotesk Variable", system-ui, sans-serif;

@@ -125,11 +125,34 @@ export function DiscBadge({
   return null;
 }
 
+/** Carrier badge for a physical record: what you'd say out loud pulling it
+ * off the shelf. Vinyl keeps its diameter, tape gets the shorter word. */
+const CARRIER_ABBR: Record<string, string> = {
+  "Vinyl LP": "LP",
+  'Vinyl 12"': '12"',
+  'Vinyl 10"': '10"',
+  'Vinyl 7"': '7"',
+  CD: "CD",
+  Cassette: "TAPE",
+};
+
 export function MediaBadge({ item }: { item: Item }) {
   if ((item.type === "movie" || item.type === "tv") && item.format === "physical") {
     const media = item.metadata.media;
     if (typeof media !== "string" || !media) return null;
     return <DiscBadge media={media} to={`/?type=${item.type}&media=${encodeURIComponent(media)}`} />;
+  }
+
+  if (item.type === "music" && item.format === "physical") {
+    const media = item.metadata.media;
+    if (typeof media !== "string") return null;
+    const abbr = CARRIER_ABBR[media];
+    if (!abbr) return null;
+    return (
+      <FilterBadge to={`/?type=music&media=${encodeURIComponent(media)}`} title={media}>
+        {abbr}
+      </FilterBadge>
+    );
   }
 
   if (item.type === "game" && item.platform) {

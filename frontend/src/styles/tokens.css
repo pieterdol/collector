@@ -35,6 +35,7 @@
   --movie: oklch(80% 0.12 350);
   --tv: oklch(80% 0.12 300);
   --game: oklch(80% 0.12 230);
+  --music: oklch(80% 0.12 190);
 
   --uhd: oklch(85% 0.16 95);
   --bluray: oklch(72% 0.13 250);
@@ -73,6 +74,7 @@
     --movie: oklch(58% 0.14 350);
     --tv: oklch(58% 0.12 300);
     --game: oklch(56% 0.12 230);
+    --music: oklch(56% 0.12 190);
 
     --uhd: oklch(58% 0.13 90);
     --bluray: oklch(48% 0.15 255);
@@ -112,6 +114,7 @@
   --movie: oklch(80% 0.12 350);
   --tv: oklch(80% 0.12 300);
   --game: oklch(80% 0.12 230);
+  --music: oklch(80% 0.12 190);
 
   --uhd: oklch(85% 0.16 95);
   --bluray: oklch(72% 0.13 250);
@@ -149,6 +152,7 @@
   --movie: oklch(58% 0.14 350);
   --tv: oklch(58% 0.12 300);
   --game: oklch(56% 0.12 230);
+  --music: oklch(56% 0.12 190);
 
   --uhd: oklch(58% 0.13 90);
   --bluray: oklch(48% 0.15 255);

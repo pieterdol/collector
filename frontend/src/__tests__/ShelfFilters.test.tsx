@@ -95,6 +95,28 @@ describe("Shelf mobile filter grouping", () => {
     await waitFor(() => expect(itemCalls().some((url) => url.includes("media=Blu-ray"))).toBe(true));
   });
 
+  it("offers Music as a type chip", async () => {
+    renderShelf("/");
+    fireEvent.click(await screen.findByRole("button", { name: "Music" }));
+    await waitFor(() => expect(itemCalls().some((url) => url.includes("type=music"))).toBe(true));
+  });
+
+  it("offers carrier options, not disc formats, for music", async () => {
+    renderShelf("/?type=music");
+    fireEvent.click(await screen.findByRole("button", { name: /^filters/i }));
+    const panel = screen.getByRole("group", { name: /filter options/i });
+    const media = within(panel).getByLabelText<HTMLSelectElement>("Media");
+    const options = [...media.options].map((o) => o.text);
+    expect(options).toContain("Vinyl LP");
+    expect(options).toContain("CD");
+    expect(options).not.toContain("Blu-ray");
+
+    fireEvent.change(media, { target: { value: "Vinyl LP" } });
+    await waitFor(() =>
+      expect(itemCalls().some((url) => url.includes("media=Vinyl+LP"))).toBe(true),
+    );
+  });
+
   it("filters from inside the panel refetch the list", async () => {
     renderShelf("/?type=game");
     fireEvent.click(await screen.findByRole("button", { name: /^filters/i }));

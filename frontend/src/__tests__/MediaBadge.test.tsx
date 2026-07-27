@@ -108,6 +108,40 @@ describe("MediaBadge — games", () => {
   });
 });
 
+describe("MediaBadge — music", () => {
+  function record(media?: string, format: Item["format"] = "physical"): Item {
+    return { ...base, type: "music", format, metadata: media ? { media } : {} };
+  }
+
+  it("abbreviates the carrier of a physical record", () => {
+    render(<MediaBadge item={record("Vinyl LP")} />);
+    expect(screen.getByTitle("Vinyl LP")).toHaveTextContent("LP");
+  });
+
+  it("keeps the diameter for singles and maxis", () => {
+    render(<MediaBadge item={record('Vinyl 7"')} />);
+    expect(screen.getByTitle('Vinyl 7"')).toHaveTextContent('7"');
+  });
+
+  it("badges CDs and cassettes", () => {
+    const { unmount } = render(<MediaBadge item={record("CD")} />);
+    expect(screen.getByTitle("CD")).toHaveTextContent("CD");
+    unmount();
+    render(<MediaBadge item={record("Cassette")} />);
+    expect(screen.getByTitle("Cassette")).toHaveTextContent("TAPE");
+  });
+
+  it("renders nothing for a digital album", () => {
+    const { container } = render(<MediaBadge item={record("CD", "digital")} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("renders nothing when the carrier is unknown", () => {
+    const { container } = render(<MediaBadge item={record(undefined)} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+});
+
 describe("MediaBadge — other types", () => {
   it("renders nothing for books", () => {
     const { container } = render(<MediaBadge item={{ ...base, type: "book" }} />);

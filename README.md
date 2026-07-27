@@ -1,8 +1,8 @@
 # Collector
 
-Self-hosted tracker for your books, movies, TV shows and games — one shelf
-for everything you own, play, read, watch and want. Built as an installable
-PWA with a FastAPI backend, React frontend and PostgreSQL.
+Self-hosted tracker for your books, records, movies, TV shows and games —
+one shelf for everything you own, play, read, watch and want. Built as an
+installable PWA with a FastAPI backend, React frontend and PostgreSQL.
 
 **Stack**: FastAPI · SQLAlchemy · Alembic · PostgreSQL (JSONB + full-text) ·
 React 19 · TypeScript · Vite · TanStack Query · Tailwind v4 · nginx.
@@ -26,15 +26,16 @@ docker compose exec backend python -m app.seed
 
 ## API keys (all optional)
 
-The app runs without any key: books use Open Library (keyless) and every
-type supports manual entry. Keys unlock movie/game search and Steam import.
-Put them in `.env`:
+The app runs without any key: books use Open Library and music uses
+MusicBrainz (both keyless), and every type supports manual entry. Keys
+unlock movie/game search and Steam import. Put them in `.env`:
 
 | Key | Unlocks | Where to get it |
 | --- | --- | --- |
 | `TMDB_API_KEY` | Movie & TV search + metadata | [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api) — free account, use the **v3 API key** |
 | `TWITCH_CLIENT_ID` + `TWITCH_CLIENT_SECRET` | Game search + artwork via IGDB | [dev.twitch.tv/console/apps](https://dev.twitch.tv/console/apps) — register an app (any redirect URL) |
 | `STEAM_API_KEY` | Steam library import | [steamcommunity.com/dev/apikey](https://steamcommunity.com/dev/apikey) — domain can be `localhost` |
+| `DISCOGS_TOKEN` | Deeper music search (Discogs instead of MusicBrainz) | [discogs.com/settings/developers](https://www.discogs.com/settings/developers) — "Generate new token" |
 | `JWT_SECRET` | Session token signing | `openssl rand -hex 32` — **set this in production** |
 
 The Epic, GOG and PlayStation imports need no keys: Epic/GOG read a Heroic
@@ -118,8 +119,8 @@ browser ──:8080──▶ frontend (nginx)
 
 ## Features & flows
 
-- **Add items** by catalog search (Open Library / TMDB / IGDB), by barcode,
-  or manually. Missing keys degrade to manual entry with a hint. Game
+- **Add items** by catalog search (Open Library / TMDB / IGDB /
+  MusicBrainz or Discogs), by barcode, or manually. Missing keys degrade to manual entry with a hint. Game
   search takes a **platform filter** (only games released on it come back,
   and it's preselected as the platform you file the copy under), and the
   search term and filter survive stepping into the confirm form and back
@@ -131,10 +132,11 @@ browser ──:8080──▶ frontend (nginx)
   Title matches always rank above description-only ones, whatever sort is
   active.
 - **Barcode scanning** uses the camera (native `BarcodeDetector`, falls
-  back to `@zxing/browser`). ISBNs auto-fill books. Movie/game barcodes
-  (UPC/EAN) have **no public catalog** — the code is stored on the item and
-  the UI drops you into title search. There's also a type-the-digits
-  fallback.
+  back to `@zxing/browser`). ISBNs auto-fill books, and sleeve barcodes
+  (UPC/EAN) auto-fill records — the music catalogs index them, and a match
+  picks the medium for you. Movie and game barcodes have **no public
+  catalog**: the code is stored on the item and the UI drops you into title
+  search. There's also a type-the-digits fallback.
   *Camera access needs HTTPS or `localhost`.* The nicest setup is
   Tailscale on the server plus the Tailscale app on your phone:
 
@@ -176,6 +178,18 @@ browser ──:8080──▶ frontend (nginx)
   pulls description, hero art and screenshots. Wrong or missing match? The
   **Re-link** action on the detail page lets you pick the correct record —
   import provenance and playtime survive the swap.
+- **Music, pressing by pressing**: records are tracked as the copy you own,
+  not just the album. Search returns *releases* — artist, year, carrier,
+  label, catalogue number, country — because that's what tells a 2000 UK
+  2×LP from a later reissue. Picking one stores the tracklist (with side
+  labels: A1, A2, …), which the detail page lists, and the carrier
+  (Vinyl LP / 12" / 10" / 7" / CD / Cassette) becomes a filterable badge on
+  the poster. Sleeve art comes from the Cover Art Archive or Discogs and is
+  downloaded once like every other cover.
+  MusicBrainz is the default and needs no key; `DISCOGS_TOKEN` switches
+  search to Discogs, which knows more about physical pressings. Either way
+  the stored `external_id` says which catalogue matched (`mb:…` /
+  `discogs:…`), so re-linking keeps working after you add the token.
 - **Upcoming**: a release timeline of everything in your library or
   wishlist with a future release date, grouped by month, with countdown
   chips; partial dates ("2027", "09-2026") stay listed until their period
@@ -215,11 +229,12 @@ backend/
   app/core/              security (argon2+JWT), events, covers, artwork, seasons,
                          episodes, platforms, library_import, import_jobs,
                          store_filters
-  app/providers/         MetadataProvider ABC + openlibrary/tmdb/igdb/steam/psn + cache
+  app/providers/         MetadataProvider ABC + openlibrary/tmdb/igdb/steam/psn +
+                         music (musicbrainz/discogs behind one front) + formats + cache
   app/tests/             pytest suite (runs against real Postgres)
   alembic/versions/      migrations
 frontend/
-  src/lib/               api client, TanStack Query hooks, types, dates, upcoming
+  src/lib/               api client, TanStack Query hooks, types, dates, upcoming, music
   src/theme/             design tokens + theme store
   src/components/        PosterCard, ItemTable, BarcodeScanner, SeasonsPanel, …
   src/pages/             Shelf, Wishlist, Upcoming, Stats, AddItem, ItemDetail,
@@ -242,6 +257,14 @@ migration or backfill when they land.
   (a Twitch service).
 - **Open Library** — book metadata and covers, from
   [Open Library](https://openlibrary.org) (an Internet Archive project).
+- **MusicBrainz & the Cover Art Archive** — music metadata and sleeve art,
+  from [MusicBrainz](https://musicbrainz.org) and the
+  [Cover Art Archive](https://coverartarchive.org) (MetaBrainz Foundation).
+  Used keyless, within their rate limit (1 request/second) and with an
+  identifying User-Agent, as their API terms ask.
+- **Discogs** — music release data and images, from
+  [Discogs](https://www.discogs.com), when a token is configured. This
+  project is not affiliated with or endorsed by Discogs.
 - **Steam / PlayStation Network** — library imports use the Steam Web API
   and PSN. This project is not affiliated with Valve or Sony.
 - **Heroic & Legendary** — Epic and GOG imports read the library files

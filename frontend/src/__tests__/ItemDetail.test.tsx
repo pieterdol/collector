@@ -341,6 +341,114 @@ describe("ItemDetail details panel", () => {
   });
 });
 
+const RECORD = {
+  ...GAME,
+  type: "music",
+  platform: null,
+  status: "completed",
+  title: "Kid A",
+  metadata: {
+    artist: "Radiohead",
+    year: 2000,
+    release_date: "2000-10-02",
+    label: "Parlophone",
+    catalog_number: "7243 5 27753 1 4",
+    country: "GB",
+    release_type: "Album",
+    media: 'Vinyl 12"',
+    barcode: "724352773824",
+    mb_release_id: "b1392450-e666-3926-a536-22c65f834433",
+    track_count: 2,
+    tracks: [
+      { position: "A1", title: "Everything in Its Right Place", length: "4:11" },
+      { position: "A2", title: "Kid A", length: "4:44" },
+    ],
+    artwork_fetched: true,
+  },
+};
+
+describe("ItemDetail music", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("shows the pressing details a record is identified by", async () => {
+    mockFetch(RECORD);
+    renderDetail();
+
+    expect(await screen.findByText("Artist")).toBeInTheDocument();
+    expect(screen.getByText("Radiohead")).toBeInTheDocument();
+    expect(screen.getByText("Label")).toBeInTheDocument();
+    expect(screen.getByText("Parlophone")).toBeInTheDocument();
+    expect(screen.getByText("Catalogue number")).toBeInTheDocument();
+    expect(screen.getByText("7243 5 27753 1 4")).toBeInTheDocument();
+    expect(screen.getByText("724352773824")).toBeInTheDocument();
+  });
+
+  it("lists the tracklist with side positions and lengths", async () => {
+    mockFetch(RECORD);
+    renderDetail();
+
+    expect(await screen.findByText("Tracklist")).toBeInTheDocument();
+    expect(screen.getByText("Everything in Its Right Place")).toBeInTheDocument();
+    expect(screen.getByText("A1")).toBeInTheDocument();
+    expect(screen.getByText("4:11")).toBeInTheDocument();
+  });
+
+  it("offers the carrier select for a physical record", async () => {
+    mockFetch(RECORD);
+    renderDetail();
+
+    const media = await screen.findByLabelText<HTMLSelectElement>("Media");
+    expect(media.value).toBe('Vinyl 12"');
+    expect([...media.options].map((o) => o.text)).toContain("Vinyl LP");
+  });
+
+  it("credits the catalog the record was matched in", async () => {
+    mockFetch({ ...RECORD, metadata: { ...RECORD.metadata, description: "Fourth album." } });
+    renderDetail();
+
+    expect(await screen.findByText(/Metadata via MusicBrainz/)).toBeInTheDocument();
+  });
+
+  it("credits Discogs when that is where the match came from", async () => {
+    mockFetch({
+      ...RECORD,
+      metadata: {
+        ...RECORD.metadata,
+        mb_release_id: undefined,
+        discogs_release_id: 371000,
+        description: "Fourth album.",
+      },
+    });
+    renderDetail();
+
+    expect(await screen.findByText(/Metadata via Discogs/)).toBeInTheDocument();
+  });
+
+  it("does not chase artwork that music catalogs do not carry", async () => {
+    mockFetch({ ...RECORD, metadata: { ...RECORD.metadata, artwork_fetched: false } });
+    renderDetail();
+
+    // By title, not by text: "Kid A" is also a track on it.
+    await screen.findByRole("heading", { name: "Kid A" });
+    await waitFor(() =>
+      expect(
+        (fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([u]) =>
+          String(u).includes("/artwork"),
+        ),
+      ).toHaveLength(0),
+    );
+  });
+
+  it("has no progress panel — an album is not read page by page", async () => {
+    mockFetch({ ...RECORD, status: "in_progress" });
+    renderDetail();
+
+    await screen.findByRole("heading", { name: "Kid A" });
+    expect(screen.queryByText("Progress")).not.toBeInTheDocument();
+    expect(screen.queryByText("Play time")).not.toBeInTheDocument();
+  });
+});
+
 describe("ItemDetail back link", () => {
   beforeEach(() => mockFetch());
   afterEach(() => vi.unstubAllGlobals());

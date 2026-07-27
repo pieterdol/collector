@@ -14,12 +14,25 @@ import {
   useProviders,
 } from "../lib/queries";
 import type { EnrichResult, ItemStatus, ItemType } from "../lib/types";
+import { mediaOptions } from "../lib/types";
 
+/** Fallback catalog name per type, for before /providers has answered. */
 const PROVIDER_LABEL: Record<ItemType, string> = {
   book: "Open Library",
   movie: "TMDB",
   tv: "TMDB",
   game: "IGDB",
+  music: "MusicBrainz",
+};
+
+/** Display name per provider, so music can say which catalog is actually
+ * in use — MusicBrainz by default, Discogs once its token is configured. */
+const PROVIDER_NAME_LABEL: Record<string, string> = {
+  openlibrary: "Open Library",
+  tmdb: "TMDB",
+  igdb: "IGDB",
+  musicbrainz: "MusicBrainz",
+  discogs: "Discogs",
 };
 
 type Mode = "search" | "scan" | "manual";
@@ -72,6 +85,18 @@ export default function AddItem() {
     return map;
   }, [providers.data]);
 
+  const labels = useMemo(() => {
+    const map = { ...PROVIDER_LABEL };
+    for (const p of providers.data?.providers ?? []) {
+      if (PROVIDER_NAME_LABEL[p.name]) map[p.type] = PROVIDER_NAME_LABEL[p.name];
+    }
+    return map;
+  }, [providers.data]);
+
+  // Books have ISBNs, records have sleeve barcodes; nothing else is in a
+  // public barcode catalog.
+  const scannable = type === "book" || type === "music";
+
   // w-full matters: without it, a flex-column item with mx-auto shrink-wraps
   // to its content's intrinsic width, and long unbreakable result lines
   // (game platform lists) push the page past the viewport on mobile.
@@ -82,7 +107,7 @@ export default function AddItem() {
         Search a catalog, scan a barcode, or enter it yourself.
       </p>
 
-      <div className="mb-5 grid grid-cols-4 gap-2.5">
+      <div className="mb-5 grid grid-cols-5 gap-2.5 max-[560px]:grid-cols-3">
         {(Object.keys(PROVIDER_LABEL) as ItemType[]).map((t) => (
           <button
             key={t}
@@ -91,7 +116,7 @@ export default function AddItem() {
             onClick={() => {
               setType(t);
               setDraft(null);
-              if (t !== "book" && mode === "scan") setMode("search");
+              if (t !== "book" && t !== "music" && mode === "scan") setMode("search");
             }}
             className={`flex flex-col items-center gap-1 rounded-xl border px-2.5 py-3.5 transition-colors ${
               type === t
@@ -103,7 +128,7 @@ export default function AddItem() {
             <small
               className={`font-mono text-[9.5px] uppercase tracking-[0.1em] ${type === t ? "text-accent" : "text-faint"}`}
             >
-              {PROVIDER_LABEL[t]}
+              {labels[t]}
             </small>
           </button>
         ))}
@@ -112,6 +137,7 @@ export default function AddItem() {
       {draft ? (
         <ConfirmForm
           type={type}
+          label={labels[type]}
           draft={draft}
           scannedUpc={scannedUpc}
           preferredPlatform={type === "game" ? platform : ""}
@@ -120,7 +146,7 @@ export default function AddItem() {
       ) : (
         <>
           <div className="mb-5 flex w-fit gap-1.5 rounded-[10px] border border-line bg-surface p-1" role="tablist">
-            {(type === "book" ? (["search", "scan", "manual"] as Mode[]) : (["search", "manual"] as Mode[])).map((m) => (
+            {(scannable ? (["search", "scan", "manual"] as Mode[]) : (["search", "manual"] as Mode[])).map((m) => (
               <button
                 key={m}
                 type="button"
@@ -139,6 +165,7 @@ export default function AddItem() {
           {mode === "search" && (
             <SearchMode
               type={type}
+              label={labels[type]}
               available={available[type] ?? false}
               query={query}
               onQuery={setQuery}
@@ -152,8 +179,11 @@ export default function AddItem() {
           )}
           {mode === "scan" && (
             <ScanMode
-              onBook={(result) => {
+              onMatch={(result) => {
                 setScannedUpc(null);
+                // A scanned code decides the medium: an ISBN is a book, a
+                // sleeve barcode is a record.
+                setType(result.type);
                 setDraft(result);
               }}
               onUpc={(code) => {
@@ -165,6 +195,7 @@ export default function AddItem() {
           {mode === "manual" && (
             <ConfirmForm
               type={type}
+              label={labels[type]}
               draft={null}
               scannedUpc={scannedUpc}
               preferredPlatform={type === "game" ? platform : ""}
@@ -185,6 +216,7 @@ export default function AddItem() {
 
 function SearchMode({
   type,
+  label,
   available,
   query,
   onQuery,
@@ -193,6 +225,8 @@ function SearchMode({
   onPick,
 }: {
   type: ItemType;
+  /** Name of the catalog being searched, as the user should see it. */
+  label: string;
   available: boolean;
   query: string;
   onQuery: (q: string) => void;
@@ -227,8 +261,9 @@ function SearchMode({
   const stale = search.isPlaceholderData || search.isFetching;
 
   function pick(result: EnrichResult) {
-    // Movies and TV get a richer record (director/creator, runtime) on selection.
-    if ((type === "movie" || type === "tv") && result.external_id) {
+    // Movies and TV get a richer record (director/creator, runtime) on
+    // selection; music gets its tracklist, which the search omits.
+    if ((type === "movie" || type === "tv" || type === "music") && result.external_id) {
       details.mutate(
         { type, externalId: result.external_id },
         {
@@ -244,7 +279,7 @@ function SearchMode({
   if (!available) {
     return (
       <div className="rounded-xl bg-surface px-5 py-4 text-sm text-muted">
-        {PROVIDER_LABEL[type]} isn't configured (missing API key), so search is off — use{" "}
+        {label} isn't configured (missing API key), so search is off — use{" "}
         <b>Manual entry</b> instead. The README explains where to get a free key.
       </div>
     );
@@ -260,7 +295,9 @@ function SearchMode({
             autoFocus
             value={query}
             onChange={(e) => onQuery(e.target.value)}
-            placeholder={`Search ${PROVIDER_LABEL[type]} by title${type === "book" ? " or ISBN" : ""}…`}
+            placeholder={`Search ${label} by ${type === "music" ? "artist or album" : "title"}${
+              type === "book" ? " or ISBN" : ""
+            }…`}
             className="input w-full"
             style={{ paddingLeft: 38 }}
           />
@@ -316,10 +353,16 @@ function ResultRow({
   const meta = result.metadata;
   const sub = [
     Array.isArray(meta.authors) ? meta.authors.slice(0, 2).join(", ") : null,
+    typeof meta.artist === "string" ? meta.artist : null,
     typeof meta.developer === "string" ? meta.developer : null,
     meta.year ? String(meta.year) : null,
     meta.page_count ? `${meta.page_count} pp` : null,
     typeof meta.platform === "string" ? meta.platform : null,
+    // Records: the pressing, which is what tells two near-identical
+    // catalog entries apart.
+    typeof meta.media === "string" ? meta.media : null,
+    typeof meta.label === "string" ? meta.label : null,
+    typeof meta.catalog_number === "string" ? meta.catalog_number : null,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -354,10 +397,11 @@ function ResultRow({
 }
 
 function ScanMode({
-  onBook,
+  onMatch,
   onUpc,
 }: {
-  onBook: (r: EnrichResult) => void;
+  /** A code the catalogs recognised — the result carries its own type. */
+  onMatch: (r: EnrichResult) => void;
   onUpc: (code: string) => void;
 }) {
   const lookup = useBarcodeLookup();
@@ -369,7 +413,7 @@ function ScanMode({
     lookup.mutate(code, {
       onSuccess: (data) => {
         if (data.matched && data.result) {
-          onBook(data.result);
+          onMatch(data.result);
         } else if (data.kind === "isbn") {
           setStatus(`No book found for ISBN ${data.code} — try search or manual entry.`);
         } else {
@@ -386,6 +430,10 @@ function ScanMode({
       <p className="mt-3.5 flex items-baseline gap-2 text-[13px] text-muted">
         <b className="font-mono text-xs">ISBN</b>
         Books fill in automatically from Open Library.
+      </p>
+      <p className="mt-1.5 flex items-baseline gap-2 text-[13px] text-muted">
+        <b className="font-mono text-xs">UPC</b>
+        Sleeve barcodes fill in from the music catalogs.
       </p>
       <form
         className="mt-2 flex gap-2"
@@ -413,12 +461,15 @@ function ScanMode({
 /** Final form: prefilled from a catalog pick, or blank for manual entry. */
 function ConfirmForm({
   type,
+  label,
   draft,
   scannedUpc,
   preferredPlatform = "",
   onBack,
 }: {
   type: ItemType;
+  /** Name of the catalog the draft came from. */
+  label: string;
   draft: EnrichResult | null;
   scannedUpc: string | null;
   /** The platform picked in the search filter — preselected here. */
@@ -433,11 +484,13 @@ function ConfirmForm({
   const [creator, setCreator] = useState(
     Array.isArray(meta.authors)
       ? meta.authors.join(", ")
-      : typeof meta.director === "string"
-        ? meta.director
-        : typeof meta.developer === "string"
-          ? meta.developer
-          : "",
+      : typeof meta.artist === "string"
+        ? meta.artist
+        : typeof meta.director === "string"
+          ? meta.director
+          : typeof meta.developer === "string"
+            ? meta.developer
+            : "",
   );
   const [year, setYear] = useState(meta.year ? String(meta.year) : "");
   const [count, setCount] = useState(
@@ -447,10 +500,13 @@ function ConfirmForm({
         ? String(meta.runtime)
         : meta.number_of_seasons
           ? String(meta.number_of_seasons)
-          : "",
+          : meta.track_count
+            ? String(meta.track_count)
+            : "",
   );
   const [format, setFormat] = useState("physical");
-  const [media, setMedia] = useState("");
+  // Records come out of the catalog with their carrier already known.
+  const [media, setMedia] = useState(typeof meta.media === "string" ? meta.media : "");
   const [storefront, setStorefront] = useState("");
   const [status, setStatus] = useState<ItemStatus>("backlog");
   const [price, setPrice] = useState("");
@@ -463,7 +519,9 @@ function ConfirmForm({
         ? "Runtime (min)"
         : type === "tv"
           ? "Seasons"
-          : "Platform";
+          : type === "music"
+            ? "Tracks"
+            : "Platform";
   const creatorLabel =
     type === "book"
       ? "Author(s)"
@@ -471,7 +529,9 @@ function ConfirmForm({
         ? "Director"
         : type === "tv"
           ? "Creator"
-          : "Developer";
+          : type === "music"
+            ? "Artist"
+            : "Developer";
 
   // The catalog reports every platform a game was released on; the user
   // stores the ONE they own (so the library can filter per platform).
@@ -505,6 +565,14 @@ function ConfirmForm({
       if (creator) metadata.director = creator;
       if (count) metadata.number_of_seasons = Number(count);
       if (media && format === "physical" && status !== "wishlist") metadata.media = media;
+    } else if (type === "music") {
+      if (creator) metadata.artist = creator;
+      if (count) metadata.track_count = Number(count);
+      // The carrier belongs to the pressing, so a wishlisted record keeps
+      // the one the catalog reported — it's the copy being hunted for.
+      // A digital copy has no carrier at all.
+      if (media && (status === "wishlist" || format === "physical")) metadata.media = media;
+      else delete metadata.media;
     } else {
       if (creator) metadata.developer = creator;
       if (platform) metadata.platform = platform;
@@ -547,7 +615,7 @@ function ConfirmForm({
             />
           )}
           <p className="m-0 flex-1 text-[13px] text-muted">
-            Prefilled from {PROVIDER_LABEL[type]} — check and adjust.
+            Prefilled from {label} — check and adjust.
           </p>
           {onBack && (
             <button type="button" onClick={onBack} className="flex-none text-[13px] font-semibold text-accent">
@@ -624,15 +692,15 @@ function ConfirmForm({
               <option value="digital">Digital</option>
             </select>
           </label>
-          {(type === "movie" || type === "tv") && format === "physical" && (
+          {/* Disc format for films, carrier for records. */}
+          {mediaOptions(type).length > 0 && format === "physical" && (
             <label className="field">
               Media
               <select value={media} onChange={(e) => setMedia(e.target.value)}>
                 <option value="">Choose…</option>
-                <option>DVD</option>
-                <option>Blu-ray</option>
-                <option>Ultra HD Blu-ray</option>
-                <option>VHS</option>
+                {mediaOptions(type).map((option) => (
+                  <option key={option}>{option}</option>
+                ))}
               </select>
             </label>
           )}

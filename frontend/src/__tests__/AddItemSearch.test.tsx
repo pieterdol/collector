@@ -16,7 +16,22 @@ const SEKIRO = {
   external_id: "9617",
 };
 
-function mockFetch() {
+const KID_A = {
+  title: "Kid A",
+  type: "music",
+  metadata: {
+    artist: "Radiohead",
+    year: 2000,
+    media: 'Vinyl 12"',
+    label: "Parlophone",
+    catalog_number: "7243 5 27753 1 4",
+    track_count: 10,
+  },
+  cover_url: "https://coverartarchive.org/release/kid-a/front-500",
+  external_id: "mb:b1392450-e666-3926-a536-22c65f834433",
+};
+
+function mockFetch(musicProvider = "musicbrainz") {
   vi.stubGlobal(
     "fetch",
     vi.fn((input: RequestInfo | URL) => {
@@ -28,6 +43,8 @@ function mockFetch() {
               { name: "tmdb", type: "movie", available: true },
               { name: "tmdb", type: "tv", available: true },
               { name: "igdb", type: "game", available: true },
+              // Keyless MusicBrainz unless a Discogs token is configured.
+              { name: musicProvider, type: "music", available: true },
             ],
           }
         : url.includes("/api/platforms")
@@ -37,14 +54,16 @@ function mockFetch() {
                 { id: "p2", name: "PlayStation 4", abbreviation: "PS4" },
               ],
             }
-          : url.includes("type=game")
-            ? {
-                provider: "igdb",
-                available: true,
-                // Sekiro never came out on Switch: the filter empties the list.
-                results: url.includes("platform=Nintendo+Switch") ? [] : [SEKIRO],
-              }
-            : { provider: "openlibrary", available: true, results: [] };
+          : url.includes("type=music")
+            ? { provider: musicProvider, available: true, results: [KID_A] }
+            : url.includes("type=game")
+              ? {
+                  provider: "igdb",
+                  available: true,
+                  // Sekiro never came out on Switch: the filter empties the list.
+                  results: url.includes("platform=Nintendo+Switch") ? [] : [SEKIRO],
+                }
+              : { provider: "openlibrary", available: true, results: [] };
       return Promise.resolve({
         ok: true,
         status: 200,
@@ -367,5 +386,78 @@ describe("TV type", () => {
     const options = [...media.options].map((o) => o.text);
     expect(options).toContain("Blu-ray");
     expect(options).toContain("Ultra HD Blu-ray");
+  });
+});
+
+describe("Music type", () => {
+  beforeEach(() => mockFetch());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  async function searchKidA() {
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: /music/i }));
+    fireEvent.change(await screen.findByPlaceholderText(/Search MusicBrainz/), {
+      target: { value: "kid a" },
+    });
+    // The whole result row, so its pressing line is in scope too.
+    return (await screen.findByText("Kid A")).closest("button")!;
+  }
+
+  it("is a selectable type backed by MusicBrainz, no key needed", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: /music/i }));
+    expect(await screen.findByPlaceholderText(/Search MusicBrainz/)).toBeInTheDocument();
+  });
+
+  it("shows the pressing that tells two editions apart", async () => {
+    const row = await searchKidA();
+    // Artist, year, carrier and label are what distinguish one pressing
+    // of an album from another — a bare title is useless here.
+    expect(row).toHaveTextContent("Radiohead");
+    expect(row).toHaveTextContent("2000");
+    expect(row).toHaveTextContent('Vinyl 12"');
+    expect(row).toHaveTextContent("Parlophone");
+  });
+
+  it("labels the creator field Artist and the count Tracks", async () => {
+    fireEvent.click(await searchKidA());
+    expect(await screen.findByLabelText<HTMLInputElement>("Artist")).toHaveValue("Radiohead");
+    expect(screen.getByLabelText<HTMLInputElement>("Tracks")).toHaveValue("10");
+  });
+
+  it("offers the carrier select for a physical record, prefilled from the catalog", async () => {
+    fireEvent.click(await searchKidA());
+    const media = await screen.findByLabelText<HTMLSelectElement>("Media");
+    expect(media.value).toBe('Vinyl 12"');
+    const options = [...media.options].map((o) => o.text);
+    expect(options).toContain("Vinyl LP");
+    expect(options).toContain('Vinyl 7"');
+    expect(options).toContain("CD");
+    expect(options).toContain("Cassette");
+    // Disc formats belong to films, not records.
+    expect(options).not.toContain("Blu-ray");
+  });
+
+  it("offers barcode scanning, because sleeves are in the catalogs", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: /music/i }));
+    expect(screen.getByRole("tab", { name: /scan barcode/i })).toBeInTheDocument();
+  });
+});
+
+describe("Music with a Discogs token", () => {
+  beforeEach(() => mockFetch("discogs"));
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it("names the catalog actually in use", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: /music/i }));
+    expect(await screen.findByPlaceholderText(/Search Discogs/)).toBeInTheDocument();
   });
 });

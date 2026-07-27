@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     twitch_client_id: str = ""
     twitch_client_secret: str = ""
     steam_api_key: str = ""
+    # Optional upgrade for music: without it, MusicBrainz (keyless) is used.
+    discogs_token: str = ""
 
     # Provider lookup cache TTL
     provider_cache_ttl_hours: int = 24 * 7

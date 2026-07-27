@@ -31,6 +31,7 @@ export function describeItem(item: Item): string {
   const meta = item.metadata;
   const parts: string[] = [];
   if (Array.isArray(meta.authors) && meta.authors.length) parts.push(String(meta.authors[0]));
+  if (typeof meta.artist === "string") parts.push(meta.artist);
   if (typeof meta.director === "string") parts.push(meta.director);
   if (typeof meta.developer === "string") parts.push(meta.developer);
   if (item.platform && !meta.developer) parts.push(item.platform);
