@@ -104,8 +104,8 @@ export default function AddItem() {
   // Books have ISBNs, records have sleeve barcodes; nothing else is in a
   // public barcode catalog.
   const scannable = type === "book" || type === "music";
-  // Reading the cover needs a local vision model (OLLAMA_URL); without one
-  // the tab would only ever error, so it stays hidden.
+  // Reading the cover needs a vision backend configured server-side (a local
+  // Ollama, Gemini, …); with none the tab would only ever error, so it hides.
   const canRead = providers.data?.vision ?? false;
   const modes: Mode[] = [
     "search",
@@ -503,10 +503,10 @@ function ScanMode({
   );
 }
 
-/** Photograph the cover and let a local vision model read the title — the
- * way in for discs and game boxes, which no barcode catalog covers. Two
- * models are asked server-side and the catalog decides which answer was
- * real; whatever comes back is a search term, never an item. */
+/** Photograph the cover and let a vision model read the text off it — the way
+ * in for discs and game boxes, which no barcode catalog covers. One read gives
+ * the title, the console and the publisher, and the catalog decides which of
+ * them was real; whatever comes back is a search term, never an item. */
 function PhotoMode({
   type,
   onRead,
@@ -526,7 +526,8 @@ function PhotoMode({
           {read.isPending ? "Reading the cover…" : "Take a photo of the front"}
         </span>
         <span className="text-[13px] text-muted">
-          Hold the box upright and fill the frame. Runs on your own machine.
+          Hold the box upright and fill the frame — the title, console and
+          publisher are read off it in one go.
         </span>
         <input
           type="file"

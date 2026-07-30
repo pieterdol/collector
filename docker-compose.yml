@@ -28,10 +28,12 @@ services:
       TWITCH_CLIENT_SECRET: ${TWITCH_CLIENT_SECRET:-}
       STEAM_API_KEY: ${STEAM_API_KEY:-}
       DISCOGS_TOKEN: ${DISCOGS_TOKEN:-}
-      # Reading a photographed cover with a local model. Empty = feature off.
+      # Reading a photographed cover. No backend configured = feature off.
+      VISION_BACKENDS: ${VISION_BACKENDS:-gemini,ollama}
       OLLAMA_URL: ${OLLAMA_URL:-}
-      VISION_MODEL: ${VISION_MODEL:-qwen3-vl:4b}
-      VISION_RECOGNIZER_MODEL: ${VISION_RECOGNIZER_MODEL:-moondream}
+      VISION_MODEL: ${VISION_MODEL:-gemma3:4b}
+      GEMINI_API: ${GEMINI_API:-}
+      GEMINI_VISION_MODEL: ${GEMINI_VISION_MODEL:-gemini-flash-lite-latest}
     # Ollama runs on the host, not in the stack; this name resolves to it.
     extra_hosts:
       - "host.containers.internal:host-gateway"

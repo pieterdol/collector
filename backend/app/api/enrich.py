@@ -129,24 +129,20 @@ async def photo(
         raise HTTPException(status_code=415, detail="That file isn't an image") from None
 
     try:
-        # Games only: one extra ~1s question that narrows the search to the
-        # edition in your hands. Nothing else can be filtered by platform.
-        console = vision.console_on_box(image) if type is ItemType.GAME else None
-        candidates = vision.title_candidates(image)
-        query, platform = _first_with_results(provider, candidates, console)
-        if query is None:
-            # The title is unreadable (stylised logo). The publisher and
-            # console are printed in plain type — worth the slower pass.
-            lines = vision.all_text(image)
-            platform = console or vision.platform_from(lines)
-            candidates = vision.dedupe([*candidates, *vision.search_terms(lines)])
-            query, filtered_platform = _first_with_results(provider, candidates, platform)
-            if query is not None:
-                platform = filtered_platform
+        lines = vision.read_cover(image)
     except vision.VisionUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-    return PhotoReadOut(read=candidates, query=query, platform=platform)
+    # One read gives all three: the console narrows a game search to the
+    # edition in your hands, the rest are search terms for the title.
+    console = vision.platform_from(lines) if type is ItemType.GAME else None
+    candidates = vision.candidates_from(lines)
+    query, platform = _first_with_results(provider, candidates, console)
+    # A console that didn't narrow to a hit is dropped, because the UI re-runs
+    # this search with the platform preselected and a misread one would filter
+    # it down to nothing. With no hit at all there's nothing to contradict it,
+    # so it stays as a hint for the search the user is about to fix by hand.
+    return PhotoReadOut(read=candidates, query=query, platform=platform if query else console)
 
 
 def _first_with_results(

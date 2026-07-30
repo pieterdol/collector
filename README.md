@@ -41,22 +41,24 @@ unlock movie/game search and Steam import. Put them in `.env`:
 The Epic, GOG and PlayStation imports need no keys: Epic/GOG read a Heroic
 or Legendary library file you upload, and PSN uses a pasted NPSSO token.
 
-**Reading a photographed cover** needs no key either, but it does need a
-local [Ollama](https://ollama.com) — no data ever leaves your machine:
-
-```bash
-ollama pull qwen3-vl:4b && ollama pull moondream
-```
+**Reading a photographed cover** takes a vision backend. Two ship, and
+`VISION_BACKENDS` picks which run and in what order — the first that answers
+wins, so a fast one leads and a local one catches what it drops:
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| `OLLAMA_URL` | *(empty — feature off)* | e.g. `http://host.containers.internal:11434` from the container, `http://localhost:11434` on the host |
-| `VISION_MODEL` | `qwen3-vl:4b` | Reads the printed title (3–5 s per photo). The 8b is ~7× slower and no more accurate on box art |
-| `VISION_RECOGNIZER_MODEL` | `moondream` | Second opinion that recognises covers it knows; empty to run the reader alone |
+| `VISION_BACKENDS` | `gemini,ollama` | Order to try. Unconfigured backends drop out; with none left the photo tab hides |
+| `OLLAMA_URL` | *(empty)* | Local backend. `http://host.containers.internal:11434` from the container (`host.docker.internal` on Docker), `http://localhost:11434` on the host |
+| `VISION_MODEL` | `gemma3:4b` | Local model. Reads title, console and publisher in one ~4.6 s call — `ollama pull gemma3:4b` |
+| `GEMINI_API` | *(empty)* | Gemini backend. ~1 s per photo, and a free tier that covers this use many times over |
+| `GEMINI_VISION_MODEL` | `gemini-flash-lite-latest` | Flash-Lite beat the bigger Flash on both speed and reliability |
 
-Ollama listens on `127.0.0.1` by default, which a container cannot reach.
-Either run it with `OLLAMA_HOST=0.0.0.0:11434`, or point `OLLAMA_URL` at
-wherever it actually listens.
+Two caveats. Ollama listens on `127.0.0.1` by default, which a container
+cannot reach — run it with `OLLAMA_HOST=0.0.0.0:11434` or point `OLLAMA_URL`
+at wherever it actually listens. And Gemini's **free tier may use your prompts
+to improve Google's products**; the paid tier doesn't, and at this volume costs
+around 3 cents a month. Run `ollama` alone if you'd rather nothing left the
+machine at all.
 
 ## Everyday commands
 
@@ -175,25 +177,27 @@ browser ──:8080──▶ frontend (nginx)
   valid certificate — full scanning + installable PWA from anywhere,
   visible only to your tailnet. Alternatives: `adb reverse tcp:8080
   tcp:8080` (Android, USB), or any HTTPS reverse proxy.
-- **Photo of the cover** (needs a local Ollama — see *API keys*): the answer
+- **Photo of the cover** (needs a vision backend — see *API keys*): the answer
   for discs and game boxes, which no public barcode catalog covers. Snap the
-  front and a vision model reads the title, which becomes an ordinary catalog
-  search — you still pick the match, so a partial read costs nothing. Two
-  models are asked because they fail in opposite directions: `qwen3-vl:4b`
-  does real OCR and drops what it can't make out (a cursive *Stellar* Blade
-  reads as just "BLADE"), while `moondream` recognises covers it knows from
-  the art alone and invents titles when it doesn't. Every answer is only a
-  search term, and the catalog is what decides which one was real. Photos are
-  downscaled to 1024px and uprighted first (EXIF rotation ruins the read),
-  in the browser and again server-side. Nothing matched? The read text is
-  still in the search box, one word away from right.
-  For games one extra question (~1 s) reads the **console** off the box and
-  narrows the search to that platform — which is also the platform the copy
-  gets filed under. A console that doesn't produce a hit is dropped rather
-  than carried into the search, so a misread can't filter the list to
-  nothing. Asking for title and console in one prompt looks cheaper and
-  isn't: the two-part instruction sends the model wandering (30 s, and one
-  box came back empty).
+  front and **one call** reads every line printed on it — the title, the
+  console and the publisher — which become ordinary catalog searches. You
+  still pick the match, so a partial read costs nothing, and for games the
+  console narrows the search to the edition in your hands (and becomes the
+  platform the copy is filed under). A console that doesn't produce a hit is
+  dropped rather than carried into the search, so a misread can't filter the
+  list to nothing. Nothing matched at all? The read text is still in the
+  search box, one word away from right.
+  Three details are load-bearing, each learned the hard way. Photos are
+  uprighted and downscaled to 1024px first — EXIF rotation alone turns
+  "BLADE" into "Letter Blade", and a 3 MB phone photo answers slower and
+  sometimes not at all. The prompt asks for *the text on the box*, never for
+  the title: asked "what is the title?", every local model tested answered a
+  photo of the *back* of a box with a confident invention. And a lone word is
+  tried after whole phrases, because covers split logos across lines and the
+  catalog will match bare "BLADE" to the wrong Blade.
+  Backends are swappable (`app/core/vision/`): a new one implements
+  `read_lines` and lands in one registry entry — nothing above that seam
+  changes.
 - **Library imports** live under *Import & settings* (sidebar footer /
   avatar menu). All of them skip already-imported games, so re-runs are
   safe, and covers arrive in the background:
@@ -277,8 +281,10 @@ backend/
                          epic, gog, psn, stats, platforms (epic/gog share
                          store_import)
   app/core/              security (argon2+JWT), events, covers, artwork, seasons,
-                         episodes, platforms, barcodes, vision (cover OCR),
-                         library_import, import_jobs, store_filters
+                         episodes, platforms, barcodes, library_import,
+                         import_jobs, store_filters
+  app/core/vision/       cover reading: backend-agnostic pipeline + one module
+                         per backend (ollama, gemini)
   app/providers/         MetadataProvider ABC + openlibrary/tmdb/igdb/steam/psn +
                          music (musicbrainz/discogs behind one front) + formats + cache
   app/tests/             pytest suite (runs against real Postgres)
