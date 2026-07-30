@@ -30,6 +30,18 @@ class BarcodeOut(BaseModel):
     owned_item_id: uuid.UUID | None = None
 
 
+class PhotoReadOut(BaseModel):
+    """What a photographed cover yielded. Search terms, not metadata."""
+
+    #: Every candidate the models offered, best first — shown to the user so
+    #: a partial read ("BLADE") is one word away from being fixed.
+    read: list[str]
+    #: The candidate the catalog recognised; None when none of them hit.
+    query: str | None = None
+    #: Console printed on the box, when the models saw one.
+    platform: str | None = None
+
+
 class ProviderStatus(BaseModel):
     name: str
     type: ItemType
@@ -38,3 +50,5 @@ class ProviderStatus(BaseModel):
 
 class ProvidersOut(BaseModel):
     providers: list[ProviderStatus]
+    #: Whether a local vision model is configured (see core/vision.py).
+    vision: bool = False

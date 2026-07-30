@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { api, upload } from "./api";
+import { shrinkForUpload } from "./images";
 import type {
   ActivityEvent,
   BarcodeResult,
@@ -19,6 +20,7 @@ import type {
   Item,
   ItemList,
   ItemType,
+  PhotoRead,
   ProviderStatus,
   Season,
   SeasonList,
@@ -295,8 +297,19 @@ export function useBarcodeLookup() {
 export function useProviders() {
   return useQuery({
     queryKey: ["providers"],
-    queryFn: () => api<{ providers: ProviderStatus[] }>("/api/enrich/providers"),
+    // `vision` says whether a local model can read a photographed cover.
+    queryFn: () =>
+      api<{ providers: ProviderStatus[]; vision: boolean }>("/api/enrich/providers"),
     staleTime: 10 * 60 * 1000,
+  });
+}
+
+/** Photograph a cover: a local vision model reads the title, the catalog
+ * confirms it. Downscaled client-side first — see lib/images.ts. */
+export function usePhotoRead(type: ItemType) {
+  return useMutation({
+    mutationFn: async (file: File) =>
+      upload<PhotoRead>(`/api/enrich/photo?type=${type}`, await shrinkForUpload(file)),
   });
 }
 

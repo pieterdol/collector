@@ -41,6 +41,23 @@ unlock movie/game search and Steam import. Put them in `.env`:
 The Epic, GOG and PlayStation imports need no keys: Epic/GOG read a Heroic
 or Legendary library file you upload, and PSN uses a pasted NPSSO token.
 
+**Reading a photographed cover** needs no key either, but it does need a
+local [Ollama](https://ollama.com) — no data ever leaves your machine:
+
+```bash
+ollama pull qwen3-vl:4b && ollama pull moondream
+```
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `OLLAMA_URL` | *(empty — feature off)* | e.g. `http://host.containers.internal:11434` from the container, `http://localhost:11434` on the host |
+| `VISION_MODEL` | `qwen3-vl:4b` | Reads the printed title (3–5 s per photo). The 8b is ~7× slower and no more accurate on box art |
+| `VISION_RECOGNIZER_MODEL` | `moondream` | Second opinion that recognises covers it knows; empty to run the reader alone |
+
+Ollama listens on `127.0.0.1` by default, which a container cannot reach.
+Either run it with `OLLAMA_HOST=0.0.0.0:11434`, or point `OLLAMA_URL` at
+wherever it actually listens.
+
 ## Everyday commands
 
 ```bash
@@ -158,6 +175,18 @@ browser ──:8080──▶ frontend (nginx)
   valid certificate — full scanning + installable PWA from anywhere,
   visible only to your tailnet. Alternatives: `adb reverse tcp:8080
   tcp:8080` (Android, USB), or any HTTPS reverse proxy.
+- **Photo of the cover** (needs a local Ollama — see *API keys*): the answer
+  for discs and game boxes, which no public barcode catalog covers. Snap the
+  front and a vision model reads the title, which becomes an ordinary catalog
+  search — you still pick the match, so a partial read costs nothing. Two
+  models are asked because they fail in opposite directions: `qwen3-vl:4b`
+  does real OCR and drops what it can't make out (a cursive *Stellar* Blade
+  reads as just "BLADE"), while `moondream` recognises covers it knows from
+  the art alone and invents titles when it doesn't. Every answer is only a
+  search term, and the catalog is what decides which one was real. Photos are
+  downscaled to 1024px and uprighted first (EXIF rotation ruins the read),
+  in the browser and again server-side. Nothing matched? The read text is
+  still in the search box, one word away from right.
 - **Library imports** live under *Import & settings* (sidebar footer /
   avatar menu). All of them skip already-imported games, so re-runs are
   safe, and covers arrive in the background:
@@ -241,14 +270,15 @@ backend/
                          epic, gog, psn, stats, platforms (epic/gog share
                          store_import)
   app/core/              security (argon2+JWT), events, covers, artwork, seasons,
-                         episodes, platforms, barcodes, library_import,
-                         import_jobs, store_filters
+                         episodes, platforms, barcodes, vision (cover OCR),
+                         library_import, import_jobs, store_filters
   app/providers/         MetadataProvider ABC + openlibrary/tmdb/igdb/steam/psn +
                          music (musicbrainz/discogs behind one front) + formats + cache
   app/tests/             pytest suite (runs against real Postgres)
   alembic/versions/      migrations
 frontend/
-  src/lib/               api client, TanStack Query hooks, types, dates, upcoming, music
+  src/lib/               api client, TanStack Query hooks, types, dates, upcoming,
+                         music, images (photo downscaling)
   src/theme/             design tokens + theme store
   src/components/        PosterCard, ItemTable, BarcodeScanner, SeasonsPanel,
                          SearchBox, …

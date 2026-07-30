@@ -10,10 +10,11 @@ import {
   useCreateItem,
   useEnrichDetails,
   useEnrichSearch,
+  usePhotoRead,
   usePlatformCatalog,
   useProviders,
 } from "../lib/queries";
-import type { EnrichResult, ItemStatus, ItemType } from "../lib/types";
+import type { EnrichResult, ItemStatus, ItemType, PhotoRead } from "../lib/types";
 import { mediaOptions } from "../lib/types";
 
 /** Fallback catalog name per type, for before /providers has answered. */
@@ -35,7 +36,14 @@ const PROVIDER_NAME_LABEL: Record<string, string> = {
   discogs: "Discogs",
 };
 
-type Mode = "search" | "scan" | "manual";
+type Mode = "search" | "scan" | "photo" | "manual";
+
+const MODE_LABEL: Record<Mode, string> = {
+  search: "Search",
+  scan: "Scan barcode",
+  photo: "Photo of cover",
+  manual: "Manual entry",
+};
 
 // Long enough that the pauses in ordinary typing don't each fire a search
 // (300ms did, which made the search feel like it ran on every keystroke).
@@ -96,6 +104,18 @@ export default function AddItem() {
   // Books have ISBNs, records have sleeve barcodes; nothing else is in a
   // public barcode catalog.
   const scannable = type === "book" || type === "music";
+  // Reading the cover needs a local vision model (OLLAMA_URL); without one
+  // the tab would only ever error, so it stays hidden.
+  const canRead = providers.data?.vision ?? false;
+  const modes: Mode[] = [
+    "search",
+    ...(scannable ? (["scan"] as Mode[]) : []),
+    ...(canRead ? (["photo"] as Mode[]) : []),
+    "manual",
+  ];
+  // What the models read off the last photo — shown next to the search box,
+  // because a wrong read has to be visible to be correctable.
+  const [photoRead, setPhotoRead] = useState<string[]>([]);
 
   // w-full matters: without it, a flex-column item with mx-auto shrink-wraps
   // to its content's intrinsic width, and long unbreakable result lines
@@ -145,8 +165,8 @@ export default function AddItem() {
         />
       ) : (
         <>
-          <div className="mb-5 flex w-fit gap-1.5 rounded-[10px] border border-line bg-surface p-1" role="tablist">
-            {(scannable ? (["search", "scan", "manual"] as Mode[]) : (["search", "manual"] as Mode[])).map((m) => (
+          <div className="mb-5 flex w-fit flex-wrap gap-1.5 rounded-[10px] border border-line bg-surface p-1" role="tablist">
+            {modes.map((m) => (
               <button
                 key={m}
                 type="button"
@@ -157,7 +177,7 @@ export default function AddItem() {
                   mode === m ? "bg-raised text-text" : "text-muted hover:text-text"
                 }`}
               >
-                {m === "search" ? "Search" : m === "scan" ? "Scan barcode" : "Manual entry"}
+                {MODE_LABEL[m]}
               </button>
             ))}
           </div>
@@ -192,6 +212,19 @@ export default function AddItem() {
               }}
             />
           )}
+          {mode === "photo" && (
+            <PhotoMode
+              type={type}
+              onRead={(read) => {
+                // The catalog-confirmed candidate, or the best guess so the
+                // box starts from a near-miss instead of empty.
+                setQuery(read.query ?? read.read[0] ?? "");
+                setPhotoRead(read.read);
+                if (read.platform && type === "game") setPlatform(read.platform);
+                setMode("search");
+              }}
+            />
+          )}
           {mode === "manual" && (
             <ConfirmForm
               type={type}
@@ -200,6 +233,13 @@ export default function AddItem() {
               scannedUpc={scannedUpc}
               preferredPlatform={type === "game" ? platform : ""}
             />
+          )}
+
+          {photoRead.length > 0 && mode === "search" && (
+            <p className="mt-4 rounded-lg bg-surface px-4 py-3 text-[13px] text-muted">
+              Read from the cover: <b>{photoRead.join(" · ")}</b>. Stylised titles come back
+              partial — fix the search above if that isn't it.
+            </p>
           )}
 
           {scannedUpc && mode === "search" && (
@@ -459,6 +499,55 @@ function ScanMode({
         </button>
       </form>
       {status && <p className="mt-2.5 text-[13px] text-muted">{status}</p>}
+    </div>
+  );
+}
+
+/** Photograph the cover and let a local vision model read the title — the
+ * way in for discs and game boxes, which no barcode catalog covers. Two
+ * models are asked server-side and the catalog decides which answer was
+ * real; whatever comes back is a search term, never an item. */
+function PhotoMode({
+  type,
+  onRead,
+}: {
+  type: ItemType;
+  onRead: (read: PhotoRead) => void;
+}) {
+  const read = usePhotoRead(type);
+
+  return (
+    <div>
+      <label
+        className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed border-line-strong px-5 py-8 text-center hover:bg-surface"
+        style={{ borderWidth: 1 }}
+      >
+        <span className="text-[15px] font-semibold text-text">
+          {read.isPending ? "Reading the cover…" : "Take a photo of the front"}
+        </span>
+        <span className="text-[13px] text-muted">
+          Hold the box upright and fill the frame. Runs on your own machine.
+        </span>
+        <input
+          type="file"
+          accept="image/*"
+          capture="environment"
+          aria-label="Photo of the cover"
+          className="hidden"
+          disabled={read.isPending}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (file) read.mutate(file, { onSuccess: onRead });
+          }}
+        />
+      </label>
+      <p className="mt-3.5 text-[13px] text-muted">
+        The title becomes a catalog search, so a partial read is fine — you pick the match.
+      </p>
+      {read.isError && (
+        <p className="mt-2.5 text-[13px] text-danger">{(read.error as Error).message}</p>
+      )}
     </div>
   );
 }

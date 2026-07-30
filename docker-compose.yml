@@ -28,6 +28,13 @@ services:
       TWITCH_CLIENT_SECRET: ${TWITCH_CLIENT_SECRET:-}
       STEAM_API_KEY: ${STEAM_API_KEY:-}
       DISCOGS_TOKEN: ${DISCOGS_TOKEN:-}
+      # Reading a photographed cover with a local model. Empty = feature off.
+      OLLAMA_URL: ${OLLAMA_URL:-}
+      VISION_MODEL: ${VISION_MODEL:-qwen3-vl:4b}
+      VISION_RECOGNIZER_MODEL: ${VISION_RECOGNIZER_MODEL:-moondream}
+    # Ollama runs on the host, not in the stack; this name resolves to it.
+    extra_hosts:
+      - "host.containers.internal:host-gateway"
     volumes:
       - media:/data/media
     depends_on:

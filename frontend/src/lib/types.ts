@@ -125,6 +125,14 @@ export interface BarcodeResult {
   owned_item_id: string | null;
 }
 
+/** What a local vision model read off a photographed cover. Search terms,
+ * not metadata: `query` is the one the catalog recognised. */
+export interface PhotoRead {
+  read: string[];
+  query: string | null;
+  platform: string | null;
+}
+
 export interface ProviderStatus {
   name: string;
   type: ItemType;
