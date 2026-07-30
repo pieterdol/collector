@@ -181,12 +181,13 @@ browser ──:8080──▶ frontend (nginx)
   pulls description, hero art and screenshots. Wrong or missing match? The
   **Re-link** action on the detail page lets you pick the correct record —
   import provenance and playtime survive the swap.
-- **Fields you can fix by hand**: the detail page edits some metadata in
-  place — disc media, storefront, a release date that is still unknown, and
-  the **author** of a book. Open Library leaves the author out for plenty of
-  editions (and a manual add can be saved without one), and books have no
-  Re-link, so the Author row is tap-to-type: one name, or several separated
-  by commas. Clearing it empties the field again.
+- **Fields you can fix by hand**: the detail page edits things in place —
+  tap the **title** to rename an item (Escape abandons, an emptied field
+  reverts), and in Details: disc media, storefront, a release date that is
+  still unknown, and the **author** of a book. Open Library leaves the author
+  out for plenty of editions (and a manual add can be saved without one), and
+  books have no Re-link, so the Author row is tap-to-type: one name, or
+  several separated by commas. Clearing it empties the field again.
 - **Music, pressing by pressing**: records are tracked as the copy you own,
   not just the album. Search returns *releases* — artist, year, carrier,
   label, catalogue number, country — because that's what tells a 2000 UK

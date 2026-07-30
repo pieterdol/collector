@@ -163,6 +163,83 @@ describe("ItemDetail book progress", () => {
   });
 });
 
+describe("ItemDetail rename", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("renames the item from its heading", async () => {
+    mockFetch(BOOK);
+    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+    renderDetail();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Dune" }));
+    const input = screen.getByLabelText("Title");
+    fireEvent.change(input, { target: { value: "Dune Messiah" } });
+    fireEvent.blur(input);
+
+    await waitFor(() => {
+      expect(patchBodies(fetchMock)).toContainEqual({ title: "Dune Messiah" });
+    });
+  });
+
+  it("commits a rename with Enter", async () => {
+    mockFetch(BOOK);
+    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+    renderDetail();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Dune" }));
+    const input = screen.getByLabelText("Title");
+    fireEvent.change(input, { target: { value: "Dune (SF Masterworks)" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(patchBodies(fetchMock)).toContainEqual({ title: "Dune (SF Masterworks)" });
+    });
+  });
+
+  it("trims a rename before saving", async () => {
+    mockFetch(BOOK);
+    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+    renderDetail();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Dune" }));
+    const input = screen.getByLabelText("Title");
+    fireEvent.change(input, { target: { value: "  Dune  " } });
+    fireEvent.blur(input);
+
+    await waitFor(() => expect(screen.queryByLabelText("Title")).not.toBeInTheDocument());
+    expect(patchBodies(fetchMock)).toHaveLength(0); // trimmed back to the original
+  });
+
+  it("keeps the old title when the field is emptied", async () => {
+    mockFetch(BOOK);
+    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+    renderDetail();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Dune" }));
+    const input = screen.getByLabelText("Title");
+    fireEvent.change(input, { target: { value: "" } });
+    fireEvent.blur(input);
+
+    // An item must have a title — the blank reverts instead of being sent.
+    expect(await screen.findByRole("heading", { name: "Dune" })).toBeInTheDocument();
+    expect(patchBodies(fetchMock)).toHaveLength(0);
+  });
+
+  it("abandons the rename on Escape", async () => {
+    mockFetch(BOOK);
+    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+    renderDetail();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Dune" }));
+    const input = screen.getByLabelText("Title");
+    fireEvent.change(input, { target: { value: "Duen" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+
+    expect(await screen.findByRole("heading", { name: "Dune" })).toBeInTheDocument();
+    expect(patchBodies(fetchMock)).toHaveLength(0);
+  });
+});
+
 describe("ItemDetail book author", () => {
   afterEach(() => vi.unstubAllGlobals());
 

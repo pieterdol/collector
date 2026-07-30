@@ -139,9 +139,7 @@ function Detail({ item }: { item: Item }) {
             <CoverEditor item={item} />
           </div>
           <div className="flex min-w-0 flex-col gap-2 pb-1.5">
-            <h2 className="m-0 font-display text-3xl font-bold tracking-[-0.01em] max-[820px]:text-xl">
-              {item.title}
-            </h2>
+            <TitleHeading item={item} />
             <div className="text-[13.5px] text-muted">{describeItem(item)}</div>
             <div className="flex flex-wrap items-center gap-2">
               <span
@@ -220,6 +218,60 @@ function Detail({ item }: { item: Item }) {
         <Lightbox images={shots} index={shotIndex} onClose={() => setShotIndex(null)} onIndex={setShotIndex} />
       )}
     </>
+  );
+}
+
+/** Tap the heading to rename. The title is the user's, not the catalog's —
+ * it already survives a re-link — so a bad import, a barcode that named a
+ * book after its edition, or a typo is fixed right here. Escape abandons;
+ * an emptied field reverts (every item must keep a title). */
+function TitleHeading({ item }: { item: Item }) {
+  const update = useUpdateItem(item.id);
+  const [editing, setEditing] = useState(false);
+  const abandoned = useRef(false);
+  const heading = "m-0 font-display text-3xl font-bold tracking-[-0.01em] max-[820px]:text-xl";
+
+  const save = (value: string) => {
+    setEditing(false);
+    const title = value.trim();
+    if (abandoned.current) {
+      abandoned.current = false;
+      return;
+    }
+    if (!title || title === item.title) return; // blank or unchanged: no PATCH
+    update.mutate({ title });
+  };
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        aria-label="Title"
+        defaultValue={item.title}
+        maxLength={500}
+        onBlur={(e) => save(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") abandoned.current = true;
+          if (e.key === "Enter" || e.key === "Escape") (e.target as HTMLInputElement).blur();
+        }}
+        className="input w-full"
+        // .input is unlayered CSS, so utility classes lose to it here.
+        style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 700 }}
+      />
+    );
+  }
+  return (
+    <h2 className={heading}>
+      {/* No aria-label: the heading's accessible name must stay the title. */}
+      <button
+        type="button"
+        title="Tap to rename"
+        onClick={() => setEditing(true)}
+        className="text-left hover:text-accent"
+      >
+        {item.title}
+      </button>
+    </h2>
   );
 }
 
