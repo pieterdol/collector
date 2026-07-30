@@ -163,6 +163,119 @@ describe("ItemDetail book progress", () => {
   });
 });
 
+describe("ItemDetail book author", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const AUTHORLESS = { ...BOOK, metadata: { artwork_fetched: true } };
+
+  it("offers the author field on a book that has none", async () => {
+    mockFetch(AUTHORLESS);
+    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+    renderDetail();
+
+    const row = await screen.findByRole("button", { name: "Edit author" });
+    expect(row).toHaveTextContent("Add author…");
+    fireEvent.click(row);
+    const input = screen.getByLabelText("Author");
+    fireEvent.change(input, { target: { value: "Ursula K. Le Guin" } });
+    fireEvent.blur(input);
+
+    await waitFor(() => {
+      expect(patchBodies(fetchMock)).toContainEqual({
+        metadata: { artwork_fetched: true, authors: ["Ursula K. Le Guin"] },
+      });
+    });
+  });
+
+  it("splits a comma-separated list into separate authors", async () => {
+    mockFetch(AUTHORLESS);
+    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+    renderDetail();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Edit author" }));
+    const input = screen.getByLabelText("Author");
+    fireEvent.change(input, { target: { value: "Terry Pratchett, Neil Gaiman" } });
+    fireEvent.blur(input);
+
+    await waitFor(() => {
+      expect(patchBodies(fetchMock)).toContainEqual({
+        metadata: { artwork_fetched: true, authors: ["Terry Pratchett", "Neil Gaiman"] },
+      });
+    });
+  });
+
+  it("treats an empty authors list as unset", async () => {
+    // Manually added books store authors: [] when the field is left blank.
+    mockFetch({ ...BOOK, metadata: { authors: [], artwork_fetched: true } });
+    renderDetail();
+
+    expect(await screen.findByRole("button", { name: "Edit author" })).toHaveTextContent(
+      "Add author…",
+    );
+  });
+
+  it("keeps the author fixable once it is set", async () => {
+    mockFetch(BOOK);
+    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+    renderDetail();
+
+    const row = await screen.findByRole("button", { name: "Edit author" });
+    expect(row).toHaveTextContent("Frank Herbert");
+    fireEvent.click(row);
+    const input = screen.getByLabelText<HTMLInputElement>("Author");
+    expect(input.value).toBe("Frank Herbert");
+    fireEvent.change(input, { target: { value: "Frank Patrick Herbert" } });
+    fireEvent.blur(input);
+
+    await waitFor(() => {
+      expect(patchBodies(fetchMock)).toContainEqual({
+        metadata: { artwork_fetched: true, authors: ["Frank Patrick Herbert"] },
+      });
+    });
+  });
+
+  it("does not save an unchanged author", async () => {
+    mockFetch(BOOK);
+    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+    renderDetail();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Edit author" }));
+    fireEvent.blur(screen.getByLabelText("Author"));
+
+    await waitFor(() => expect(screen.queryByLabelText("Author")).not.toBeInTheDocument());
+    expect(patchBodies(fetchMock)).toHaveLength(0);
+  });
+
+  it("drops the authors key when the field is cleared", async () => {
+    mockFetch(BOOK);
+    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+    renderDetail();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Edit author" }));
+    const input = screen.getByLabelText("Author");
+    fireEvent.change(input, { target: { value: "  " } });
+    fireEvent.blur(input);
+
+    await waitFor(() => {
+      expect(patchBodies(fetchMock)).toContainEqual({ metadata: { artwork_fetched: true } });
+    });
+  });
+
+  it("leaves other types' creators read-only — they can be re-linked", async () => {
+    mockFetch({
+      ...GAME,
+      type: "movie",
+      platform: null,
+      metadata: { director: "Denis Villeneuve", artwork_fetched: true },
+    });
+    renderDetail();
+
+    // Twice: the hero subtitle and the Details row — both plain text.
+    expect(await screen.findAllByText("Denis Villeneuve")).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "Edit author" })).not.toBeInTheDocument();
+  });
+});
+
 describe("ItemDetail details panel", () => {
   beforeEach(() => mockFetch());
   afterEach(() => vi.unstubAllGlobals());

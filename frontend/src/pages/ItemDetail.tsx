@@ -657,7 +657,10 @@ function DetailsPanel({ item }: { item: Item }) {
   const [relinking, setRelinking] = useState(false);
   const meta = item.metadata;
   const rows: Array<[string, React.ReactNode]> = [];
-  if (Array.isArray(meta.authors) && meta.authors.length) rows.push(["Author", meta.authors.join(", ")]);
+  // Books get their own editable row (see AuthorRow); other types would
+  // only ever have an `authors` list from a legacy import.
+  if (item.type !== "book" && Array.isArray(meta.authors) && meta.authors.length)
+    rows.push(["Author", meta.authors.join(", ")]);
   if (typeof meta.artist === "string") rows.push(["Artist", meta.artist]);
   if (typeof meta.director === "string")
     rows.push([item.type === "tv" ? "Creator" : "Director", meta.director]);
@@ -765,6 +768,7 @@ function DetailsPanel({ item }: { item: Item }) {
         />
       </div>
       )}
+      {item.type === "book" && <AuthorRow item={item} />}
       {rows.map(([key, value]) => (
         <div key={key} className="flex justify-between gap-3 border-b border-line/60 pb-2 text-[12.5px] last:border-b-0 last:pb-0">
           <span className="text-faint">{key}</span>
@@ -1001,6 +1005,58 @@ function MetaSelectRow({
           </option>
         ))}
       </select>
+    </div>
+  );
+}
+
+/** Tap-to-type author row for books. Open Library often has no author for
+ * an edition (and manual entries can be saved without one), and books have
+ * no Re-link to fix it with — so this stays editable, not just fillable.
+ * Comma-separated, matching how the add form takes authors. */
+function AuthorRow({ item }: { item: Item }) {
+  const update = useUpdateItem(item.id);
+  const [editing, setEditing] = useState(false);
+  const authors = Array.isArray(item.metadata.authors)
+    ? (item.metadata.authors as unknown[]).filter((a): a is string => typeof a === "string")
+    : [];
+  const shown = authors.join(", ");
+
+  const save = (value: string) => {
+    setEditing(false);
+    const names = value.split(",").map((name) => name.trim()).filter(Boolean);
+    if (names.join(", ") === shown) return; // no-op: don't PATCH
+    // Cleared → the key drops out of the metadata (JSON.stringify skips it).
+    update.mutate({
+      metadata: { ...item.metadata, authors: names.length ? names : undefined },
+    });
+  };
+
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-line/60 pb-2 text-[12.5px]">
+      <span className="flex-none text-faint">Author</span>
+      {editing ? (
+        <input
+          autoFocus
+          aria-label="Author"
+          defaultValue={shown}
+          placeholder="Who wrote it?"
+          onBlur={(e) => save(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+          className="input min-w-0 flex-1 px-2 py-1 text-right text-[12.5px] font-medium"
+        />
+      ) : (
+        <button
+          type="button"
+          aria-label="Edit author"
+          title="Tap to type the author"
+          onClick={() => setEditing(true)}
+          className={`min-w-0 text-right font-medium underline decoration-dotted hover:text-accent ${
+            shown ? "text-text" : "text-faint"
+          }`}
+        >
+          {shown || "Add author…"}
+        </button>
+      )}
     </div>
   );
 }
