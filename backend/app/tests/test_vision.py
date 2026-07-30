@@ -14,6 +14,8 @@ from PIL import Image
 
 from app.config import get_settings
 from app.core import vision
+from app.db import SessionLocal
+from app.models import Platform
 from app.tests.helpers import auth_headers
 from app.tests.test_providers import OPENLIB_SEARCH
 
@@ -52,13 +54,15 @@ def photo(size=(60, 90)) -> bytes:
     return buffer.getvalue()
 
 
-def mock_ollama(reader="", recognizer="", all_text=""):
-    """One route for both models; the request says which is being asked."""
+def mock_ollama(reader="", recognizer="", all_text="", console=""):
+    """One route for every model call; the request says which is being asked."""
 
     def handler(request: httpx.Request) -> httpx.Response:
         body = json.loads(request.content)
         if "one per line" in body["prompt"]:
             answer = all_text
+        elif "console" in body["prompt"]:
+            answer = console
         elif body["model"].startswith("moondream"):
             answer = recognizer
         else:
@@ -66,6 +70,34 @@ def mock_ollama(reader="", recognizer="", all_text=""):
         return httpx.Response(200, json={"response": answer})
 
     return respx.post(f"{OLLAMA}/api/generate").mock(side_effect=handler)
+
+
+def prompts_asked(route) -> list[str]:
+    return [json.loads(call.request.content)["prompt"] for call in route.calls]
+
+
+def mock_igdb(monkeypatch, hits_only_when_filtered: bool):
+    """IGDB, with a Platform row so the name can be mapped to its id."""
+    monkeypatch.setenv("TWITCH_CLIENT_ID", "cid")
+    monkeypatch.setenv("TWITCH_CLIENT_SECRET", "secret")
+    get_settings.cache_clear()
+    respx.post("https://id.twitch.tv/oauth2/token").mock(
+        return_value=httpx.Response(200, json={"access_token": "tok", "expires_in": 5000})
+    )
+    with SessionLocal() as db:
+        db.add(Platform(igdb_id=167, name="PlayStation 5"))
+        db.commit()
+    game = [{"id": 3, "name": "Stellar Blade", "platforms": [{"name": "PlayStation 5"}]}]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        # Substring, not "where platforms = (…)": a search that finds nothing
+        # is retried as a name-contains lookup, where the same filter appears
+        # as "& platforms = (167)".
+        filtered = "platforms = (167)" in request.content.decode()
+        hit = filtered if hits_only_when_filtered else not filtered
+        return httpx.Response(200, json=game if hit else [])
+
+    return respx.post("https://api.igdb.com/v4/games").mock(side_effect=handler)
 
 
 def mock_openlibrary(*titles_that_match: str):
@@ -181,6 +213,41 @@ def test_providers_reports_whether_vision_is_available(client, no_vision, vision
     vision_env()
     body = client.get("/api/enrich/providers", headers=headers).json()
     assert body["vision"] is True
+
+
+@respx.mock
+def test_photo_narrows_a_game_search_to_the_console_on_the_box(client, vision_env, monkeypatch):
+    """One extra ~1s question, and the right edition comes back first."""
+    vision_env()
+    mock_ollama(reader="Stellar Blade", console="PS5")
+    mock_igdb(monkeypatch, hits_only_when_filtered=True)
+    body = post_photo(client, auth_headers(client), type="game").json()
+    assert body["query"] == "Stellar Blade"
+    assert body["platform"] == "PlayStation 5"
+
+
+@respx.mock
+def test_photo_drops_a_console_that_did_not_help(client, vision_env, monkeypatch):
+    """A misread console must not follow the user into the next search and
+    filter it down to nothing — the unfiltered hit wins and the guess goes."""
+    vision_env()
+    mock_ollama(reader="Stellar Blade", console="PS5")
+    mock_igdb(monkeypatch, hits_only_when_filtered=False)
+    body = post_photo(client, auth_headers(client), type="game").json()
+    assert body["query"] == "Stellar Blade"
+    assert body["platform"] is None
+
+
+@respx.mock
+def test_photo_does_not_ask_about_consoles_for_a_book(client, vision_env):
+    """Only games can be narrowed by platform; nobody else pays that second."""
+    vision_env()
+    route = mock_ollama(reader="Dune", console="PS5")
+    mock_openlibrary("Dune")
+    body = post_photo(client, auth_headers(client), type="book").json()
+    assert body["query"] == "Dune"
+    assert body["platform"] is None
+    assert not [p for p in prompts_asked(route) if "console" in p]
 
 
 # --- unit level: the bits that don't need a request ---------------------

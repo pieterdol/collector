@@ -129,33 +129,47 @@ async def photo(
         raise HTTPException(status_code=415, detail="That file isn't an image") from None
 
     try:
+        # Games only: one extra ~1s question that narrows the search to the
+        # edition in your hands. Nothing else can be filtered by platform.
+        console = vision.console_on_box(image) if type is ItemType.GAME else None
         candidates = vision.title_candidates(image)
-        query = _first_with_results(provider, candidates)
-        platform: str | None = None
+        query, platform = _first_with_results(provider, candidates, console)
         if query is None:
             # The title is unreadable (stylised logo). The publisher and
             # console are printed in plain type — worth the slower pass.
             lines = vision.all_text(image)
-            platform = vision.platform_from(lines)
+            platform = console or vision.platform_from(lines)
             candidates = vision.dedupe([*candidates, *vision.search_terms(lines)])
-            query = _first_with_results(provider, candidates)
+            query, filtered_platform = _first_with_results(provider, candidates, platform)
+            if query is not None:
+                platform = filtered_platform
     except vision.VisionUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     return PhotoReadOut(read=candidates, query=query, platform=platform)
 
 
-def _first_with_results(provider, candidates: list[str]) -> str | None:
-    """The first candidate the catalog knows. Repeats are free — provider
-    lookups are cached (see providers/cache.py)."""
+def _first_with_results(
+    provider, candidates: list[str], platform: str | None
+) -> tuple[str | None, str | None]:
+    """The first candidate the catalog knows, plus the platform that found it.
+
+    A console read off the box is a guess like any other, so it is only kept
+    when it actually narrowed to a hit: the UI re-runs this search with the
+    platform preselected, and a misread console would filter that down to
+    nothing. Repeats are cheap — provider lookups are cached.
+    """
     if not provider.available:
-        return None
+        return None, None
+    narrows = bool(platform) and provider.supports_platform_filter
     for candidate in candidates:
         if len(candidate) < 2:
             continue
+        if narrows and provider.search(candidate, platform=platform):
+            return candidate, platform
         if provider.search(candidate):
-            return candidate
-    return None
+            return candidate, None
+    return None, None
 
 
 @router.get("/providers", response_model=ProvidersOut)

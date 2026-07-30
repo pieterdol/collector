@@ -22,8 +22,10 @@ function mockFetch(vision: boolean, photo: object) {
       const url = String(input);
       const body = url.includes("/api/enrich/photo")
         ? photo
-        : url.includes("/api/enrich/providers")
-          ? {
+        : url.includes("/api/platforms")
+          ? { platforms: [{ id: "p1", name: "PlayStation 5", abbreviation: "PS5" }] }
+          : url.includes("/api/enrich/providers")
+            ? {
               vision,
               providers: [
                 { name: "openlibrary", type: "book", available: true },
@@ -112,6 +114,30 @@ describe("AddItem cover photo", () => {
     expect(box).toHaveValue("BLADE");
     // What it saw is shown, so a wrong read is obvious rather than mysterious.
     expect(screen.getByText(/BLADE · SHIFT UP/)).toBeInTheDocument();
+  });
+
+  it("narrows a game search to the console read off the box", async () => {
+    mockFetch(true, {
+      read: ["Stellar Blade"],
+      query: "Stellar Blade",
+      platform: "PlayStation 5",
+    });
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: /game/i }));
+    fireEvent.click(await screen.findByRole("tab", { name: /photo/i }));
+    await choosePhoto();
+
+    // The console becomes the platform filter — and the platform the copy
+    // gets filed under on the confirm step.
+    const filter = await screen.findByLabelText<HTMLSelectElement>("Filter by platform");
+    expect(filter.value).toBe("PlayStation 5");
+    await waitFor(() => {
+      const searches = (fetch as ReturnType<typeof vi.fn>).mock.calls
+        .map(([url]) => String(url))
+        .filter((url) => url.includes("/api/enrich/search"));
+      expect(searches.some((url) => url.includes("platform=PlayStation+5"))).toBe(true);
+    });
   });
 
   it("reports a model that isn't answering instead of failing silently", async () => {

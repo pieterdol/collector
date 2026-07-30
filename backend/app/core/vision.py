@@ -33,6 +33,11 @@ MAX_EDGE = 1024
 TITLE_PROMPT = (
     "Read the main title printed on this cover. Reply with only the title text."
 )
+#: One narrow question, ~1s, and it was right on all four boxes tested.
+#: Asking for the title and the console together instead is a false economy:
+#: the two-part instruction sends the model wandering (30s, and one box came
+#: back empty), so this stays a separate call.
+CONSOLE_PROMPT = "Which console name is printed on this box? Answer with only the console name."
 #: Slower (3-10x) and slightly worse at the title, but it surfaces the
 #: publisher and console, which are printed in plain type.
 ALL_TEXT_PROMPT = (
@@ -55,17 +60,20 @@ NOISE = re.compile(
     re.IGNORECASE,
 )
 
-#: Console words as printed on the box → the platform name IGDB uses.
+#: Console as printed on the box → the platform name IGDB uses. Keys are
+#: normalised by _platform_key, so punctuation and spacing don't matter
+#: ("PS5.", "PlayStation®5" and "playstation 5" all land here).
 PLATFORMS = {
     "ps5": "PlayStation 5",
-    "playstation 5": "PlayStation 5",
+    "playstation5": "PlayStation 5",
     "ps4": "PlayStation 4",
-    "playstation 4": "PlayStation 4",
-    "nintendo switch 2": "Nintendo Switch 2",
-    "nintendo switch": "Nintendo Switch",
-    "xbox series x|s": "Xbox Series X|S",
-    "xbox series x": "Xbox Series X|S",
-    "xbox one": "Xbox One",
+    "playstation4": "PlayStation 4",
+    "nintendoswitch2": "Nintendo Switch 2",
+    "nintendoswitch": "Nintendo Switch",
+    "xboxseriesx|s": "Xbox Series X|S",
+    "xboxseriesxs": "Xbox Series X|S",
+    "xboxseriesx": "Xbox Series X|S",
+    "xboxone": "Xbox One",
 }
 
 
@@ -111,6 +119,16 @@ def clean_answer(answer: str) -> str | None:
     return text
 
 
+def console_on_box(image: bytes) -> str | None:
+    """The console whose name is printed on the box, as IGDB spells it.
+
+    Only worth asking for games — it narrows the catalog search to the right
+    edition, and becomes the platform the copy is filed under. The reader is
+    the one to ask: the recogniser answers nothing at all to this.
+    """
+    return platform_from([_ask(get_settings().vision_model, CONSOLE_PROMPT, image)])
+
+
 def platform_from(lines: list[str]) -> str | None:
     """The console printed on the box, if one of them says so."""
     for line in lines:
@@ -126,7 +144,9 @@ def search_terms(lines: list[str]) -> list[str]:
 
 
 def _platform_key(line: str) -> str:
-    return line.strip().lower().strip(".")
+    """Normalise box print for the PLATFORMS lookup: case, spacing and the
+    ®/™/. decoration all vary between boxes and between model answers."""
+    return re.sub(r"[^a-z0-9|]", "", line.lower())
 
 
 def title_candidates(image: bytes) -> list[str]:

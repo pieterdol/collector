@@ -187,6 +187,13 @@ browser ──:8080──▶ frontend (nginx)
   downscaled to 1024px and uprighted first (EXIF rotation ruins the read),
   in the browser and again server-side. Nothing matched? The read text is
   still in the search box, one word away from right.
+  For games one extra question (~1 s) reads the **console** off the box and
+  narrows the search to that platform — which is also the platform the copy
+  gets filed under. A console that doesn't produce a hit is dropped rather
+  than carried into the search, so a misread can't filter the list to
+  nothing. Asking for title and console in one prompt looks cheaper and
+  isn't: the two-part instruction sends the model wandering (30 s, and one
+  box came back empty).
 - **Library imports** live under *Import & settings* (sidebar footer /
   avatar menu). All of them skip already-imported games, so re-runs are
   safe, and covers arrive in the background:
