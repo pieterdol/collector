@@ -120,6 +120,9 @@ export interface BarcodeResult {
   kind: "isbn" | "upc";
   matched: boolean;
   result: EnrichResult | null;
+  /** The user's item carrying this code, when they already added it. Set
+   * means the catalog was skipped, so `matched`/`result` say nothing. */
+  owned_item_id: string | null;
 }
 
 export interface ProviderStatus {

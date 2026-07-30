@@ -5,7 +5,7 @@ import respx
 from app.config import get_settings
 from app.db import SessionLocal
 from app.models import Platform
-from app.tests.helpers import auth_headers
+from app.tests.helpers import auth_headers, create_item
 from app.tests.test_music_providers import KID_A_SEARCH
 from app.tests.test_providers import OPENLIB_SEARCH
 
@@ -140,6 +140,74 @@ def test_barcode_upc_survives_a_provider_outage(client):
     res = client.get("/api/enrich/barcode?code=883929247318", headers=auth_headers(client))
     assert res.status_code == 200
     assert res.json()["matched"] is False
+
+
+@respx.mock
+def test_barcode_reports_a_book_already_in_the_collection(client):
+    """Scanning a copy you already added must not start a second one."""
+    route = respx.get("https://openlibrary.org/api/books")
+    headers = auth_headers(client)
+    item = create_item(
+        client, headers, metadata={"authors": ["Frank Herbert"], "isbn": "9780441172719"}
+    )
+    res = client.get("/api/enrich/barcode?code=978-0-441-17271-9", headers=headers)
+    body = res.json()
+    assert body["owned_item_id"] == item["id"]
+    assert body["code"] == "9780441172719"
+    assert body["kind"] == "isbn"
+    assert not route.called  # a hit skips the catalog entirely
+
+
+@respx.mock
+def test_barcode_matches_the_other_isbn_form(client):
+    """Books added by title search carry an ISBN-10; the barcode is the 13."""
+    headers = auth_headers(client)
+    item = create_item(client, headers, metadata={"isbn": "0441172717"})
+    res = client.get("/api/enrich/barcode?code=9780441172719", headers=headers)
+    assert res.json()["owned_item_id"] == item["id"]
+
+
+@respx.mock
+def test_barcode_matches_a_sleeve_barcode_stored_with_spaces(client):
+    """Catalogs report sleeve barcodes as printed ("7 24352 77382 4")."""
+    headers = auth_headers(client)
+    item = create_item(
+        client,
+        headers,
+        type="music",
+        title="Kid A",
+        metadata={"artist": "Radiohead", "barcode": "7 24352 77382 4"},
+    )
+    res = client.get("/api/enrich/barcode?code=724352773824", headers=headers)
+    assert res.json()["owned_item_id"] == item["id"]
+
+
+@respx.mock
+def test_barcode_matches_a_code_captured_without_a_catalog_match(client):
+    """Movies and games store the raw scan as `upc` — that counts as owned."""
+    headers = auth_headers(client)
+    item = create_item(
+        client, headers, type="movie", title="Arrival", metadata={"upc": "883929247318"}
+    )
+    res = client.get("/api/enrich/barcode?code=883929247318", headers=headers)
+    assert res.json()["owned_item_id"] == item["id"]
+
+
+@respx.mock
+def test_barcode_ignores_another_users_copy(client):
+    """Owned means owned by you — someone else's ISBN is not your item."""
+    respx.get("https://openlibrary.org/api/books").mock(
+        return_value=httpx.Response(
+            200, json={"ISBN:9780441172719": {"title": "Dune", "authors": []}}
+        )
+    )
+    theirs = auth_headers(client, email="other@example.com", name="Other")
+    create_item(client, theirs, metadata={"isbn": "9780441172719"})
+    mine = auth_headers(client)
+    res = client.get("/api/enrich/barcode?code=9780441172719", headers=mine)
+    body = res.json()
+    assert body["owned_item_id"] is None
+    assert body["matched"] is True  # falls through to the catalog as usual
 
 
 def test_providers_status_lists_all(client):

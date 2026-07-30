@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.core.barcodes import clean_code, find_owned
 from app.core.security import get_current_user
 from app.db import get_db
 from app.domain.enums import ItemType
@@ -67,13 +68,25 @@ def details(
 def barcode(
     code: Annotated[str, Query(min_length=8, max_length=20)],
     db: Session = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ) -> BarcodeOut:
     """ISBN → Open Library; other UPC/EAN codes → the music catalogs, which
     index sleeve barcodes. Discs and game boxes have no public barcode
     catalog: their code is returned for storage and the UI offers title
-    search instead."""
-    clean = code.replace("-", "").replace(" ", "")
+    search instead.
+
+    A code the user already has short-circuits all of that: the item id
+    comes back so the scanner can open it instead of adding a second copy.
+    """
+    clean = clean_code(code)
+    owned = find_owned(db, user.id, clean, isbn=_is_isbn(clean))
+    if owned is not None:
+        return BarcodeOut(
+            code=clean,
+            kind="isbn" if _is_isbn(clean) else "upc",
+            matched=False,
+            owned_item_id=owned.id,
+        )
     if _is_isbn(clean):
         result = get_provider(ItemType.BOOK, db).lookup_barcode(clean)
         return BarcodeOut(

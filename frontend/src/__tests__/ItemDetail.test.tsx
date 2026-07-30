@@ -163,6 +163,34 @@ describe("ItemDetail book progress", () => {
   });
 });
 
+describe("ItemDetail scanned notice", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("says you already own it when a scan opened the page", async () => {
+    mockFetch(BOOK);
+    renderDetail({ scanned: "9780441172719" });
+
+    expect(await screen.findByText("You already own this item.")).toBeInTheDocument();
+    expect(screen.getByText("9780441172719")).toBeInTheDocument();
+  });
+
+  it("calls a wishlisted copy what it is", async () => {
+    mockFetch({ ...BOOK, status: "wishlist" });
+    renderDetail({ scanned: "9780441172719" });
+
+    expect(await screen.findByText("This is already on your wishlist.")).toBeInTheDocument();
+    expect(screen.queryByText("You already own this item.")).not.toBeInTheDocument();
+  });
+
+  it("stays out of the way when the page was opened normally", async () => {
+    mockFetch(BOOK);
+    renderDetail();
+
+    await screen.findByRole("heading", { name: "Dune" });
+    expect(screen.queryByText("You already own this item.")).not.toBeInTheDocument();
+  });
+});
+
 describe("ItemDetail rename", () => {
   afterEach(() => vi.unstubAllGlobals());
 

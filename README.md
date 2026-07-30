@@ -140,6 +140,10 @@ browser ──:8080──▶ frontend (nginx)
   picks the medium for you. Movie and game barcodes have **no public
   catalog**: the code is stored on the item and the UI drops you into title
   search. There's also a type-the-digits fallback.
+  Scanning something you **already added** opens that item with *You already
+  own this item* (or *…already on your wishlist*) instead of starting a
+  duplicate — matched against the ISBN/UPC/sleeve barcode stored on your
+  items, in either ISBN form, and it skips the catalog call entirely.
   *Camera access needs HTTPS or `localhost`.* The nicest setup is
   Tailscale on the server plus the Tailscale app on your phone:
 
@@ -237,8 +241,8 @@ backend/
                          epic, gog, psn, stats, platforms (epic/gog share
                          store_import)
   app/core/              security (argon2+JWT), events, covers, artwork, seasons,
-                         episodes, platforms, library_import, import_jobs,
-                         store_filters
+                         episodes, platforms, barcodes, library_import,
+                         import_jobs, store_filters
   app/providers/         MetadataProvider ABC + openlibrary/tmdb/igdb/steam/psn +
                          music (musicbrainz/discogs behind one front) + formats + cache
   app/tests/             pytest suite (runs against real Postgres)

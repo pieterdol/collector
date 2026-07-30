@@ -404,6 +404,7 @@ function ScanMode({
   onMatch: (r: EnrichResult) => void;
   onUpc: (code: string) => void;
 }) {
+  const navigate = useNavigate();
   const lookup = useBarcodeLookup();
   const [manualCode, setManualCode] = useState("");
   const [status, setStatus] = useState<string | null>(null);
@@ -412,7 +413,11 @@ function ScanMode({
     setStatus(`Looking up ${code}…`);
     lookup.mutate(code, {
       onSuccess: (data) => {
-        if (data.matched && data.result) {
+        if (data.owned_item_id) {
+          // Already on the shelf: open it rather than adding a second copy.
+          // The code travels along so the item page can say why you're there.
+          navigate(`/items/${data.owned_item_id}`, { state: { scanned: data.code } });
+        } else if (data.matched && data.result) {
           onMatch(data.result);
         } else if (data.kind === "isbn") {
           setStatus(`No book found for ISBN ${data.code} — try search or manual entry.`);

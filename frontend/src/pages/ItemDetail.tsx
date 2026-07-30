@@ -111,6 +111,7 @@ function Detail({ item }: { item: Item }) {
   return (
     <>
       <BackLink wishlist={item.status === "wishlist"} />
+      <ScannedNotice item={item} />
 
       {/* Hero + overlapping cover (books skip the hero band) */}
       <section>
@@ -218,6 +219,33 @@ function Detail({ item }: { item: Item }) {
         <Lightbox images={shots} index={shotIndex} onClose={() => setShotIndex(null)} onIndex={setShotIndex} />
       )}
     </>
+  );
+}
+
+/** Why you're here: the scanner sends a code that is already in the
+ * collection straight to its item, and this says so. A wishlisted copy is
+ * not owned yet — the "Mark as owned" button is right above. */
+function ScannedNotice({ item }: { item: Item }) {
+  const location = useLocation();
+  const code = (location.state as { scanned?: string } | null)?.scanned;
+  if (!code) return null;
+  return (
+    <div
+      className="flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-[14px] px-4 py-3 text-[13px]"
+      style={{
+        background: "color-mix(in oklch, var(--accent) 7%, transparent)",
+        border: "1px solid color-mix(in oklch, var(--accent) 25%, transparent)",
+      }}
+    >
+      <strong className="font-semibold text-text">
+        {item.status === "wishlist"
+          ? "This is already on your wishlist."
+          : "You already own this item."}
+      </strong>
+      <span className="text-muted">
+        Scanned <span className="font-mono">{code}</span>.
+      </span>
+    </div>
   );
 }
 
