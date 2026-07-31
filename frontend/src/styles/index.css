@@ -284,6 +284,18 @@ body {
   text-transform: uppercase;
   color: var(--faint);
 }
+/* A select is intrinsically as wide as its widest option, and as a grid/flex
+   item it won't shrink below that — long option text (platform names) would
+   widen its column and push the whole form past its container. */
+.field,
+.field select {
+  min-width: 0;
+}
+.field select {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 .field input,
 .field select,
 .field textarea {

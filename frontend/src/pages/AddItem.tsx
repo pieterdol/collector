@@ -328,7 +328,7 @@ function SearchMode({
   return (
     <div>
       <div className="flex gap-2 max-[520px]:flex-col">
-        <div className="relative flex-1">
+        <div className="relative min-w-0 flex-1">
           <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 opacity-45" />
           <input
             type="search"
@@ -343,13 +343,16 @@ function SearchMode({
           />
         </div>
         {/* Games only: narrow the catalog to one platform — it also becomes
-            the platform the copy is filed under on the next step. */}
+            the platform the copy is filed under on the next step.
+            min-w-0 + max-w matter: a select is intrinsically as wide as its
+            widest option, and the long IGDB names ("PC (Microsoft Windows)")
+            would otherwise squeeze the search box down to nothing. */}
         {isGame && (
           <select
             aria-label="Filter by platform"
             value={platform}
             onChange={(e) => onPlatform(e.target.value)}
-            className="input cursor-pointer appearance-none text-[13px] font-semibold text-body max-[520px]:w-full"
+            className="input min-w-0 max-w-[190px] flex-none cursor-pointer appearance-none truncate text-[13px] font-semibold text-body max-[520px]:w-full max-[520px]:max-w-none"
           >
             <option value="">All platforms</option>
             {platformOptions.map((option) => (
