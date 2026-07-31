@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { formatDate } from "../lib/dates";
 import type { Item, ItemStatus } from "../lib/types";
 import { STATUS_LABEL } from "../lib/types";
+import { CopiesIcon } from "./icons";
 import { RatingStars } from "./RatingStars";
 
 const COLUMNS = "grid-cols-[2.2fr_0.8fr_0.9fr_1fr_0.9fr_0.8fr]";
@@ -39,7 +40,18 @@ export function ItemTable({ items }: { items: Item[] }) {
             className={`grid ${COLUMNS} cursor-pointer items-center gap-3 border-b border-line/60 px-4.5 py-3 text-[13px] transition-colors last:border-b-0 hover:bg-raised/40`}
             style={{ paddingLeft: 18, paddingRight: 18 }}
           >
-            <span className="truncate font-semibold">{item.title}</span>
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className="truncate font-semibold">{item.title}</span>
+              {/* One row per bundle, so say how many copies it covers. */}
+              {item.bundle_count > 1 && (
+                <span
+                  title={`${item.bundle_count} copies`}
+                  className="flex flex-none items-center gap-0.5 font-mono text-[10.5px] text-faint"
+                >
+                  <CopiesIcon /> {item.bundle_count}
+                </span>
+              )}
+            </span>
             <span className="text-xs font-semibold capitalize" style={{ color: `var(--${item.type})` }}>
               {item.type}
             </span>

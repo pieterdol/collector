@@ -32,6 +32,10 @@ const base: Item = {
   created_at: "2026-03-12T10:00:00Z",
   updated_at: "2026-03-12T10:00:00Z",
   completed_at: null,
+  bundle_id: null,
+  bundle_front: false,
+  bundle_count: 1,
+  bundle_labels: [],
 };
 
 function renderCard(item: Item) {
@@ -110,6 +114,49 @@ describe("PosterCard", () => {
     renderCard({ ...base, type: "tv", metadata: { media: "DVD" } });
     fireEvent.click(screen.getByTitle("DVD"));
     expect(screen.getByTestId("loc").textContent).toBe("/?type=tv&media=DVD");
+  });
+
+  it("badges a collapsed bundle with how many copies it stands for", () => {
+    renderCard({ ...base, bundle_id: "b1", bundle_front: true, bundle_count: 3 });
+    expect(screen.getByTitle("3 copies")).toHaveTextContent("3");
+  });
+
+  it("leaves an unbundled item unbadged", () => {
+    renderCard(base);
+    expect(screen.queryByTitle(/copies/)).not.toBeInTheDocument();
+  });
+
+  it("names the copies instead of the meta line for a bundle", () => {
+    renderCard({
+      ...base,
+      type: "game",
+      platform: "PlayStation 5",
+      metadata: { developer: "FromSoftware", year: 2022 },
+      bundle_id: "b1",
+      bundle_front: true,
+      bundle_count: 2,
+      bundle_labels: ["PlayStation 5", "PC (Microsoft Windows)"],
+    });
+    expect(screen.getByText("PS5 · PC")).toBeInTheDocument();
+    expect(screen.queryByText(/FromSoftware/)).not.toBeInTheDocument();
+  });
+
+  it("falls back to the normal meta line when a bundle has nothing to tell apart", () => {
+    renderCard({ ...base, bundle_id: "b1", bundle_front: true, bundle_count: 2 });
+    expect(screen.getByText("Frank Herbert · 1965")).toBeInTheDocument();
+  });
+
+  it("spells out disc formats of a bundled movie", () => {
+    renderCard({
+      ...base,
+      type: "movie",
+      metadata: { media: "DVD" },
+      bundle_id: "b1",
+      bundle_front: true,
+      bundle_count: 2,
+      bundle_labels: ["DVD", "Blu-ray"],
+    });
+    expect(screen.getByText("DVD · Blu-ray")).toBeInTheDocument();
   });
 });
 

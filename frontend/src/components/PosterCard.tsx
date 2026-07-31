@@ -4,7 +4,8 @@
 import { Link } from "react-router-dom";
 import type { Item, ItemStatus } from "../lib/types";
 import { STATUS_LABEL } from "../lib/types";
-import { MediaBadge } from "./MediaBadge";
+import { CopiesIcon } from "./icons";
+import { MediaBadge, platformAbbr } from "./MediaBadge";
 import { RatingStars } from "./RatingStars";
 
 const STATUS_COLOR: Record<ItemStatus, string> = {
@@ -27,6 +28,15 @@ export function coverSrc(item: Item): string | null {
   return `${item.cover_path}?v=${Date.parse(item.updated_at)}`;
 }
 
+/** Caption for a collapsed bundle: what tells its copies apart. Game
+ * platforms shorten to their badge abbreviation ("PS5 · PC"); disc formats
+ * and carriers are already short enough to spell out. */
+export function describeBundle(item: Item): string {
+  return item.bundle_labels
+    .map((label) => (item.type === "game" ? platformAbbr(label) ?? label : label))
+    .join(" · ");
+}
+
 export function describeItem(item: Item): string {
   const meta = item.metadata;
   const parts: string[] = [];
@@ -42,6 +52,8 @@ export function describeItem(item: Item): string {
 export function PosterCard({ item }: { item: Item }) {
   const pct = progressPercent(item);
   const onLoan = Boolean(item.borrowed_by && !item.returned_date);
+  // One card stands for every copy in the bundle (see api/items.list_items).
+  const copies = item.bundle_count > 1 ? item.bundle_count : 0;
 
   return (
     <Link to={`/items/${item.id}`} className="cardlink">
@@ -57,6 +69,11 @@ export function PosterCard({ item }: { item: Item }) {
           {STATUS_LABEL[item.status]}
         </span>
         {onLoan && <span className="badge badge-loan">→ {item.borrowed_by}</span>}
+        {copies > 0 && (
+          <span className="badge badge-bundle" title={`${copies} copies`}>
+            <CopiesIcon /> {copies}
+          </span>
+        )}
         <MediaBadge item={item} />
         {pct !== null && item.status === "in_progress" && (
           <div className="pstrip" title={`${item.progress_current} / ${item.progress_total}`}>
@@ -66,7 +83,9 @@ export function PosterCard({ item }: { item: Item }) {
       </div>
       <div className="flex flex-col gap-0.5">
         <div className="truncate text-[13.5px] font-semibold leading-[1.3]">{item.title}</div>
-        <div className="truncate text-xs text-faint">{describeItem(item)}</div>
+        <div className="truncate text-xs text-faint">
+          {(copies > 0 ? describeBundle(item) : "") || describeItem(item)}
+        </div>
         {item.rating && (
           <div className="text-xs tracking-[0.1em] text-accent">
             <RatingStars value={Number(item.rating)} size={11} />

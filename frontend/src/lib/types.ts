@@ -34,6 +34,14 @@ export interface Item {
   created_at: string;
   updated_at: string;
   completed_at: string | null;
+  /** Copies of one release share a bundle id; the library shows one of them. */
+  bundle_id: string | null;
+  /** True on the copy the library shows. */
+  bundle_front: boolean;
+  /** Copies in the bundle (1 when unbundled) — set by list/detail responses. */
+  bundle_count: number;
+  /** What tells the copies apart ("PlayStation 5", "DVD"), front copy first. */
+  bundle_labels: string[];
 }
 
 export interface ItemList {
@@ -191,6 +199,16 @@ export const STATUS_LABEL: Record<ItemStatus, string> = {
   completed: "Completed",
   abandoned: "Abandoned",
 };
+
+/** What tells one copy of a bundled release apart from its siblings —
+ * mirrors `_label` in backend/app/core/bundles.py. */
+export function copyLabel(item: Item): string {
+  if (item.type === "game" && item.platform) return item.platform;
+  const media = item.metadata.media;
+  if (typeof media === "string" && media) return media;
+  if (!item.format) return "Copy";
+  return item.format === "physical" ? "Physical" : "Digital";
+}
 
 /** Disc formats a physical movie or TV season can be stored on
  * (metadata.media / item_seasons.media — mirrors DiscMedia in enums.py). */

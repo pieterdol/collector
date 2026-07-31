@@ -3,6 +3,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Computed,
     Date,
@@ -42,6 +43,16 @@ class Item(Base):
     # Games link to a platform record; other types leave this NULL.
     platform_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("platforms.id", ondelete="SET NULL")
+    )
+
+    # Copies of the same release (a game on PS5 and PC, a DVD later replaced
+    # by a Blu-ray) share a bundle id: separate items, one library entry.
+    # Deliberately not a FK to a bundles table — membership lives on the
+    # copies, so deleting one can never leave a dangling group behind.
+    bundle_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    # The one copy of a bundle the library grid shows.
+    bundle_front: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false")
     )
 
     type: Mapped[str] = mapped_column(Text)
@@ -98,6 +109,18 @@ class Item(Base):
         CheckConstraint(
             "rating >= 0 AND rating <= 5 AND rating * 2 = floor(rating * 2)",
             name="ck_items_rating_half_steps",
+        ),
+        CheckConstraint(
+            "NOT bundle_front OR bundle_id IS NOT NULL",
+            name="ck_items_bundle_front_needs_bundle",
+        ),
+        Index("ix_items_user_bundle", "user_id", "bundle_id"),
+        # At most one copy fronts a bundle.
+        Index(
+            "uq_items_bundle_front",
+            "bundle_id",
+            unique=True,
+            postgresql_where=text("bundle_front"),
         ),
         Index("ix_items_user_type_status", "user_id", "type", "status"),
         Index("ix_items_user_format", "user_id", "format"),

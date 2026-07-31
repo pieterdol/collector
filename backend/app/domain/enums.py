@@ -72,6 +72,10 @@ class EventType(StrEnum):
     LOAN_OUT = "loan_out"
     LOAN_RETURN = "loan_return"
     ITEM_DELETED = "item_deleted"
+    BUNDLED = "bundled"
+    UNBUNDLED = "unbundled"
+    #: Which copy of a bundle the library shows changed.
+    BUNDLE_FRONT = "bundle_front"
     SEASON_ACQUIRED = "season_acquired"
     SEASON_WATCHED = "season_watched"
     SEASON_UPDATED = "season_updated"

@@ -142,3 +142,13 @@ export function SteamIcon({ size = 19, className }: IconProps) {
     </svg>
   );
 }
+
+/** Stacked cards: several copies of one thing bundled together. */
+export function CopiesIcon({ size = 11, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" className={className} aria-hidden>
+      <rect x="8" y="3" width="13" height="13" rx="2.5" />
+      <path d="M16 20.5H5.5A2.5 2.5 0 0 1 3 18V7.5" />
+    </svg>
+  );
+}

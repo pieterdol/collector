@@ -76,6 +76,12 @@ class AcquireIn(BaseModel):
     platform: str | None = Field(default=None, max_length=100)
 
 
+class BundleIn(BaseModel):
+    """The other copies to pull into this item's bundle."""
+
+    item_ids: list[uuid.UUID] = Field(min_length=1, max_length=20)
+
+
 class ItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
@@ -107,10 +113,24 @@ class ItemOut(BaseModel):
     updated_at: datetime
     completed_at: datetime | None
 
+    # Bundled copies of one release. `count`/`labels` describe the whole
+    # bundle and are filled by the endpoints that list or fetch items (see
+    # core/bundles.as_out); elsewhere they read as "just this copy".
+    bundle_id: uuid.UUID | None = None
+    bundle_front: bool = False
+    bundle_count: int = 1
+    bundle_labels: list[str] = Field(default_factory=list)
+
 
 class ItemListOut(BaseModel):
     items: list[ItemOut]
     total: int
+
+
+class CopyListOut(BaseModel):
+    """Every copy in an item's bundle, front copy first; empty when unbundled."""
+
+    copies: list[ItemOut]
 
 
 class ActivityEventOut(BaseModel):

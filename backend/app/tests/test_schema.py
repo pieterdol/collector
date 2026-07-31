@@ -144,11 +144,27 @@ def test_expected_indexes_exist(db):
         "ix_items_user_format",
         "ix_items_user_completed_at",
         "ix_items_title_tsv",
+        "ix_items_user_bundle",
+        "uq_items_bundle_front",
         "ix_activity_events_item_id",
         "ix_activity_events_user_created",
         "ix_activity_events_type_created",
     ]:
         assert expected in rows, f"missing index {expected}"
+
+
+def test_only_one_copy_can_front_a_bundle(db):
+    user = make_user(db)
+    bundle_id = uuid.uuid4()
+    make_item(db, user, bundle_id=bundle_id, bundle_front=True)
+    with pytest.raises(IntegrityError):
+        make_item(db, user, bundle_id=bundle_id, bundle_front=True)
+
+
+def test_an_unbundled_item_cannot_front_a_bundle(db):
+    user = make_user(db)
+    with pytest.raises(IntegrityError):
+        make_item(db, user, bundle_front=True)
 
 
 def test_migration_produces_schema(tmp_path):

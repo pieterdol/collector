@@ -126,6 +126,11 @@ browser ──:8080──▶ frontend (nginx)
 - **Items** are user-owned rows with type-specific data in a JSONB
   `metadata` column; enum-ish fields are TEXT + CHECK constraints (enums
   live in code: `backend/app/domain/enums.py`, `frontend/src/lib/types.ts`).
+- **Bundles are an id on the copies**, not a table: items sharing a
+  `bundle_id` are copies of one release and one of them carries
+  `bundle_front`. Deleting a copy can't strand a group, and the library
+  collapses bundles with a window function *after* filtering — so a filter
+  always surfaces a copy that matches it (`backend/app/core/bundles.py`).
 - **Every mutation writes an `activity_events` row** in the same
   transaction (see `backend/app/core/events.py`). This append-only log plus
   `completed_at`/`acquisition_date` timestamps makes future dashboards
@@ -265,6 +270,19 @@ browser ──:8080──▶ frontend (nginx)
 - **Loans**: lend to a name, mark returned — both logged. What is out shows
   as a badge on the poster and is listed under Stats; the library itself
   stays uncluttered.
+- **Bundled copies** — for the things you own twice: a game on PS5 *and* PC, a
+  DVD you later replaced with the Blu-ray. Each copy stays its own item with
+  its own platform, format, status, rating and progress; the library shows one
+  entry for the bundle, badged with the number of copies and captioned with
+  what tells them apart ("PS5 · PC", "DVD · Blu-ray"). Bundle from the
+  **Copies** panel on an item page ("Bundle another copy…", searches your
+  library for the same type), and unbundle a copy there too. You choose which
+  copy the library shows ("Show in library"); bundling with an already-bundled
+  copy merges the two groups. Filters pick the copy that matches, so
+  *Platform: PC* surfaces the PC copy even when the PS5 one fronts the bundle
+  — and a wishlisted upgrade bundled with what you own shows up on the
+  wishlist while the owned copy stays in the library. Stats still counts
+  copies individually: two copies are two games.
 - **Theming**: dark ("graphite", the designed theme) and a derived light variant,
   OS-aware with a persisted toggle. All colors are CSS custom properties in
   `frontend/src/styles/tokens.css`; a new theme is one more
@@ -279,11 +297,11 @@ backend/
   app/domain/enums.py    the enum single-source-of-truth
   app/models/            SQLAlchemy tables (users, items, item_seasons,
                          item_episodes, platforms, activity_events, provider_cache)
-  app/api/               routers: auth, items, seasons, episodes, enrich, steam,
-                         epic, gog, psn, stats, platforms (epic/gog share
+  app/api/               routers: auth, items, bundles, seasons, episodes, enrich,
+                         steam, epic, gog, psn, stats, platforms (epic/gog share
                          store_import)
   app/core/              security (argon2+JWT), events, covers, artwork, seasons,
-                         episodes, platforms, barcodes, library_import,
+                         episodes, platforms, bundles, barcodes, library_import,
                          import_jobs, store_filters
   app/core/vision/       cover reading: backend-agnostic pipeline + one module
                          per backend (ollama, gemini)

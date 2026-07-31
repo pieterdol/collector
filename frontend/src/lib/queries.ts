@@ -137,6 +137,63 @@ export function useDeleteItem() {
   });
 }
 
+/** Copies of one release bundled under a single library entry. Empty for an
+ * unbundled item; the front copy (the one the library shows) comes first. */
+export function useCopies(id: string | undefined) {
+  return useQuery({
+    queryKey: ["copies", id],
+    queryFn: () => api<{ copies: Item[] }>(`/api/items/${id}/copies`),
+    enabled: Boolean(id),
+  });
+}
+
+/** Bundle mutations all reshuffle which copies the library shows, so they
+ * drop the gallery, the copy lists and both items' caches. */
+function useInvalidateCopies() {
+  const client = useQueryClient();
+  const invalidateItems = useInvalidateItems();
+  return (...ids: string[]) => {
+    void client.invalidateQueries({ queryKey: ["copies"] });
+    invalidateItems();
+    for (const id of ids) {
+      void client.invalidateQueries({ queryKey: ["item", id] });
+      void client.invalidateQueries({ queryKey: ["activity", id] });
+    }
+  };
+}
+
+/** Pull other copies into this item's bundle (creating one if needed). */
+export function useBundleWith(id: string) {
+  const invalidate = useInvalidateCopies();
+  return useMutation({
+    mutationFn: (itemIds: string[]) =>
+      api<{ copies: Item[] }>(`/api/items/${id}/bundle`, {
+        method: "POST",
+        body: { item_ids: itemIds },
+      }),
+    onSuccess: (_data, itemIds) => invalidate(id, ...itemIds),
+  });
+}
+
+/** Take one copy out of its bundle. */
+export function useUnbundleCopy() {
+  const invalidate = useInvalidateCopies();
+  return useMutation({
+    mutationFn: (copyId: string) => api<void>(`/api/items/${copyId}/bundle`, { method: "DELETE" }),
+    onSuccess: (_data, copyId) => invalidate(copyId),
+  });
+}
+
+/** Make this copy the one the library shows. */
+export function useFrontCopy() {
+  const invalidate = useInvalidateCopies();
+  return useMutation({
+    mutationFn: (copyId: string) =>
+      api<Item>(`/api/items/${copyId}/bundle/front`, { method: "POST" }),
+    onSuccess: (_data, copyId) => invalidate(copyId),
+  });
+}
+
 export function useAcquireItem(id: string) {
   const invalidate = useInvalidateItems();
   return useMutation({

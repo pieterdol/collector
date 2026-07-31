@@ -15,19 +15,24 @@ import { SeasonsPanel } from "../components/SeasonsPanel";
 import { DetailSkeleton } from "../components/Skeletons";
 import {
   useActivity,
+  useBundleWith,
+  useCopies,
   useDeleteActivity,
   useDeleteItem,
   useEnrichSearch,
   useFetchArtwork,
+  useFrontCopy,
   useItem,
+  useItems,
   useRelinkItem,
+  useUnbundleCopy,
   useUpdateItem,
   useUploadCover,
 } from "../lib/queries";
 import { musicTracks } from "../lib/music";
 import type { Item, ItemStatus } from "../lib/types";
 import { mediaOptions } from "../lib/types";
-import { STATUS_LABEL, progressUnit } from "../lib/types";
+import { STATUS_LABEL, copyLabel, progressUnit } from "../lib/types";
 
 const SOURCE_LABEL: Record<string, string> = {
   book: "Open Library",
@@ -209,6 +214,7 @@ function Detail({ item }: { item: Item }) {
         <div className="flex flex-col gap-3.5">
           {progressUnit(item.type) && item.status !== "wishlist" && <ProgressPanel item={item} />}
           <DetailsPanel item={item} />
+          <CopiesPanel item={item} />
           <LoanPanel item={item} />
           <DangerZone item={item} />
         </div>
@@ -945,6 +951,179 @@ function RelinkDialog({ item, onClose }: { item: Item; onClose: () => void }) {
         </div>
         {relink.isError && (
           <p className="m-0 text-xs text-danger">{(relink.error as Error).message}</p>
+        )}
+        <button type="button" className="btn btn-ghost btn-sm w-fit" onClick={onClose}>
+          Cancel
+        </button>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/** The copies of this release you own more than once. They stay separate
+ * items — own platform, format, status, progress — but the library shows
+ * only the front one, and this panel is where you say which that is. */
+function CopiesPanel({ item }: { item: Item }) {
+  const { data } = useCopies(item.id);
+  const front = useFrontCopy();
+  const unbundle = useUnbundleCopy();
+  const [picking, setPicking] = useState(false);
+  const copies = data?.copies ?? [];
+  const busy = front.isPending || unbundle.isPending;
+
+  return (
+    <div
+      className="panel flex flex-col gap-2.5 p-4.5"
+      style={{ padding: 18 }}
+      role="group"
+      aria-label="Copies"
+    >
+      <div className="paneltitle">Copies</div>
+      {copies.length === 0 ? (
+        <p className="m-0 text-[13px] text-faint">
+          The only copy you have. Bundle another one to keep them under a single
+          library entry.
+        </p>
+      ) : (
+        copies.map((copy) =>
+          copy.id === item.id ? (
+            <div key={copy.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">
+              <span className="font-semibold">{copyLabel(copy)}</span>
+              <span className="text-faint">· {STATUS_LABEL[copy.status]}</span>
+              <span className="pillbadge border border-line-strong bg-raised text-muted">
+                This copy
+              </span>
+              {copy.bundle_front && <span className="text-xs text-accent">In library</span>}
+              <span className="ml-auto flex gap-2.5">
+                {!copy.bundle_front && (
+                  <button
+                    type="button"
+                    className="text-[12.5px] font-semibold text-accent"
+                    disabled={busy}
+                    onClick={() => front.mutate(copy.id)}
+                  >
+                    Show in library
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="text-[12.5px] font-semibold text-muted"
+                  disabled={busy}
+                  onClick={() => unbundle.mutate(copy.id)}
+                >
+                  Unbundle
+                </button>
+              </span>
+            </div>
+          ) : (
+            <Link
+              key={copy.id}
+              to={`/items/${copy.id}`}
+              className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] no-underline text-inherit hover:text-accent"
+            >
+              <span className="font-semibold">{copyLabel(copy)}</span>
+              <span className="text-faint">· {STATUS_LABEL[copy.status]}</span>
+              {copy.bundle_front && <span className="text-xs text-accent">In library</span>}
+            </Link>
+          ),
+        )
+      )}
+      <button
+        type="button"
+        className="btn btn-ghost btn-sm w-fit"
+        onClick={() => setPicking(true)}
+      >
+        Bundle another copy…
+      </button>
+      {(front.isError || unbundle.isError) && (
+        <p className="m-0 text-xs text-danger">
+          {((front.error ?? unbundle.error) as Error).message}
+        </p>
+      )}
+      {picking && (
+        <BundleDialog item={item} copies={copies} onClose={() => setPicking(false)} />
+      )}
+    </div>
+  );
+}
+
+/** Pick another copy out of your library. Only the same type can be
+ * bundled, and copies already in this bundle are filtered out. */
+function BundleDialog({
+  item,
+  copies,
+  onClose,
+}: {
+  item: Item;
+  copies: Item[];
+  onClose: () => void;
+}) {
+  // The other copy is the same release, so its title is the same too — open
+  // on it and let the field be edited for the odd re-titled copy.
+  const [q, setQ] = useState(item.title);
+  const search = useItems({ type: [item.type], q: q.trim() || undefined, sort: "title" });
+  const bundleWith = useBundleWith(item.id);
+  const own = new Set(copies.map((copy) => copy.id));
+  const results = (search.data?.items ?? []).filter(
+    (candidate) =>
+      candidate.id !== item.id &&
+      !own.has(candidate.id) &&
+      // A collapsed row can stand for a copy of this very bundle.
+      (item.bundle_id === null || candidate.bundle_id !== item.bundle_id),
+  );
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-label="Bundle another copy"
+        className="panel flex max-h-[85dvh] w-full max-w-[440px] flex-col gap-3 p-5 shadow-lift"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="paneltitle">Bundle another copy</div>
+        <p className="m-0 text-xs text-faint">
+          Pick the other copy of {item.title}. Both keep their own platform, format and
+          progress; the library lists them as one entry.
+        </p>
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          aria-label="Search your library"
+          placeholder="Search your library…"
+          className="input w-full"
+        />
+        <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
+          {results.map((candidate) => (
+            <button
+              key={candidate.id}
+              type="button"
+              disabled={bundleWith.isPending}
+              onClick={() => bundleWith.mutate([candidate.id], { onSuccess: onClose })}
+              className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-left hover:bg-raised disabled:opacity-50"
+            >
+              <span className="grid h-12 w-[34px] flex-none place-items-center overflow-hidden rounded-md border border-line-strong bg-surface">
+                {candidate.cover_path && (
+                  <img src={coverSrc(candidate)!} alt="" className="h-full w-full object-cover" />
+                )}
+              </span>
+              <span className="flex min-w-0 flex-col">
+                <span className="truncate text-[13px] font-semibold">{candidate.title}</span>
+                <span className="truncate text-xs text-faint">
+                  {copyLabel(candidate)} · {STATUS_LABEL[candidate.status]}
+                  {candidate.bundle_count > 1 && ` · ${candidate.bundle_count} copies`}
+                </span>
+              </span>
+            </button>
+          ))}
+          {!search.isLoading && results.length === 0 && (
+            <span className="px-2 py-1.5 text-xs text-faint">
+              No other {item.type} in your library matches.
+            </span>
+          )}
+        </div>
+        {bundleWith.isError && (
+          <p className="m-0 text-xs text-danger">{(bundleWith.error as Error).message}</p>
         )}
         <button type="button" className="btn btn-ghost btn-sm w-fit" onClick={onClose}>
           Cancel

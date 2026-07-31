@@ -5,7 +5,8 @@
  * library on it. */
 
 import { useNavigate } from "react-router-dom";
-import type { Item } from "../lib/types";
+import type { Item, ItemType } from "../lib/types";
+import { MOVIE_MEDIA } from "../lib/types";
 
 /** Compact 3–5 char platform label, or null when none fits the badge. */
 export function platformAbbr(name: string): string | null {
@@ -136,37 +137,72 @@ const CARRIER_ABBR: Record<string, string> = {
   Cassette: "TAPE",
 };
 
-export function MediaBadge({ item }: { item: Item }) {
-  if ((item.type === "movie" || item.type === "tv") && item.format === "physical") {
-    const media = item.metadata.media;
-    if (typeof media !== "string" || !media) return null;
-    return <DiscBadge media={media} to={`/?type=${item.type}&media=${encodeURIComponent(media)}`} />;
+/** The badge for one copy's distinguishing label — a disc format, a carrier
+ * or a platform. Null when the label has no badge form (an unabbreviatable
+ * platform, or a plain "Physical"/"Digital" with no medium recorded). */
+function LabelBadge({ type, label }: { type: ItemType; label: string }) {
+  if (type === "movie" || type === "tv") {
+    return <DiscBadge media={label} to={`/?type=${type}&media=${encodeURIComponent(label)}`} />;
   }
-
-  if (item.type === "music" && item.format === "physical") {
-    const media = item.metadata.media;
-    if (typeof media !== "string") return null;
-    const abbr = CARRIER_ABBR[media];
-    if (!abbr) return null;
-    return (
-      <FilterBadge to={`/?type=music&media=${encodeURIComponent(media)}`} title={media}>
+  if (type === "music") {
+    const abbr = CARRIER_ABBR[label];
+    return abbr ? (
+      <FilterBadge to={`/?type=music&media=${encodeURIComponent(label)}`} title={label}>
         {abbr}
       </FilterBadge>
-    );
+    ) : null;
   }
-
-  if (item.type === "game" && item.platform) {
-    const abbr = platformAbbr(item.platform);
-    if (!abbr) return null;
-    return (
-      <FilterBadge
-        to={`/?type=game&platform=${encodeURIComponent(item.platform)}`}
-        title={item.platform}
-      >
+  if (type === "game") {
+    const abbr = platformAbbr(label);
+    return abbr ? (
+      <FilterBadge to={`/?type=game&platform=${encodeURIComponent(label)}`} title={label}>
         {abbr}
       </FilterBadge>
-    );
+    ) : null;
   }
-
   return null;
+}
+
+/** Whether that label would render as a badge at all. */
+function hasBadge(type: ItemType, label: string): boolean {
+  if (type === "movie" || type === "tv") return MOVIE_MEDIA.includes(label);
+  if (type === "music") return label in CARRIER_ABBR;
+  if (type === "game") return platformAbbr(label) !== null;
+  return false;
+}
+
+/** What this one copy is: its disc/carrier when physical, its platform when
+ * it's a game. Books and digital discs have nothing to show. */
+function ownLabel(item: Item): string | null {
+  if (item.type === "game") return item.platform;
+  const media = item.metadata.media;
+  const physicalMedium = item.type === "movie" || item.type === "tv" || item.type === "music";
+  if (physicalMedium && item.format === "physical" && typeof media === "string" && media) {
+    return media;
+  }
+  return null;
+}
+
+/** A poster corner holds three badges; the ⧉ count says how many copies
+ * there really are, and the caption lists them. */
+const MAX_BADGES = 3;
+
+export function MediaBadge({ item }: { item: Item }) {
+  // One card can stand for several copies (bundles, see core/bundles.py), so
+  // badge each of them — a PS5+PS4 bundle must not read as PS5-only.
+  const labels =
+    item.bundle_count > 1 ? item.bundle_labels.filter((label) => hasBadge(item.type, label)) : [];
+
+  if (labels.length > 1) {
+    return (
+      <span className="badgestack">
+        {labels.slice(0, MAX_BADGES).map((label) => (
+          <LabelBadge key={label} type={item.type} label={label} />
+        ))}
+      </span>
+    );
+  }
+
+  const label = labels[0] ?? ownLabel(item);
+  return label ? <LabelBadge type={item.type} label={label} /> : null;
 }

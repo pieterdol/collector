@@ -136,6 +136,18 @@ body {
   color: var(--accent);
 }
 
+/* Copies badge in the poster's top-right: this card stands for a bundle */
+.badge-bundle {
+  top: 8px;
+  left: auto;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
 /* Media badge (disc format / game platform) in the poster's bottom-right */
 .badge-media {
   top: auto;
@@ -148,6 +160,25 @@ body {
   letter-spacing: 0.08em;
   color: var(--muted);
 }
+/* One card standing for a bundle carries a badge per copy: they fill
+   leftward from the poster's bottom-right corner and wrap upward. */
+.badgestack {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap-reverse;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 4px;
+  max-width: calc(100% - 16px);
+}
+.badgestack .badge {
+  position: static;
+  inset: auto;
+}
+
 /* Same disc badge, flowing inline instead of pinned to a poster corner
    (season rows, where the thumbnail is too small to carry it) */
 .badge-chip {

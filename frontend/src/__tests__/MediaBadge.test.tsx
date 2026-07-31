@@ -31,6 +31,10 @@ const base: Item = {
   created_at: "2026-03-12T10:00:00Z",
   updated_at: "2026-03-12T10:00:00Z",
   completed_at: null,
+  bundle_id: null,
+  bundle_front: false,
+  bundle_count: 1,
+  bundle_labels: [],
 };
 
 function movie(media?: string, format: Item["format"] = "physical"): Item {
@@ -139,6 +143,69 @@ describe("MediaBadge — music", () => {
   it("renders nothing when the carrier is unknown", () => {
     const { container } = render(<MediaBadge item={record(undefined)} />);
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+/** A collapsed bundle stands for every copy, so the corner badge has to
+ * name all of them — not just whichever copy fronts the entry. */
+describe("MediaBadge — bundled copies", () => {
+  function bundled(item: Item, labels: string[]): Item {
+    return { ...item, bundle_id: "b1", bundle_front: true, bundle_count: labels.length, bundle_labels: labels };
+  }
+
+  it("badges every platform in a bundled game", () => {
+    render(
+      <MediaBadge
+        item={bundled(game("PlayStation 5"), ["PlayStation 5", "PlayStation 4"])}
+      />,
+    );
+    expect(screen.getByTitle("PlayStation 5")).toHaveTextContent("PS5");
+    expect(screen.getByTitle("PlayStation 4")).toHaveTextContent("PS4");
+  });
+
+  it("keeps every badge a filter link of its own", () => {
+    render(
+      <MediaBadge
+        item={bundled(game("PlayStation 5"), ["PlayStation 5", "PlayStation 4"])}
+      />,
+    );
+    expect(screen.getByTitle("PlayStation 4")).toHaveAttribute("role", "button");
+  });
+
+  it("badges both discs of a movie owned twice", () => {
+    render(<MediaBadge item={bundled(movie("DVD"), ["DVD", "Blu-ray"])} />);
+    expect(screen.getByTitle("DVD")).toBeInTheDocument();
+    expect(screen.getByTitle("Blu-ray")).toBeInTheDocument();
+  });
+
+  it("skips labels that have no badge of their own", () => {
+    const { container } = render(
+      <MediaBadge item={bundled(movie(undefined, "digital"), ["Digital", "Blu-ray"])} />,
+    );
+    expect(screen.getByTitle("Blu-ray")).toBeInTheDocument();
+    expect(container.querySelectorAll(".badge")).toHaveLength(1);
+  });
+
+  it("stops at three badges — the copies count carries the rest", () => {
+    const { container } = render(
+      <MediaBadge
+        item={bundled(game("PlayStation 5"), [
+          "PlayStation 5",
+          "PlayStation 4",
+          "PC (Microsoft Windows)",
+          "Xbox One",
+        ])}
+      />,
+    );
+    expect(container.querySelectorAll(".badge")).toHaveLength(3);
+    expect(screen.queryByTitle("Xbox One")).not.toBeInTheDocument();
+  });
+
+  it("still shows one badge when the bundle has a single label", () => {
+    const { container } = render(
+      <MediaBadge item={bundled(game("PlayStation 5"), ["PlayStation 5"])} />,
+    );
+    expect(container.querySelectorAll(".badge")).toHaveLength(1);
   });
 });
 

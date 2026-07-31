@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api import (
     auth,
+    bundles,
     enrich,
     epic,
     episodes,
@@ -28,6 +29,7 @@ app = FastAPI(title="Collector API", docs_url="/api/docs", openapi_url="/api/ope
 
 app.include_router(auth.router)
 app.include_router(items.router)
+app.include_router(bundles.router)
 app.include_router(seasons.router)
 app.include_router(episodes.router)
 app.include_router(enrich.router)

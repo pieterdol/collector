@@ -3,9 +3,10 @@ from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from sqlalchemy import case, func, or_, select, text
-from sqlalchemy.orm import Session
+from sqlalchemy import case, func, literal, or_, select, text
+from sqlalchemy.orm import Session, aliased
 
+from app.core import bundles
 from app.core.artwork import fetch_artwork
 from app.core.covers import download_cover
 from app.core.events import record_event
@@ -182,35 +183,52 @@ def list_items(
         query = query.where(
             or_(title_match, creator_match, _meta_match(DESCRIPTION_FIELDS, q))
         )
-    release = Item.meta["release_date"].astext
     if upcoming:
         # Release dates are ISO strings, full ("2026-12-18") or partial
         # ("2026-09", "2027"). An item is upcoming while its release period
         # hasn't fully passed: compare against today truncated to the same
         # precision, so a year-only date stays upcoming all year.
         today = datetime.now(UTC).date().isoformat()
+        release = Item.meta["release_date"].astext
         query = query.where(release >= func.substr(today, 1, func.length(release)))
 
-    total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
+    # Bundled copies collapse to one row. The window runs after the filters,
+    # so the representative is picked among the copies that actually match:
+    # filtering on PC surfaces the PC copy even when another one fronts the
+    # bundle. Unbundled items partition on their own id, i.e. stay as they are.
+    rank = func.row_number().over(
+        partition_by=func.coalesce(Item.bundle_id, Item.id),
+        order_by=(Item.bundle_front.desc(), Item.created_at.asc(), Item.id.asc()),
+    ).label("bundle_rank")
+    # Tiering search hits has to happen inside the same SELECT as the window,
+    # so it travels along as a column instead of an ORDER BY expression.
+    tier = (
+        case((title_match, 0), (creator_match, 1), else_=2) if q else literal(0)
+    ).label("match_tier")
+    inner = query.add_columns(tier, rank).subquery()
+    Copy = aliased(Item, inner)
+    collapsed = select(Copy).where(inner.c.bundle_rank == 1)
+
+    total = db.scalar(select(func.count()).select_from(collapsed.subquery())) or 0
 
     order = {
-        "added": Item.created_at.desc(),
-        "title": func.lower(Item.title).asc(),
-        "rating": Item.rating.desc().nullslast(),
-        "updated": Item.updated_at.desc(),
+        "added": Copy.created_at.desc(),
+        "title": func.lower(Copy.title).asc(),
+        "rating": Copy.rating.desc().nullslast(),
+        "updated": Copy.updated_at.desc(),
         # Lexicographic asc puts partial dates at the start of their period
         # ("2027" < "2027-01-01"), matching how the Upcoming page groups.
-        "release": release.asc().nullslast(),
+        "release": Copy.meta["release_date"].astext.asc().nullslast(),
     }[sort]
     # id tiebreaker: batch imports share created_at, and without a total
     # order Postgres pages tied rows arbitrarily (duplicates/gaps in the UI).
-    ordering = [order, Item.id.desc()]
+    ordering = [order, Copy.id.desc()]
     if q:
         # Tier before the chosen sort, so "sort by title" still lists the
         # title matches first.
-        ordering.insert(0, case((title_match, 0), (creator_match, 1), else_=2))
-    items = db.scalars(query.order_by(*ordering).limit(limit).offset(offset)).all()
-    return ItemListOut(items=[ItemOut.model_validate(i) for i in items], total=total)
+        ordering.insert(0, inner.c.match_tier)
+    items = db.scalars(collapsed.order_by(*ordering).limit(limit).offset(offset)).all()
+    return ItemListOut(items=bundles.as_out(db, user.id, items), total=total)
 
 
 @router.get("/{item_id}", response_model=ItemOut)
@@ -218,8 +236,9 @@ def get_item(
     item_id: uuid.UUID,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
-) -> Item:
-    return _get_owned_item(db, user, item_id)
+) -> ItemOut:
+    item = _get_owned_item(db, user, item_id)
+    return bundles.as_out(db, user.id, [item])[0]
 
 
 @router.patch("/{item_id}", response_model=ItemOut)
@@ -347,7 +366,12 @@ def delete_item(
     user: User = Depends(get_current_user),
 ) -> None:
     item = _get_owned_item(db, user, item_id)
+    bundle_id = item.bundle_id
     db.delete(item)  # activity events cascade with the item
+    db.flush()
+    # A deleted copy leaves its bundle like an unbundled one would: the
+    # remaining copies keep a front, and a lone survivor keeps no bundle.
+    bundles.settle(db, user.id, bundle_id)
     db.commit()
 
 
