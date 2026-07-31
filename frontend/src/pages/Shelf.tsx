@@ -1,4 +1,4 @@
-/** Library: loan banner, type chips, status/sort dropdowns, poster grid ⇄ table. */
+/** Library: type chips, status/sort dropdowns, poster grid ⇄ table. */
 
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -7,14 +7,7 @@ import { GridIcon, RowsIcon } from "../components/icons";
 import { ItemTable } from "../components/ItemTable";
 import { PosterCard } from "../components/PosterCard";
 import { PosterGridSkeleton } from "../components/Skeletons";
-import { formatDate } from "../lib/dates";
-import {
-  flattenItemPages,
-  useItemsInfinite,
-  usePlatforms,
-  useStats,
-  useUpdateItem,
-} from "../lib/queries";
+import { flattenItemPages, useItemsInfinite, usePlatforms } from "../lib/queries";
 import { mediaOptions } from "../lib/types";
 
 const TYPE_CHIPS = [
@@ -69,7 +62,6 @@ export default function Shelf() {
 
   return (
     <>
-      <LoanBanner />
       <section className="flex flex-wrap items-center gap-2">
         {/* Desktop: one chip per type; mobile: a single compact select so the
             whole filter bar fits on one row. */}
@@ -314,45 +306,5 @@ function LoadMore({
     <div ref={ref} className="flex justify-center py-6">
       <div className="skeleton h-8 w-28 rounded-full" />
     </div>
-  );
-}
-
-/** Accent-tinted banner for items currently out on loan. */
-function LoanBanner() {
-  const { data } = useStats();
-  const loans = data?.loans ?? [];
-  if (loans.length === 0) return null;
-  const first = loans[0];
-  return (
-    <section
-      className="flex flex-wrap items-center gap-3 rounded-xl px-4 py-3 text-[13.5px]"
-      style={{
-        background: "color-mix(in oklch, var(--accent) 8%, transparent)",
-        border: "1px solid color-mix(in oklch, var(--accent) 25%, transparent)",
-      }}
-    >
-      <span className="h-2 w-2 flex-none rounded-full" style={{ background: "var(--accent)" }} />
-      <span className="min-w-0">
-        <strong>{first.title}</strong> is with {first.borrowed_by}
-        {first.loaned_date &&
-          ` since ${formatDate(first.loaned_date)}`}
-        {loans.length > 1 && ` · +${loans.length - 1} more on loan`}
-      </span>
-      <MarkReturned id={first.id} />
-    </section>
-  );
-}
-
-function MarkReturned({ id }: { id: string }) {
-  const update = useUpdateItem(id);
-  return (
-    <button
-      type="button"
-      className="ml-auto text-[12.5px] font-semibold text-accent"
-      disabled={update.isPending}
-      onClick={() => update.mutate({ returned_date: new Date().toISOString().slice(0, 10) })}
-    >
-      Mark returned
-    </button>
   );
 }

@@ -1,10 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Shelf from "../pages/Shelf";
 
-function mockFetch() {
+type Loan = { id: string; title: string; borrowed_by: string; loaned_date: string };
+
+function mockFetch(loans: Loan[] = []) {
   vi.stubGlobal(
     "fetch",
     vi.fn((input: RequestInfo | URL) => {
@@ -12,7 +14,7 @@ function mockFetch() {
       const body = url.includes("/api/items/platforms")
         ? { platforms: ["PC (Microsoft Windows)", "PlayStation 4", "Xbox One"] }
         : url.includes("/api/stats")
-          ? { tiles: {}, continue: [], loans: [], recent: [] }
+          ? { tiles: {}, continue: [], loans, recent: [] }
           : { items: [], total: 0 };
       return Promise.resolve({
         ok: true,
@@ -126,5 +128,27 @@ describe("Shelf mobile filter grouping", () => {
     await waitFor(() =>
       expect(itemCalls().some((url) => url.includes("status=backlog"))).toBe(true),
     );
+  });
+});
+
+describe("Shelf loans", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("keeps loans out of the library — Stats owns that panel", async () => {
+    mockFetch([{ id: "i1", title: "Dune", borrowed_by: "Sam", loaned_date: "2026-07-01" }]);
+    renderShelf("/");
+    await screen.findByRole("button", { name: /^filters/i });
+    // Give any stats-driven UI a chance to land before asserting it is absent.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+
+    expect(screen.queryByText(/is with Sam/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /mark returned/i })).not.toBeInTheDocument();
+    expect(
+      (fetch as ReturnType<typeof vi.fn>).mock.calls.some(([url]) =>
+        String(url).includes("/api/stats"),
+      ),
+    ).toBe(false);
   });
 });

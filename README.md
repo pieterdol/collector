@@ -262,7 +262,9 @@ browser ──:8080──▶ frontend (nginx)
   which records the acquisition and moves it to your backlog. On desktop that
   button appears over the poster on hover; on narrow screens the poster stays
   uncovered and you acquire from the item page ("Mark as owned").
-- **Loans**: lend to a name, mark returned — both logged.
+- **Loans**: lend to a name, mark returned — both logged. What is out shows
+  as a badge on the poster and is listed under Stats; the library itself
+  stays uncluttered.
 - **Theming**: dark ("graphite", the designed theme) and a derived light variant,
   OS-aware with a persisted toggle. All colors are CSS custom properties in
   `frontend/src/styles/tokens.css`; a new theme is one more
