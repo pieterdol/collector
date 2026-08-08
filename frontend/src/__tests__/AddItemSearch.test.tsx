@@ -52,6 +52,10 @@ function mockFetch(musicProvider = "musicbrainz") {
               platforms: [
                 { id: "p1", name: "Nintendo Switch", abbreviation: null },
                 { id: "p2", name: "PlayStation 4", abbreviation: "PS4" },
+                // Catalog rows arrive alphabetically — an A-name here proves
+                // the pinned block isn't just riding on IGDB's own order.
+                { id: "p3", name: "Atari 2600", abbreviation: null },
+                { id: "p4", name: "Xbox", abbreviation: "XBOX" },
               ],
             }
           : url.includes("type=music")
@@ -261,6 +265,23 @@ describe("game platform options", () => {
     const options = [...select.options].map((o) => o.text);
     expect(options).toContain("Nintendo Switch");
     expect(options).toContain("Xbox Series X|S");
+  });
+
+  it("pins the consoles you actually own above the alphabetical catalog", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: /game/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /manual/i }));
+    const select = await screen.findByLabelText<HTMLSelectElement>(/Platform/);
+    // The pinned block paints before the catalog request lands; wait for a
+    // catalog-only name, or the ordering below compares against nothing.
+    await screen.findByRole("option", { name: "Atari 2600" });
+    const options = [...select.options].map((o) => o.text);
+    // The original Xbox is one row among 200+; alphabetically it lands at the
+    // very bottom, which is no use when it's a console you collect for.
+    expect(options).toContain("Xbox");
+    expect(options.indexOf("Xbox")).toBeLessThan(options.indexOf("Atari 2600"));
+    // ...and it stays with the rest of the Xbox family, not above Windows.
+    expect(options.indexOf("Xbox")).toBeGreaterThan(options.indexOf("Xbox One"));
   });
 });
 

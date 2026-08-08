@@ -80,6 +80,10 @@ PLATFORMS = {
     "xboxseriesxs": "Xbox Series X|S",
     "xboxseriesx": "Xbox Series X|S",
     "xboxone": "Xbox One",
+    # Last, and bare on purpose: the original console's box prints just the
+    # wordmark. Every later Xbox qualifies it, and lookup is on the whole
+    # line, so "XBOX 360" misses here and stays a search term.
+    "xbox": "Xbox",
 }
 
 
