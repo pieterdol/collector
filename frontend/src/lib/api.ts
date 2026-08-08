@@ -20,6 +20,29 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * The request never reached the backend. Browsers word this uselessly for a
+ * self-hosted app ("Load failed" on Safari, "Failed to fetch" on Chrome), and
+ * the screens show `err.message` as-is — so say what actually went wrong. The
+ * usual cause is the phone being off the tailnet/LAN, with the installed PWA
+ * still painting its cached shell.
+ */
+export class NetworkError extends Error {
+  constructor(cause: unknown) {
+    super("Couldn't reach the server. Check your connection and try again.", { cause });
+  }
+}
+
+/** A rejected `fetch()` means no response at all; anything else is the caller's. */
+async function send(url: string | URL, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (err) {
+    if (err instanceof TypeError) throw new NetworkError(err);
+    throw err;
+  }
+}
+
 interface RequestOptions {
   method?: string;
   body?: unknown;
@@ -40,7 +63,7 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
   if (token) headers.Authorization = `Bearer ${token}`;
   if (options.body !== undefined) headers["Content-Type"] = "application/json";
 
-  const res = await fetch(url, {
+  const res = await send(url, {
     method: options.method ?? "GET",
     headers,
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
@@ -73,7 +96,7 @@ export async function upload<T>(path: string, file: File): Promise<T> {
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(path, { method: "POST", headers, body: form });
+  const res = await send(path, { method: "POST", headers, body: form });
   if (!res.ok) {
     let detail = res.statusText;
     try {

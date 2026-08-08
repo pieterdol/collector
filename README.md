@@ -182,6 +182,11 @@ browser ──:8080──▶ frontend (nginx)
   valid certificate — full scanning + installable PWA from anywhere,
   visible only to your tailnet. Alternatives: `adb reverse tcp:8080
   tcp:8080` (Android, USB), or any HTTPS reverse proxy.
+  *Signing in says "Couldn't reach the server"?* The installed PWA paints
+  its cached shell with no connection at all, so that message means the
+  phone can't reach the host — reconnect Tailscale (`tailscale status` on
+  the server lists the phone as offline) rather than hunting for a bad
+  password.
 - **Photo of the cover** (needs a vision backend — see *API keys*): the answer
   for discs and game boxes, which no public barcode catalog covers. Snap the
   front and **one call** reads every line printed on it — the title, the
