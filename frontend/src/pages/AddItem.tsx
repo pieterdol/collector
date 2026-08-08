@@ -72,6 +72,7 @@ const COMMON_PLATFORMS = [
   "PlayStation 4",
   "Xbox Series X|S",
   "Xbox One",
+  "Xbox 360",
   // IGDB calls the original console plain "Xbox", which buries it at the
   // bottom of a 200-row alphabetical catalog.
   "Xbox",

@@ -311,12 +311,14 @@ def test_prepare_image_uprights_a_sideways_photo():
         ("PlayStation®5", "PlayStation 5"),
         ("ps 4", "PlayStation 4"),
         ("SHIFT UP", None),
-        # The original console prints the bare wordmark. Every later Xbox
-        # qualifies it, so the bare key can't swallow them: an unmapped
-        # "XBOX 360" must stay a search term rather than resolve to Xbox.
+        # The original console prints the bare wordmark, later ones qualify
+        # it. Matching is per whole line, so the bare key can't swallow the
+        # qualified names — nor the publisher line printed on every Xbox box.
         ("XBOX", "Xbox"),
         ("Xbox®", "Xbox"),
-        ("XBOX 360", None),
+        ("XBOX 360", "Xbox 360"),
+        ("Xbox 360.", "Xbox 360"),
+        ("XBOX GAME STUDIOS", None),
     ],
 )
 def test_platform_from(line, expected):

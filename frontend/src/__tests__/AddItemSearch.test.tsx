@@ -279,9 +279,13 @@ describe("game platform options", () => {
     // The original Xbox is one row among 200+; alphabetically it lands at the
     // very bottom, which is no use when it's a console you collect for.
     expect(options).toContain("Xbox");
+    expect(options).toContain("Xbox 360");
     expect(options.indexOf("Xbox")).toBeLessThan(options.indexOf("Atari 2600"));
-    // ...and it stays with the rest of the Xbox family, not above Windows.
-    expect(options.indexOf("Xbox")).toBeGreaterThan(options.indexOf("Xbox One"));
+    expect(options.indexOf("Xbox 360")).toBeLessThan(options.indexOf("Atari 2600"));
+    // ...and they stay with the rest of the Xbox family, newest first,
+    // rather than jumping above Windows.
+    expect(options.indexOf("Xbox 360")).toBeGreaterThan(options.indexOf("Xbox One"));
+    expect(options.indexOf("Xbox")).toBeGreaterThan(options.indexOf("Xbox 360"));
   });
 });
 

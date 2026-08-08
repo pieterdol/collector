@@ -80,9 +80,11 @@ PLATFORMS = {
     "xboxseriesxs": "Xbox Series X|S",
     "xboxseriesx": "Xbox Series X|S",
     "xboxone": "Xbox One",
+    "xbox360": "Xbox 360",
     # Last, and bare on purpose: the original console's box prints just the
-    # wordmark. Every later Xbox qualifies it, and lookup is on the whole
-    # line, so "XBOX 360" misses here and stays a search term.
+    # wordmark. Every later Xbox qualifies it and lookup is on the whole
+    # line, so this key can't swallow them — nor "XBOX GAME STUDIOS", the
+    # publisher line printed on the boxes that do say plain "XBOX".
     "xbox": "Xbox",
 }
 
