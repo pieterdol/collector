@@ -2,6 +2,7 @@
 
 import { useNavigate } from "react-router-dom";
 import { formatDate } from "../lib/dates";
+import { useListOrigin } from "../lib/navigation";
 import type { Item, ItemStatus } from "../lib/types";
 import { STATUS_LABEL } from "../lib/types";
 import { CopiesIcon } from "./icons";
@@ -19,6 +20,7 @@ const STATUS_COLOR: Record<ItemStatus, string> = {
 
 export function ItemTable({ items }: { items: Item[] }) {
   const navigate = useNavigate();
+  const origin = useListOrigin();
   return (
     <section className="panel overflow-x-auto">
       <div className="min-w-[720px]">
@@ -36,7 +38,7 @@ export function ItemTable({ items }: { items: Item[] }) {
         {items.map((item) => (
           <div
             key={item.id}
-            onClick={() => navigate(`/items/${item.id}`)}
+            onClick={() => navigate(`/items/${item.id}`, { state: origin })}
             className={`grid ${COLUMNS} cursor-pointer items-center gap-3 border-b border-line/60 px-4.5 py-3 text-[13px] transition-colors last:border-b-0 hover:bg-raised/40`}
             style={{ paddingLeft: 18, paddingRight: 18 }}
           >

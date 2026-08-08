@@ -5,6 +5,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { EmptyState } from "../components/EmptyState";
 import { HeartIcon } from "../components/icons";
 import { coverSrc, describeItem } from "../components/PosterCard";
+import { useListOrigin } from "../lib/navigation";
 import { useItems } from "../lib/queries";
 import { TYPE_LABEL, type Item } from "../lib/types";
 import { groupByRelease, type ReleaseInfo } from "../lib/upcoming";
@@ -90,11 +91,12 @@ export default function Upcoming() {
 }
 
 function UpcomingRow({ item, info }: { item: Item; info: ReleaseInfo }) {
+  const origin = useListOrigin();
   const meta = describeItem(item);
   return (
     <Link
       to={`/items/${item.id}`}
-      state={{ from: "upcoming" }}
+      state={origin}
       className="flex items-center gap-3.5 border-b border-line px-4 py-3 no-underline transition-colors last:border-b-0 hover:bg-raised"
     >
       <div

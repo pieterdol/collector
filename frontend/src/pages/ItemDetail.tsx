@@ -69,11 +69,21 @@ export default function ItemDetail() {
 
 /** Items opened from the Upcoming page return there; wishlist items to
  * the wishlist; everything else to the library. */
+/** Which section a remembered list belongs to, for the button's label. */
+function sectionLabel(path: string): string {
+  if (path.startsWith("/wishlist")) return "Wishlist";
+  if (path.startsWith("/upcoming")) return "Upcoming";
+  return "Library";
+}
+
 function BackLink({ wishlist = false }: { wishlist?: boolean }) {
   const location = useLocation();
-  const fromUpcoming = (location.state as { from?: string } | null)?.from === "upcoming";
-  const [to, label] = fromUpcoming
-    ? ["/upcoming", "Upcoming"]
+  // The list this item was opened from, filters and all — the lists put their
+  // own URL here. Absent when the item was opened cold (deep link, barcode
+  // scan, a shared URL), and then its own section is the sensible landing.
+  const from = (location.state as { from?: string } | null)?.from;
+  const [to, label] = from?.startsWith("/")
+    ? [from, sectionLabel(from)]
     : wishlist
       ? ["/wishlist", "Wishlist"]
       : ["/", "Library"];
@@ -965,6 +975,9 @@ function RelinkDialog({ item, onClose }: { item: Item; onClose: () => void }) {
  * items — own platform, format, status, progress — but the library shows
  * only the front one, and this panel is where you say which that is. */
 function CopiesPanel({ item }: { item: Item }) {
+  // Hopping to a sibling copy keeps the list we came from, so the back
+  // button still lands on the filtered view rather than a bare library.
+  const { state } = useLocation();
   const { data } = useCopies(item.id);
   const front = useFrontCopy();
   const unbundle = useUnbundleCopy();
@@ -1020,6 +1033,7 @@ function CopiesPanel({ item }: { item: Item }) {
             <Link
               key={copy.id}
               to={`/items/${copy.id}`}
+              state={state}
               className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] no-underline text-inherit hover:text-accent"
             >
               <span className="font-semibold">{copyLabel(copy)}</span>

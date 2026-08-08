@@ -2,6 +2,7 @@
  * caption below (title, meta line, stars in accent). */
 
 import { Link } from "react-router-dom";
+import { useListOrigin } from "../lib/navigation";
 import type { Item, ItemStatus } from "../lib/types";
 import { STATUS_LABEL } from "../lib/types";
 import { CopiesIcon } from "./icons";
@@ -50,13 +51,14 @@ export function describeItem(item: Item): string {
 }
 
 export function PosterCard({ item }: { item: Item }) {
+  const origin = useListOrigin();
   const pct = progressPercent(item);
   const onLoan = Boolean(item.borrowed_by && !item.returned_date);
   // One card stands for every copy in the bundle (see api/items.list_items).
   const copies = item.bundle_count > 1 ? item.bundle_count : 0;
 
   return (
-    <Link to={`/items/${item.id}`} className="cardlink">
+    <Link to={`/items/${item.id}`} state={origin} className="cardlink">
       <div className="poster">
         {item.cover_path ? (
           <img src={coverSrc(item)!} alt="" loading="lazy" />

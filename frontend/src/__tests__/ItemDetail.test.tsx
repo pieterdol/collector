@@ -678,10 +678,25 @@ describe("ItemDetail back link", () => {
   });
 
   it("returns to Upcoming when the item was opened from the upcoming page", async () => {
-    renderDetail({ from: "upcoming" });
+    // The lists now hand over their own URL rather than a bare marker, so
+    // the label follows the path.
+    renderDetail({ from: "/upcoming" });
     const link = await screen.findByRole("link", { name: /upcoming/i });
     expect(link).toHaveAttribute("href", "/upcoming");
     expect(screen.queryByRole("link", { name: /library/i })).not.toBeInTheDocument();
+  });
+
+  it("returns to the list exactly as it was filtered", async () => {
+    // Filters live in the query string; dropping it is what reset them.
+    renderDetail({ from: "/?type=game&platform=Xbox+360&status=backlog" });
+    const link = await screen.findByRole("link", { name: /library/i });
+    expect(link).toHaveAttribute("href", "/?type=game&platform=Xbox+360&status=backlog");
+  });
+
+  it("keeps a filtered wishlist rather than the plain one", async () => {
+    renderDetail({ from: "/wishlist?type=movie" });
+    const link = await screen.findByRole("link", { name: /wishlist/i });
+    expect(link).toHaveAttribute("href", "/wishlist?type=movie");
   });
 });
 

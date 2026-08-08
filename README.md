@@ -158,6 +158,11 @@ browser ──:8080──▶ frontend (nginx)
   title matches, then creator matches, then description-only ones,
   whatever sort is active. The box clears with the **×** at its right edge
   (or Esc), which drops `?q=` and keeps every other filter.
+  Filters live in the URL, and opening an item carries that URL along, so
+  the **Library** button on the item page returns you to the list exactly
+  as you left it — same filters, same search, same sort. An item opened
+  cold (deep link, barcode scan) has no list to return to and falls back to
+  its own section.
 - **Barcode scanning** uses the camera (native `BarcodeDetector`, falls
   back to `@zxing/browser`). ISBNs auto-fill books, and sleeve barcodes
   (UPC/EAN) auto-fill records — the music catalogs index them, and a match

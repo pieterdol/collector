@@ -47,6 +47,11 @@ function renderCard(item: Item) {
   );
 }
 
+function FromSpy() {
+  const location = useLocation();
+  return <div data-testid="from">{(location.state as { from?: string } | null)?.from ?? ""}</div>;
+}
+
 describe("PosterCard", () => {
   it("links to the item detail page", () => {
     renderCard(base);
@@ -54,6 +59,18 @@ describe("PosterCard", () => {
       "href",
       "/items/11111111-1111-1111-1111-111111111111",
     );
+  });
+
+  it("carries the filtered list it was opened from", () => {
+    // The detail page reads this to send you back to the same view.
+    render(
+      <MemoryRouter initialEntries={["/?type=game&platform=Xbox+360"]}>
+        <PosterCard item={base} />
+        <FromSpy />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole("link"));
+    expect(screen.getByTestId("from")).toHaveTextContent("/?type=game&platform=Xbox+360");
   });
 
   it("shows the status badge on the cover", () => {

@@ -7,6 +7,7 @@ import { EmptyState } from "../components/EmptyState";
 import { coverSrc, describeItem } from "../components/PosterCard";
 import { PosterGridSkeleton } from "../components/Skeletons";
 import { formatDate } from "../lib/dates";
+import { useListOrigin } from "../lib/navigation";
 import { useItems } from "../lib/queries";
 import type { Item } from "../lib/types";
 
@@ -50,9 +51,10 @@ export default function Wishlist() {
 }
 
 function WishCard({ item, onAcquire }: { item: Item; onAcquire: () => void }) {
+  const origin = useListOrigin();
   return (
     <div className="group relative">
-      <Link to={`/items/${item.id}`} className="cardlink">
+      <Link to={`/items/${item.id}`} state={origin} className="cardlink">
         <div
           className="poster opacity-85 saturate-[0.8]"
           style={{ border: "1.5px dashed color-mix(in oklch, var(--accent) 50%, transparent)" }}
