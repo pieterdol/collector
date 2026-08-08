@@ -13,11 +13,24 @@ export function SearchBox() {
   const [params, setParams] = useSearchParams();
   const [value, setValue] = useState(params.get("q") ?? "");
   const inputRef = useRef<HTMLInputElement>(null);
+  // The last term we put in the URL ourselves. Our own write comes back as a
+  // params change one flush later, and adopting that echo overwrote whatever
+  // had been typed in between — a keystroke landing next to the debounce was
+  // simply lost ("Far Cry" arriving as "Fr Cry").
+  const ownWrite = useRef(params.get("q") ?? "");
 
-  useEffect(() => setValue(params.get("q") ?? ""), [params]);
+  // Follow the URL when something else changes it — back/forward, a filter
+  // link — but never when it is only our own search coming back.
+  useEffect(() => {
+    const term = params.get("q") ?? "";
+    if (term === ownWrite.current) return;
+    ownWrite.current = term;
+    setValue(term);
+  }, [params]);
 
   // Typing is debounced; every other filter in the URL is left alone.
   function commit(term: string) {
+    ownWrite.current = term;
     const next = new URLSearchParams(params);
     if (term) next.set("q", term);
     else next.delete("q");
