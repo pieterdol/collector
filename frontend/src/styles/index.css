@@ -382,6 +382,14 @@ body {
   }
 }
 
+/* An input that stands in for a big number while you edit it (progress on an
+   item page). Sized here rather than with a Tailwind text-* utility: .input is
+   unlayered and would outrank one. Last, so it also beats the touch rule
+   above — 22px is over the zoom threshold anyway. */
+.input-lg {
+  font-size: 22px;
+}
+
 /* Section heading inside panels */
 .paneltitle {
   font-family: var(--font-display);

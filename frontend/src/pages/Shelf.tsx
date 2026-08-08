@@ -82,7 +82,7 @@ export default function Shelf() {
           aria-label="Type"
           value={type}
           onChange={(e) => setParam("type", e.target.value)}
-          className="input hidden cursor-pointer appearance-none py-[7px] text-[12.5px] font-semibold text-body max-[820px]:block"
+          className="input hidden cursor-pointer appearance-none py-[7px] font-semibold text-body max-[820px]:block"
         >
           {TYPE_CHIPS.map((chip) => (
             <option key={chip.value} value={chip.value}>

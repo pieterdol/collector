@@ -437,7 +437,7 @@ function ProgressPanel({ item }: { item: Item }) {
         flush(); // typing a value is an explicit commit
       }}
       onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-      className="input w-24 px-2 py-0.5 font-display text-[22px] font-bold"
+      className="input input-lg w-24 px-2 py-0.5 font-display font-bold"
     />
   ) : (
     <button
@@ -507,7 +507,7 @@ function ProgressPanel({ item }: { item: Item }) {
                 flush(); // typing a value is an explicit commit
               }}
               onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-              className="input w-16 px-1 py-0.5 text-xs"
+              className="input w-16 px-1 py-0.5"
             />
           ) : (
             <button
@@ -534,7 +534,7 @@ function ProgressPanel({ item }: { item: Item }) {
                 if (value !== total) update.mutate({ progress_total: value });
               }}
               onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-              className="input w-16 px-1 py-0.5 text-xs"
+              className="input w-16 px-1 py-0.5"
             />
           ) : (
             <button
@@ -860,7 +860,7 @@ function DetailsPanel({ item }: { item: Item }) {
               },
             });
           }}
-          className="input w-auto cursor-pointer px-2 py-1 text-right text-[12.5px] font-medium"
+          className="input w-auto cursor-pointer px-2 py-1 text-right font-medium"
         />
       </div>
       )}
@@ -1269,7 +1269,7 @@ function MetaSelectRow({
         aria-label={label}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="input w-auto cursor-pointer appearance-none px-2 py-1 text-right text-[12.5px] font-medium"
+        className="input w-auto cursor-pointer appearance-none px-2 py-1 text-right font-medium"
       >
         <option value="">Choose…</option>
         {options.map((option) => (
@@ -1315,7 +1315,7 @@ function AuthorRow({ item }: { item: Item }) {
           placeholder="Who wrote it?"
           onBlur={(e) => save(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-          className="input min-w-0 flex-1 px-2 py-1 text-right text-[12.5px] font-medium"
+          className="input min-w-0 flex-1 px-2 py-1 text-right font-medium"
         />
       ) : (
         <button
@@ -1394,7 +1394,7 @@ function CoverEditor({ item }: { item: Item }) {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="…or paste an image URL"
-              className="input w-full px-2 py-1.5 text-[11.5px]"
+              className="input w-full px-2 py-1.5"
             />
             {url.trim() && (
               <button type="submit" className="btn btn-sm" disabled={busy}>

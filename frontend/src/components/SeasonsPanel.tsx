@@ -216,7 +216,7 @@ function SeasonOptions({
         value={season.ownership ?? ""}
         disabled={busy}
         onChange={(e) => onChange({ ownership: e.target.value || null })}
-        className="input w-auto cursor-pointer px-1.5 py-0.5 text-[11.5px]"
+        className="input w-auto cursor-pointer px-1.5 py-0.5"
       >
         <option value="">Not tracked</option>
         <option value="owned">Owned</option>
@@ -228,7 +228,7 @@ function SeasonOptions({
           value={season.format ?? ""}
           disabled={busy}
           onChange={(e) => onChange({ format: e.target.value || null })}
-          className="input w-auto cursor-pointer px-1.5 py-0.5 text-[11.5px]"
+          className="input w-auto cursor-pointer px-1.5 py-0.5"
         >
           <option value="">Format…</option>
           <option value="physical">physical</option>
@@ -241,7 +241,7 @@ function SeasonOptions({
           value={season.media ?? ""}
           disabled={busy}
           onChange={(e) => onChange({ media: e.target.value || null })}
-          className="input w-auto cursor-pointer px-1.5 py-0.5 text-[11.5px]"
+          className="input w-auto cursor-pointer px-1.5 py-0.5"
         >
           <option value="">Media…</option>
           {MOVIE_MEDIA.map((media) => (

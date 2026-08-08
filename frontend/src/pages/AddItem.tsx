@@ -356,7 +356,7 @@ function SearchMode({
             aria-label="Filter by platform"
             value={platform}
             onChange={(e) => onPlatform(e.target.value)}
-            className="input min-w-0 max-w-[190px] flex-none cursor-pointer appearance-none truncate text-[13px] font-semibold text-body max-[520px]:w-full max-[520px]:max-w-none"
+            className="input min-w-0 max-w-[190px] flex-none cursor-pointer appearance-none truncate font-semibold text-body max-[520px]:w-full max-[520px]:max-w-none"
           >
             <option value="">All platforms</option>
             {platformOptions.map((option) => (
