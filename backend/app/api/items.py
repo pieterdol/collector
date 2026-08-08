@@ -15,6 +15,7 @@ from app.core.seasons import create_seasons_from_metadata
 from app.core.security import get_current_user
 from app.db import get_db
 from app.domain.enums import EventType, ItemFormat, ItemStatus, ItemType
+from app.domain.platforms import names_one_platform
 from app.models import ActivityEvent, Item, ItemSeason, User
 from app.schemas.item import (
     AcquireIn,
@@ -46,7 +47,9 @@ def _link_platform(db: Session, item: Item) -> None:
     if item.type != "game":
         return
     name = item.meta.get("platform")
-    if not isinstance(name, str) or not name.strip():
+    # A release list would mint a platform row no other item can ever share;
+    # leave the FK as it is rather than invent one.
+    if not names_one_platform(name):
         return
     if item.platform_ref is not None and item.platform_ref.name.lower() == name.strip().lower():
         return

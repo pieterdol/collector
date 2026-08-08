@@ -57,6 +57,40 @@ def test_patching_platform_relinks(client):
     assert {p.name for p in platform_rows()} == {"Xbox One", "Xbox Series X|S"}
 
 
+def test_a_release_list_is_not_a_platform(client):
+    """IGDB reports every console a game shipped on as one comma-joined
+    string. Storing that verbatim invented a 'platform' named after five
+    consoles at once, which then sat in everyone's dropdown."""
+    headers = auth_headers(client)
+    item = create_item(
+        client, headers, type="game", title="Mass Effect Legendary Edition",
+        metadata={"platform": "Xbox Series X|S, PlayStation 4, PlayStation 5"},
+    )
+    assert item["platform"] is None
+    assert platform_rows() == []
+
+
+def test_a_real_platform_name_survives_the_guard(client):
+    """The guard keys on the separator, so names that merely look busy —
+    punctuation, parenthesised vendors — must still link."""
+    headers = auth_headers(client)
+    for name in ("Xbox Series X|S", "PC (Microsoft Windows)"):
+        create_item(client, headers, type="game", title=name, metadata={"platform": name})
+    assert {p.name for p in platform_rows()} == {"Xbox Series X|S", "PC (Microsoft Windows)"}
+
+
+def test_patching_in_a_release_list_leaves_the_link_alone(client):
+    headers = auth_headers(client)
+    item = create_item(client, headers, type="game", title="Wolfenstein",
+                       metadata={"platform": "Xbox One"})
+    client.patch(
+        f"/api/items/{item['id']}",
+        json={"metadata": {"platform": "Xbox One, PlayStation 4"}},
+        headers=headers,
+    )
+    assert [p.name for p in platform_rows()] == ["Xbox One"]
+
+
 def test_books_get_no_platform_link(client):
     headers = auth_headers(client)
     item = create_item(client, headers, type="book", title="Dune")

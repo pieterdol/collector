@@ -20,6 +20,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
 from app.domain.enums import ItemFormat, ItemStatus, ItemType, values
+from app.domain.platforms import names_one_platform
 
 
 def _check_in(column: str, allowed: list[str]) -> str:
@@ -100,7 +101,9 @@ class Item(Base):
         if self.platform_ref is not None:
             return self.platform_ref.name
         value = self.meta.get("platform")
-        return value if isinstance(value, str) else None
+        # Unlinked means nothing was picked — never show the release list a
+        # catalog left behind (see app/domain/platforms.py).
+        return value if names_one_platform(value) else None
 
     __table_args__ = (
         CheckConstraint(_check_in("type", values(ItemType)), name="ck_items_type"),

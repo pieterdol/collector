@@ -384,6 +384,33 @@ describe("confirm form", () => {
       "https://images.igdb.com/covers/t_cover_big/sekiro.jpg",
     );
   });
+
+  it("sends no platform at all when you skip the picker", async () => {
+    // The catalog's `platform` is every console the game shipped on, joined
+    // with commas. Passing that through made the backend mint a platform
+    // named after four consoles at once; the list belongs in released_on.
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: /game/i }));
+    const input = await screen.findByPlaceholderText(/Search IGDB/);
+    fireEvent.change(input, { target: { value: "Sekiro" } });
+    fireEvent.click(await screen.findByText("Sekiro: Shadows Die Twice"));
+    fireEvent.click(await screen.findByRole("button", { name: /Add to shelf/ }));
+
+    const posted = () =>
+      (fetch as ReturnType<typeof vi.fn>).mock.calls.find(
+        ([url, init]) =>
+          String(url).endsWith("/api/items") && (init as RequestInit)?.method === "POST",
+      );
+    await waitFor(() => expect(posted()).toBeDefined());
+    const sent = JSON.parse(String((posted()![1] as RequestInit).body));
+    expect(sent.metadata).not.toHaveProperty("platform");
+    expect(sent.metadata.released_on).toEqual([
+      "Google Stadia",
+      "PlayStation 4",
+      "PC (Microsoft Windows)",
+      "Xbox One",
+    ]);
+  });
 });
 
 describe("TV type", () => {

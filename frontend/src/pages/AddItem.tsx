@@ -676,7 +676,10 @@ function ConfirmForm({
       else delete metadata.media;
     } else {
       if (creator) metadata.developer = creator;
+      // Skipping the picker must not fall back to the catalog's value: that
+      // is every console the game shipped on, joined with commas.
       if (platform) metadata.platform = platform;
+      else delete metadata.platform;
       if (detectedPlatforms.length > 1) metadata.released_on = detectedPlatforms;
       if (storefront && format === "digital" && status !== "wishlist") {
         metadata.storefront = storefront;
